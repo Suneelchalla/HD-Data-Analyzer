@@ -1,0 +1,1492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HD Ticket Trend Tracker</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230F766E'/%3E%3Crect x='7' y='9' width='7' height='14' rx='2' fill='%235EEAD4'/%3E%3Crect x='18' y='9' width='7' height='14' rx='2' fill='%23A5B4FC'/%3E%3C/svg%3E">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="hd-store.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EEF1F4; --paper:#F6F8FA; --card:#FFFFFF;
+  --ink:#111A2B; --ink2:#3E4C63; --muted:#6B7A90; --faint:#9AA7B8; --line:#E3E8EE; --line2:#D2DAE3;
+  /* HD = teal, ENGG = indigo — the core duality */
+  --hd:#0F766E; --hd2:#14B8A6; --hd-soft:#D6F3EE; --hd-bg:#F0FBF9;
+  --engg:#5B57D8; --engg2:#8B87F0; --engg-soft:#E2E1FB; --engg-bg:#F3F3FE;
+  --amber:#B45309; --amber-soft:#FCE7C3; --amber-bg:#FEF7EC;
+  --rose:#BE1D42; --rose-soft:#FAD1DC; --rose-bg:#FDF0F3;
+  --slate:#334155;
+  --r:14px; --r2:18px;
+  --disp:'Space Grotesk',sans-serif; --sans:'Inter',-apple-system,sans-serif; --mono:'JetBrains Mono',monospace;
+  --sh:0 1px 2px rgba(16,24,40,.05),0 1px 3px rgba(16,24,40,.04);
+  --sh2:0 6px 18px rgba(16,24,40,.09),0 2px 6px rgba(16,24,40,.05);
+  --sh3:0 24px 60px rgba(16,24,40,.18);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{font-size:14px}
+body{background:var(--bg);font-family:var(--sans);color:var(--ink);-webkit-font-smoothing:antialiased;min-height:100vh}
+::selection{background:var(--hd);color:#fff}
+::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--line2);border-radius:9px}::-webkit-scrollbar-thumb:hover{background:var(--faint)}
+button{cursor:pointer;font-family:inherit;transition:all .18s}button:active{transform:translateY(1px)}
+a{color:var(--hd);text-decoration:none}a:hover{text-decoration:underline}
+input[type=file]{display:none}
+select,input[type=date]{outline:none;font-family:var(--sans);appearance:none}
+select{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%236B7A90' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center;padding-right:30px!important}
+h1,h2,h3,.disp{font-family:var(--disp)}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+@keyframes up{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+@keyframes pop{from{opacity:0;transform:scale(.97) translateY(8px)}to{opacity:1;transform:none}}
+@keyframes float1{0%,100%{transform:translateY(0)}50%{transform:translateY(-18px)}}
+@keyframes float2{0%,100%{transform:translateY(0) rotate(0)}50%{transform:translateY(14px) rotate(8deg)}}
+@keyframes grow{from{transform:scaleY(0)}to{transform:scaleY(1)}}
+@keyframes dash{from{stroke-dashoffset:var(--len)}to{stroke-dashoffset:var(--off)}}
+.up{animation:up .5s cubic-bezier(.22,1,.36,1) both}
+.d1{animation-delay:.05s}.d2{animation-delay:.1s}.d3{animation-delay:.16s}.d4{animation-delay:.22s}.d5{animation-delay:.28s}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r2);box-shadow:var(--sh)}
+.hidden{display:none!important}
+
+/* ── LANDING ── */
+.landing{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;overflow:hidden;background:
+  radial-gradient(1100px 600px at 15% -10%,#E4FBF6 0%,transparent 55%),
+  radial-gradient(1000px 700px at 100% 110%,#EEEDFD 0%,transparent 55%),
+  linear-gradient(160deg,#F6F8FA,#EEF1F4)}
+.deco{position:absolute;pointer-events:none;opacity:.55}
+.deco.b1{width:280px;height:280px;border-radius:60% 40% 55% 45%;background:linear-gradient(135deg,#5EEAD4,#0F766E);filter:blur(8px);top:-70px;left:-60px;animation:float1 9s ease-in-out infinite}
+.deco.b2{width:230px;height:230px;border-radius:50%;background:linear-gradient(135deg,#A5B4FC,#5B57D8);filter:blur(10px);bottom:-60px;right:-40px;animation:float2 11s ease-in-out infinite}
+.deco.ring{border:2px solid rgba(15,118,110,.15);border-radius:50%;background:none;filter:none;opacity:.7}
+.deco.r1{width:120px;height:120px;top:18%;right:16%;animation:float1 8s ease-in-out infinite}
+.deco.r2{width:70px;height:70px;bottom:20%;left:14%;border-color:rgba(91,87,216,.18);animation:float2 10s ease-in-out infinite}
+.landing-card{position:relative;z-index:2;width:100%;max-width:600px;margin:16px;text-align:center}
+.brand-mark{display:inline-flex;align-items:center;gap:11px;margin-bottom:20px}
+.brand-mark .bar{display:flex;gap:5px;align-items:flex-end;height:38px}
+.brand-mark .bar i{display:block;width:11px;border-radius:4px}
+.upload-panel{background:rgba(255,255,255,.72);backdrop-filter:blur(16px);border:1px solid #fff;border-radius:22px;padding:38px 34px;box-shadow:0 30px 70px rgba(16,24,40,.14)}
+.dz{border:2px dashed var(--line2);border-radius:16px;padding:30px 20px;transition:all .2s;background:var(--paper);cursor:pointer}
+.dz:hover,.dz.over{border-color:var(--hd);background:var(--hd-bg)}
+.btn-primary{background:linear-gradient(135deg,#0F766E,#12897E);color:#fff;border:none;padding:13px 34px;border-radius:11px;font-size:14px;font-weight:600;font-family:var(--disp);box-shadow:0 8px 22px rgba(15,118,110,.32)}
+.btn-primary:hover{box-shadow:0 10px 26px rgba(15,118,110,.4)}
+.hint-cols{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:16px}
+.hint-cols span{font-size:10.5px;color:var(--ink2);background:#fff;border:1px solid var(--line);padding:4px 9px;border-radius:20px;font-weight:500}
+
+/* ── HEADER ── */
+header.top{background:rgba(255,255,255,.9);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:90;padding:9px 26px;min-height:60px;display:flex;align-items:center;gap:11px;flex-wrap:wrap}
+.logo{display:flex;align-items:center;gap:9px}
+.logo .bar{display:flex;gap:3px;align-items:flex-end;height:22px}
+.logo .bar i{display:block;width:6px;border-radius:2px}
+.logo b{font-family:var(--disp);font-weight:700;font-size:15px;letter-spacing:-.3px}
+.divider{width:1px;height:30px;background:var(--line);margin:0 2px}
+.fsel{background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:7px 12px;font-size:12px;font-weight:500;color:var(--ink);cursor:pointer;transition:border-color .15s}
+.fsel:hover{border-color:var(--line2)}
+.fsel:focus{border-color:var(--hd);box-shadow:0 0 0 3px rgba(15,118,110,.12)}
+.flabel{font-size:9.5px;font-weight:700;color:var(--faint);text-transform:uppercase;letter-spacing:.7px;margin-right:-6px}
+.tabs{display:flex;background:var(--paper);border:1px solid var(--line);border-radius:11px;padding:3px;gap:2px}
+.tabs button{background:none;border:none;padding:7px 15px;border-radius:8px;font-size:12px;font-weight:600;color:var(--muted);font-family:var(--disp);display:flex;align-items:center;gap:7px}
+.tabs button.on{background:var(--ink);color:#fff}
+.tabs button .cnt{background:rgba(0,0,0,.07);padding:1px 7px;border-radius:10px;font-size:10px;font-family:var(--mono)}
+.tabs button.on .cnt{background:rgba(255,255,255,.18)}
+.ghost{background:var(--paper);border:1px solid var(--line);color:var(--ink2);padding:7px 13px;border-radius:9px;font-size:11.5px;font-weight:600}
+.ghost:hover{border-color:var(--line2)}
+
+/* ── DATE BAR ── */
+.datebar{background:#fff;border-bottom:1px solid var(--line);padding:9px 26px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;position:sticky;top:60px;z-index:89}
+.chip{padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--line);background:#fff;color:var(--ink2)}
+.chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.chip:hover:not(.on){border-color:var(--line2)}
+.dinput{border:1px solid var(--line);border-radius:8px;padding:5px 9px;font-size:11px;color:var(--ink);background:#fff}
+.dinput:focus{border-color:var(--hd)}
+
+main{max-width:1320px;margin:0 auto;padding:22px 26px 70px}
+
+/* ── SHARED ── */
+.eyebrow{font-size:10.5px;font-weight:700;color:var(--faint);text-transform:uppercase;letter-spacing:1.1px}
+.sec-title{font-size:14px;font-weight:600;font-family:var(--disp);letter-spacing:-.2px}
+.sub{font-size:11.5px;color:var(--muted)}
+.click{font-size:10.5px;color:var(--faint);font-weight:500}
+.grid{display:grid;gap:14px}
+.pad{padding:20px 22px}
+
+/* dual track */
+.track{display:flex;height:30px;border-radius:9px;overflow:hidden;background:var(--paper);border:1px solid var(--line)}
+.track .seg{display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;cursor:pointer;transition:filter .15s;min-width:0;white-space:nowrap}
+.track .seg:hover{filter:brightness(1.08)}
+.track .seg.hd{background:linear-gradient(120deg,#0F766E,#12897E)}
+.track .seg.engg{background:linear-gradient(120deg,#5B57D8,#6D69E0)}
+.track.mini{height:9px;border-radius:5px}
+.track.mini .seg{font-size:0}
+
+/* KPI */
+.kpi{padding:17px 19px;cursor:default;transition:box-shadow .2s,transform .15s;position:relative;overflow:hidden}
+.kpi.clk{cursor:pointer}
+.kpi.clk:hover{box-shadow:var(--sh2);transform:translateY(-2px)}
+.kpi .kv{font-size:29px;font-weight:700;font-family:var(--mono);letter-spacing:-1.5px;line-height:1}
+.kpi .kl{font-size:10px;color:var(--faint);text-transform:uppercase;letter-spacing:.6px;font-weight:700;margin-top:9px}
+.kpi .ks{font-size:11px;color:var(--muted);margin-top:5px}
+.kpi .tag{position:absolute;top:14px;right:16px;font-size:14px}
+
+/* ring */
+.ring-wrap{position:relative;display:inline-flex;align-items:center;justify-content:center}
+.ring-wrap .ctr{position:absolute;text-align:center}
+
+/* tables */
+table{width:100%;border-collapse:collapse;font-size:12px}
+thead th{padding:10px 12px;text-align:left;font-size:10px;font-weight:700;color:var(--faint);text-transform:uppercase;letter-spacing:.6px;border-bottom:2px solid var(--line);background:var(--paper);position:sticky;top:0;z-index:2;white-space:nowrap;cursor:pointer;user-select:none}
+thead th.static{cursor:default}
+tbody td{padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:middle}
+tbody tr.rowlink{cursor:pointer;transition:background .12s}
+tbody tr.rowlink:hover{background:var(--hd-bg)}
+.jkey{font-family:var(--mono);font-weight:700;font-size:11.5px;color:var(--hd)}
+.badge{padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;white-space:nowrap;display:inline-block}
+.badge.hd{background:var(--hd-soft);color:var(--hd)}
+.badge.engg{background:var(--engg-soft);color:var(--engg)}
+.pill{padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600;background:var(--paper);color:var(--ink2);border:1px solid var(--line)}
+.trunc{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tag-miss{background:var(--rose-bg);color:var(--rose);border:1px solid var(--rose-soft);padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700}
+
+/* bars list */
+.barrow{display:flex;align-items:center;gap:11px;margin-bottom:11px;cursor:pointer;padding:2px 0}
+.barrow:hover .lbl{color:var(--ink)}
+.barrow .lbl{font-size:11px;color:var(--ink2);min-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:color .15s}
+.barrow .track2{flex:1;height:20px;border-radius:6px;background:var(--paper);overflow:hidden;display:flex}
+.barrow .fillhd{background:linear-gradient(90deg,#0F766E,#2AA79A);height:100%}
+.barrow .fillengg{background:linear-gradient(90deg,#5B57D8,#8B87F0);height:100%}
+.barrow .num{font-size:11px;color:var(--muted);font-family:var(--mono);min-width:78px;text-align:right}
+
+/* month cards (trend) */
+.mcard{border:1px solid var(--line);border-radius:14px;padding:16px 18px;background:#fff;transition:box-shadow .2s}
+.mcard:hover{box-shadow:var(--sh2)}
+.mcard .mtop{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:4px}
+.mcard .mmon{font-family:var(--disp);font-weight:700;font-size:16px}
+.mcard .msent{font-size:12px;color:var(--ink2);line-height:1.55;margin-bottom:12px}
+.mcard .msent b.hd{color:var(--hd)} .mcard .msent b.eg{color:var(--engg)}
+
+/* legend */
+.legend{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.legend .li{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--ink2);font-weight:500}
+.legend .sw{width:11px;height:11px;border-radius:3px}
+
+/* grouped monthly bars */
+.mbars{display:flex;align-items:flex-end;gap:10px;height:180px;padding:0 4px}
+.mbars .col{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px}
+.mbars .pair{display:flex;gap:4px;align-items:flex-end;height:150px;width:100%}
+.mbars .bar{flex:1;border-radius:5px 5px 0 0;min-height:4px;transition:height .5s cubic-bezier(.22,1,.36,1);cursor:pointer;position:relative;transform-origin:bottom;animation:grow .6s cubic-bezier(.22,1,.36,1) both}
+.mbars .bar:hover{filter:brightness(1.08)}
+.mbars .bar.hd{background:linear-gradient(180deg,#2AA79A,#0F766E)}
+.mbars .bar.engg{background:linear-gradient(180deg,#8B87F0,#5B57D8)}
+.mbars .bar .v{position:absolute;top:-16px;left:0;right:0;text-align:center;font-size:9.5px;font-weight:700;color:var(--ink2);font-family:var(--mono)}
+.mbars .mx{font-size:10px;color:var(--muted);font-weight:600;white-space:nowrap}
+
+/* line chart */
+.linechart{width:100%;height:230px;position:relative}
+.lc-dot{cursor:pointer;transition:r .12s}
+.lc-dot:hover{r:7}
+.lc-tip{position:absolute;background:var(--ink);color:#fff;padding:6px 10px;border-radius:8px;font-size:11px;pointer-events:none;opacity:0;transition:opacity .12s;white-space:nowrap;z-index:5;transform:translate(-50%,-130%)}
+.lc-tip .mono{font-size:11px}
+
+/* PIVOTS */
+.pivnav{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:16px}
+.pivnav button{background:#fff;border:1px solid var(--line);color:var(--ink2);padding:8px 14px;border-radius:9px;font-size:11.5px;font-weight:600;font-family:var(--disp)}
+.pivnav button.on{background:var(--hd);color:#fff;border-color:var(--hd)}
+.pivnav button:hover:not(.on){border-color:var(--line2)}
+.filtchip{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:600;color:var(--ink2);background:var(--paper);border:1px solid var(--line);padding:4px 10px;border-radius:20px}
+.filtchip b{color:var(--hd)}
+.ptable{width:100%;border-collapse:collapse;font-size:12px;font-variant-numeric:tabular-nums}
+.ptable th{background:var(--slate);color:#fff;padding:9px 12px;text-align:right;font-size:10.5px;font-weight:600;white-space:nowrap;border:1px solid #26303f;font-family:var(--sans)}
+.ptable th.rh{text-align:left}
+.ptable td{padding:8px 12px;text-align:right;border:1px solid var(--line);white-space:nowrap}
+.ptable td.rl{text-align:left;font-weight:600;color:var(--ink)}
+.ptable td.val{font-family:var(--mono);cursor:pointer;transition:background .12s}
+.ptable td.val:hover{background:var(--hd-bg)}
+.ptable td.val.zero{color:var(--faint);cursor:default}
+.ptable td.val.zero:hover{background:none}
+.ptable td.tot{font-family:var(--mono);font-weight:700;background:var(--paper)}
+.ptable tr.grand td{font-weight:700;background:var(--ink);color:#fff;border-color:#26303f}
+.ptable tr.grand td.val{color:#fff;cursor:pointer}
+.ptable tr.grand td.val:hover{background:#26303f}
+/* nested */
+.ptable tr.g1 td.rl{background:var(--hd-bg)} .ptable tr.g2 td.rl{background:var(--engg-bg)} .ptable tr.g0 td.rl{background:var(--paper)}
+.ptable tr.grouphdr td{font-weight:700;background:#EAEFF4;color:var(--ink);border-top:2px solid var(--line2)}
+.ptable tr.solvedhdr td.rl{padding-left:26px;font-weight:600;color:var(--ink2)}
+.ptable tr.svmrow td.rl{padding-left:44px;font-weight:500;color:var(--ink2)}
+.ptable .bhd{color:var(--hd)} .ptable .beg{color:var(--engg)}
+.pivscroll{overflow:auto;max-height:600px;border:1px solid var(--line);border-radius:12px}
+.pivnote{font-size:11px;color:var(--muted);margin-top:10px;line-height:1.6}
+.pivnote b{color:var(--ink2)}
+
+/* WEEK ON WEEK */
+.stackwrap{display:flex;align-items:flex-end;gap:10px;height:250px;padding:0 4px;overflow-x:auto}
+.stackwrap .col{flex:1;min-width:44px;max-width:120px;display:flex;flex-direction:column;align-items:center;gap:6px;justify-content:flex-end}
+.stackwrap .stack{width:100%;max-width:66px;display:flex;flex-direction:column;justify-content:flex-end;border-radius:7px 7px 0 0;overflow:hidden;box-shadow:0 1px 3px rgba(16,24,40,.12)}
+.stackwrap .stack .seg{cursor:pointer;transition:filter .15s;min-height:5px;display:flex;align-items:center;justify-content:center}
+.stackwrap .stack .seg:hover{filter:brightness(1.12)}
+.stackwrap .stack .seg .sv{font-size:11px;font-weight:700;color:#fff;font-family:var(--mono)}
+.stackwrap .stack .seg.hd{background:linear-gradient(180deg,#2AA79A,#0F766E)}
+.stackwrap .stack .seg.engg{background:linear-gradient(180deg,#8B87F0,#5B57D8)}
+.stackwrap .tot{font-size:11px;font-weight:700;font-family:var(--mono);color:var(--ink)}
+.stackwrap .wx{font-size:9.5px;color:var(--muted);font-weight:600;white-space:nowrap;text-align:center;line-height:1.35}
+.dchip{font-family:var(--mono);font-weight:700;font-size:11px;padding:2px 7px;border-radius:6px;display:inline-block}
+.dchip.up{color:var(--hd);background:var(--hd-bg)} .dchip.down{color:var(--rose);background:var(--rose-bg)} .dchip.flat{color:var(--muted);background:var(--paper)}
+
+/* OBSERVATIONS (rule-based, computed from the numbers) */
+.insight{margin-top:14px;background:var(--paper);border:1px solid var(--line);border-left:3px solid var(--hd);border-radius:10px;padding:11px 14px 12px;font-size:12px;color:var(--ink2);line-height:1.6}
+.insight .ih{font-weight:700;color:var(--ink);font-family:var(--disp);font-size:10px;text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.insight ul{margin:0;padding-left:16px}
+.insight li{margin:3px 0}
+.insight b{color:var(--ink)}
+.insight b.hd{color:var(--hd)} .insight b.eg{color:var(--engg)} .insight b.up{color:var(--hd)} .insight b.dn{color:var(--rose)}
+
+/* MODAL */
+.overlay{position:fixed;inset:0;background:rgba(17,26,43,.42);backdrop-filter:blur(3px);z-index:200;display:flex;align-items:center;justify-content:center;padding:22px;animation:up .2s}
+.modal{background:#fff;border-radius:20px;box-shadow:var(--sh3);width:100%;max-width:1120px;max-height:86vh;display:flex;flex-direction:column;overflow:hidden;animation:pop .28s cubic-bezier(.22,1,.36,1)}
+.modal .mh{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:13px}
+.modal .mh .ic{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.modal .mh .mt{font-family:var(--disp);font-weight:700;font-size:15px}
+.modal .mh .mc{font-size:11.5px;color:var(--muted);margin-top:2px}
+.modal .mh .x{margin-left:auto;width:34px;height:34px;border-radius:9px;border:1px solid var(--line);background:var(--paper);color:var(--muted);font-size:15px}
+.modal .mb{flex:1;overflow:auto}
+.modal .mfoot{padding:9px 22px;border-top:1px solid var(--line);display:flex;align-items:center;gap:10px;font-size:11px;color:var(--muted)}
+.empty{padding:48px;text-align:center;color:var(--faint);font-size:13px}
+
+.footer{margin-top:34px;text-align:center;color:var(--faint);font-size:11px;line-height:1.9}
+.footer b{color:var(--muted);font-weight:600}
+@media(max-width:820px){
+  .datebar,header.top{padding-left:14px;padding-right:14px}
+  main{padding:18px 14px 60px}
+  .tabs button span.lbl{display:none}
+}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+/* ═══════════════════════════════ CONFIG ═══════════════════════════════ */
+var JIRA = "https://svmhelpdesk.atlassian.net/browse/";
+
+/* SVM In Charge → Group mapping (matched on the incharge person) */
+var GROUP_MAP = {
+  "muthuraj v":"Group 1","manikandan v":"Group 1","naveen n":"Group 1","vijay j":"Group 1","ramkumar m":"Group 1","lenin b premnath":"Group 1",
+  "sentamil selvan":"Group 2","thennarasu s":"Group 2","jayasree b":"Group 2","balamurugan r":"Group 2","alaudeen m":"Group 2","vignesh r":"Group 2"
+};
+var GROUP_MEMBERS = {
+  "Group 1":"Exports (Muthuraj) · Imports (Manikandan) · Operations (Naveen N) · Ecom (Vijay) · PNC (Ramkumar/Lenin)",
+  "Group 2":"CMR (Sentamil) · NFR (Thennarasu) · Cost (Jayasree) · EMS (Balamurugan) · VSS (Alaudeen) · EDI (Vignesh)",
+  "Others":"All remaining SVM In Charge (and unassigned)"
+};
+var GROUP_ORDER = ["Group 1","Group 2","Others"];
+function normName(s){ return String(s||"").toLowerCase().replace(/[.]/g," ").replace(/\s+/g," ").trim(); }
+function groupOf(svm){ if(!svm) return "Others"; return GROUP_MAP[normName(svm)] || "Others"; }
+var MONTHS_ORDER = []; // filled from data
+var RAW = [];          // normalized tickets
+var FILENAME = "";
+
+/* global filter + view state */
+var S = {
+  tab:"perf",
+  svm:"", cw:"", rc:"", issue:"",     // global filters
+  from:"", to:"", dlabel:"All time",
+  sortCol:"total", sortDir:"desc",
+  // trend tab local controls
+  tRc:"__CLAR__", tStatus:"Closed",
+  pivot:"hdworker",
+  weekA:"", weekB:""
+};
+
+/* ═══════════════════════════════ HELPERS ═══════════════════════════════ */
+function blank(v){ return v===null||v===undefined||String(v).trim()===""||String(v).trim().toLowerCase()==="nan"; }
+function toDate(v){
+  if(v instanceof Date) return isNaN(v)?null:v;
+  if(blank(v)) return null;
+  var d=new Date(v); return isNaN(d)?null:d;
+}
+function mKey(d){ return d? d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0") : null; }
+function mLabel(k){ if(!k) return "—"; var p=k.split("-"); var d=new Date(+p[0],+p[1]-1,1); return d.toLocaleDateString("en-GB",{month:"short",year:"2-digit"}); }
+function fdate(d){ return d? d.toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"2-digit"}) : "—"; }
+function pct(n,d){ return d>0? Math.round(n/d*100) : 0; }
+function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function el(id){ return document.getElementById(id); }
+
+/* month bucket for a ticket = resolved month if present else created month */
+function bucketMonth(t){ return mKey(t.resolved) || mKey(t.created); }
+
+/* ── ISO week helpers ── */
+function isoWeek(d){
+  var date=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+  var day=date.getUTCDay()||7; date.setUTCDate(date.getUTCDate()+4-day);
+  var ys=new Date(Date.UTC(date.getUTCFullYear(),0,1));
+  var wk=Math.ceil((((date-ys)/86400000)+1)/7);
+  return {year:date.getUTCFullYear(), week:wk};
+}
+function isoWeekStart(year,week){
+  var s=new Date(Date.UTC(year,0,1+(week-1)*7)); var dow=s.getUTCDay();
+  if(dow<=4) s.setUTCDate(s.getUTCDate()-s.getUTCDay()+1); else s.setUTCDate(s.getUTCDate()+8-s.getUTCDay());
+  return s;
+}
+function weekLabel(key){ return "W"+key.slice(6); }
+function weekKeyLabel(d){ var iw=isoWeek(d); return "W"+String(iw.week).padStart(2,"0"); }
+function weekDates(year,week){
+  var s=isoWeekStart(year,week), e=new Date(s); e.setUTCDate(s.getUTCDate()+6);
+  var day=function(d){return d.getUTCDate();}, mon=function(d){return d.toLocaleDateString("en-GB",{month:"short",timeZone:"UTC"});};
+  return s.getUTCMonth()===e.getUTCMonth() ? day(s)+"–"+day(e)+" "+mon(s) : day(s)+" "+mon(s)+"–"+day(e)+" "+mon(e);
+}
+/* resolved-date pool for week analysis: dimension filters + date range on resolved */
+function weekPool(){
+  return RAW.filter(function(t){
+    if(!t.resolved) return false;
+    if(S.from && t.resolved < new Date(S.from+"T00:00:00")) return false;
+    if(S.to && t.resolved > new Date(S.to+"T23:59:59")) return false;
+    if(S.svm && t.svm!==S.svm) return false;
+    if(S.cw && t.currentWorker!==S.cw) return false;
+    if(S.rc && t.rc!==S.rc) return false;
+    if(S.issue && t.issue!==S.issue) return false;
+    return true;
+  });
+}
+
+/* ═══════════════════════════════ PARSE ═══════════════════════════════ */
+function readFile(file){
+  return new Promise(function(res,rej){
+    var r=new FileReader();
+    r.onload=function(e){
+      try{
+        var wb=XLSX.read(e.target.result,{type:"array",cellDates:true});
+        var sn=wb.SheetNames.find(function(s){return s.toLowerCase().indexOf("jira issues")>-1;})
+          || wb.SheetNames.find(function(s){return s.toLowerCase().indexOf("issue")>-1;})
+          || wb.SheetNames[1] || wb.SheetNames[0];
+        var rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{defval:""});
+        res(rows);
+      }catch(err){ rej(err); }
+    };
+    r.onerror=rej;
+    r.readAsArrayBuffer(file);
+  });
+}
+function normalize(rows){
+  if(!rows.length) return [];
+  // case-insensitive header resolver
+  var keymap={};
+  Object.keys(rows[0]).forEach(function(k){ keymap[k.trim().toLowerCase()]=k; });
+  function pick(row){ for(var i=1;i<arguments.length;i++){ var kk=keymap[arguments[i]]; if(kk!==undefined) return row[kk]; } return ""; }
+  return rows.map(function(row){
+    var solved=String(pick(row,"solved by")||"").trim().toUpperCase();
+    var linked=pick(row,"linked issues");
+    var isHD;
+    if(solved==="HD") isHD=true;
+    else if(solved==="ENGG"||solved==="ENG"||solved==="ENGINEERING") isHD=false;
+    else isHD=blank(linked); // fallback: no linked ticket => HD
+    var svmv=String(pick(row,"svm in charge")||"").trim();
+    return {
+      key:String(pick(row,"key")||"").trim(),
+      summary:String(pick(row,"summary")||""),
+      svm:svmv,
+      group:groupOf(svmv),
+      issue:String(pick(row,"issue type")||"").trim(),
+      rc:String(pick(row,"root cause")||"").trim(),
+      status:String(pick(row,"status")||"").trim(),
+      components:String(pick(row,"components")||"").trim(),
+      linked:blank(linked)?"":String(linked).trim(),
+      solvedRaw:solved,
+      isHD:isHD,
+      created:toDate(pick(row,"created")),
+      resolved:toDate(pick(row,"resolved")),
+      project:String(pick(row,"project")||"").trim(),
+      priority:String(pick(row,"priority")||"").trim(),
+      currentWorker:String(pick(row,"current worker")||"").trim(),
+      typeOfFix:String(pick(row,"type of fix")||"").trim()
+    };
+  });
+}
+
+/* ═══════════════════════════════ FILTERING ═══════════════════════════════ */
+function inRange(t){
+  if(!S.from && !S.to) return true;
+  var d=t.created; if(!d) return false;
+  if(S.from && d < new Date(S.from+"T00:00:00")) return false;
+  if(S.to && d > new Date(S.to+"T23:59:59")) return false;
+  return true;
+}
+function filtered(){
+  return RAW.filter(function(t){
+    if(!inRange(t)) return false;
+    if(S.svm && t.svm!==S.svm) return false;
+    if(S.cw && t.currentWorker!==S.cw) return false;
+    if(S.rc && t.rc!==S.rc) return false;
+    if(S.issue && t.issue!==S.issue) return false;
+    return true;
+  });
+}
+function isClar(rc){ return String(rc).toLowerCase().indexOf("clarification")>-1; }
+
+/* ── rule-based observations (no AI) ── */
+function note(items){
+  items=(items||[]).filter(Boolean);
+  if(!items.length) return "";
+  return '<div class="insight"><div class="ih">📝 Observations</div>'+
+    (items.length===1?'<div>'+items[0]+'</div>':'<ul>'+items.map(function(x){return '<li>'+x+'</li>';}).join("")+'</ul>')+'</div>';
+}
+function cnt(tickets,keyFn){ var m={}; tickets.forEach(function(t){ var k=keyFn(t); if(k==null)return; m[k]=(m[k]||0)+1; }); return m; }
+function topKey(m,skipBlank){ var best=null; Object.keys(m).forEach(function(k){ if(skipBlank&&k==="(blank)")return; if(best===null||m[k]>m[best])best=k; }); return best; }
+function arrow(d){ return d>0?"▲":(d<0?"▼":"→"); }
+function hdSentence(tix){ var hd=tix.filter(function(t){return t.isHD;}).length; var eg=tix.length-hd;
+  return 'Of <b>'+tix.length.toLocaleString()+'</b> tickets, HD resolved <b class="hd">'+hd.toLocaleString()+' ('+pct(hd,tix.length)+'%)</b> and Engg <b class="eg">'+eg.toLocaleString()+' ('+pct(eg,tix.length)+'%)</b>.'; }
+function bestWorstHD(tix,minN){ // returns {best,worst} worker HD share among those with >=minN, skipping blank
+  var s={}; tix.forEach(function(t){var w=t.currentWorker||"(blank)"; if(w==="(blank)")return; if(!s[w])s[w]={t:0,hd:0}; s[w].t++; if(t.isHD)s[w].hd++;});
+  var best=null,worst=null; Object.keys(s).forEach(function(w){ if(s[w].t<minN)return; s[w].p=Math.round(s[w].hd/s[w].t*100);
+    if(best===null||s[w].p>s[best].p)best=w; if(worst===null||s[w].p<s[worst].p)worst=w; });
+  return {s:s,best:best,worst:worst};
+}
+
+/* ═══════════════════════════════ MODAL ═══════════════════════════════ */
+function openModal(title,icon,color,tickets){
+  var rows=tickets.slice().sort(function(a,b){
+    var da=(a.resolved||a.created||0), db=(b.resolved||b.created||0);
+    return db-da;
+  });
+  var body=rows.map(function(t){
+    return '<tr>'+
+      '<td style="white-space:nowrap"><a class="jkey" href="'+JIRA+encodeURIComponent(t.key)+'" target="_blank" rel="noreferrer">'+esc(t.key)+'</a></td>'+
+      '<td class="trunc" title="'+esc(t.summary)+'" style="color:var(--ink2)">'+esc(t.summary)+'</td>'+
+      '<td><span class="badge '+(t.isHD?'hd':'engg')+'">'+(t.isHD?'HD':'ENGG')+'</span></td>'+
+      '<td style="color:var(--ink2);white-space:nowrap">'+esc(t.svm||"—")+'</td>'+
+      '<td style="color:var(--ink2);white-space:nowrap">'+esc(t.currentWorker||"—")+'</td>'+
+      '<td><span class="pill">'+esc(t.rc||"—")+'</span></td>'+
+      '<td style="color:var(--muted);font-size:11px;white-space:nowrap">'+esc(t.issue||"—")+'</td>'+
+      '<td style="white-space:nowrap">'+(t.linked?'<a class="jkey" style="color:var(--engg)" href="'+JIRA+encodeURIComponent(t.linked.split(";")[0])+'" target="_blank" rel="noreferrer">'+esc(t.linked.split(";")[0])+'</a>':'<span style="color:var(--faint)">—</span>')+'</td>'+
+      '<td style="color:var(--muted);font-size:11px;white-space:nowrap">'+esc(t.status||"—")+'</td>'+
+      '<td class="mono" style="color:var(--muted);font-size:11px;white-space:nowrap">'+fdate(t.resolved||t.created)+'</td>'+
+    '</tr>';
+  }).join("");
+  var html=''+
+  '<div class="overlay" id="ov">'+
+    '<div class="modal">'+
+      '<div class="mh">'+
+        '<div class="ic" style="background:'+color+'1a;color:'+color+'">'+icon+'</div>'+
+        '<div><div class="mt">'+esc(title)+'</div><div class="mc">'+rows.length+' ticket'+(rows.length!==1?'s':'')+' · click a key to open in Jira</div></div>'+
+        '<button class="x" id="mx">✕</button>'+
+      '</div>'+
+      '<div class="mb">'+
+        (rows.length? '<table><thead><tr>'+
+          '<th class="static">Key</th><th class="static">Summary</th><th class="static">Solved</th><th class="static">SVM In Charge</th><th class="static">Current Worker</th><th class="static">Root Cause</th><th class="static">Type</th><th class="static">Linked</th><th class="static">Status</th><th class="static">Date</th>'+
+          '</tr></thead><tbody>'+body+'</tbody></table>' : '<div class="empty">No tickets match this selection.</div>')+
+      '</div>'+
+      '<div class="mfoot"><span>Showing all '+rows.length+' tickets</span>'+
+        '<button class="ghost" style="margin-left:auto" id="mcsv">Export CSV</button></div>'+
+    '</div>'+
+  '</div>';
+  var d=document.createElement("div"); d.innerHTML=html; document.body.appendChild(d.firstChild);
+  var ov=el("ov");
+  ov.addEventListener("click",function(e){ if(e.target===ov) closeModal(); });
+  el("mx").onclick=closeModal;
+  el("mcsv").onclick=function(){ exportCSV(rows,(title||"tickets").replace(/[^\w]+/g,"-").toLowerCase()); };
+}
+function closeModal(){ var ov=el("ov"); if(ov) ov.remove(); }
+document.addEventListener("keydown",function(e){ if(e.key==="Escape") closeModal(); });
+
+function exportCSV(rows,name){
+  var cols=["Key","Summary","Solved By","SVM In Charge","Current Worker","Root Cause","Issue Type","Status","Linked Issues","Created","Resolved"];
+  var lines=[cols.join(",")];
+  rows.forEach(function(t){
+    var r=[t.key,'"'+String(t.summary).replace(/"/g,'""')+'"',t.isHD?"HD":"ENGG",t.svm,t.currentWorker,t.rc,t.issue,t.status,t.linked,fdate(t.created),fdate(t.resolved)];
+    lines.push(r.join(","));
+  });
+  var blob=new Blob([lines.join("\n")],{type:"text/csv"});
+  var url=URL.createObjectURL(blob); var a=document.createElement("a");
+  a.href=url; a.download=(name||"tickets")+".csv"; a.click(); URL.revokeObjectURL(url);
+}
+
+/* ═══════════════════════════════ SVG RING ═══════════════════════════════ */
+function ring(pctVal,size,sw,color,inner){
+  var r=(size-sw)/2, c=2*Math.PI*r, off=c-(Math.min(pctVal,100)/100)*c;
+  return '<div class="ring-wrap" style="width:'+size+'px;height:'+size+'px">'+
+    '<svg width="'+size+'" height="'+size+'" style="transform:rotate(-90deg)">'+
+      '<circle cx="'+size/2+'" cy="'+size/2+'" r="'+r+'" fill="none" stroke="var(--line)" stroke-width="'+sw+'"/>'+
+      '<circle cx="'+size/2+'" cy="'+size/2+'" r="'+r+'" fill="none" stroke="'+color+'" stroke-width="'+sw+'" stroke-linecap="round" stroke-dasharray="'+c+'" stroke-dashoffset="'+off+'" style="transition:stroke-dashoffset 1s cubic-bezier(.22,1,.36,1)"/>'+
+    '</svg><div class="ctr">'+inner+'</div></div>';
+}
+
+/* ═══════════════════════════════ RENDER: shell ═══════════════════════════════ */
+function bars(cols){ // small logo bars markup
+  return '<span class="bar">'+cols+'</span>';
+}
+function renderShell(){
+  var f=filtered();
+  var svmList=[...new Set(RAW.map(function(t){return t.svm;}).filter(Boolean))].sort();
+  var cwList=[...new Set(RAW.map(function(t){return t.currentWorker;}).filter(Boolean))].sort();
+  var rcList=[...new Set(RAW.map(function(t){return t.rc;}).filter(Boolean))].sort();
+  var issueList=[...new Set(RAW.map(function(t){return t.issue;}).filter(Boolean))].sort();
+  var exCount=RAW.filter(function(t){return !t.components||!t.svm||!t.rc;}).length;
+
+  var app=el("app");
+  app.innerHTML=''+
+  '<header class="top">'+
+    '<div class="logo"><span class="bar" style="display:flex;gap:3px;align-items:flex-end;height:22px">'+
+      '<i style="height:14px;background:var(--hd)"></i><i style="height:22px;background:var(--hd2)"></i><i style="height:11px;background:var(--engg2)"></i><i style="height:18px;background:var(--engg)"></i>'+
+    '</span><b>HD Trend Tracker</b></div>'+
+    '<div class="divider"></div>'+
+    '<span class="flabel">SVM</span>'+
+    '<select class="fsel" id="fsvm" style="min-width:135px"><option value="">All SVM In Charge</option>'+svmList.map(function(s){return '<option '+(S.svm===s?'selected':'')+' value="'+esc(s)+'">'+esc(s)+'</option>';}).join("")+'</select>'+
+    '<span class="flabel">Worker</span>'+
+    '<select class="fsel" id="fcw" style="min-width:135px"><option value="">All current workers</option>'+cwList.map(function(s){return '<option '+(S.cw===s?'selected':'')+' value="'+esc(s)+'">'+esc(s)+'</option>';}).join("")+'</select>'+
+    '<span class="flabel">Root cause</span>'+
+    '<select class="fsel" id="frc" style="min-width:135px"><option value="">All root causes</option>'+rcList.map(function(s){return '<option '+(S.rc===s?'selected':'')+' value="'+esc(s)+'">'+esc(s)+'</option>';}).join("")+'</select>'+
+    '<span class="flabel">Type</span>'+
+    '<select class="fsel" id="fissue"><option value="">All types</option>'+issueList.map(function(s){return '<option '+(S.issue===s?'selected':'')+' value="'+esc(s)+'">'+esc(s)+'</option>';}).join("")+'</select>'+
+    '<div style="flex:1"></div>'+
+    '<nav class="tabs">'+
+      tabBtn("perf","📊","HD Performance",f.length)+
+      tabBtn("trend","📈","Trend Analysis","")+
+      tabBtn("wow","🗓️","Week on Week","")+
+      tabBtn("pivots","🧮","Pivots","")+
+      tabBtn("exc","⚠️","Exceptions",exCount)+
+    '</nav>'+
+    '<button class="ghost" id="newfile">↻ New file</button>'+
+    '<input type="file" id="fileinput" accept=".xlsx,.xls">'+
+  '</header>'+
+  dateBar()+
+  '<main id="main"></main>';
+
+  el("fsvm").onchange=function(e){ S.svm=e.target.value; render(); };
+  el("fcw").onchange=function(e){ S.cw=e.target.value; render(); };
+  el("frc").onchange=function(e){ S.rc=e.target.value; render(); };
+  el("fissue").onchange=function(e){ S.issue=e.target.value; render(); };
+  el("newfile").onclick=function(){ window.location.href="index.html"; };
+  el("fileinput").onchange=handleUpload;
+  document.querySelectorAll(".tabs button").forEach(function(b){ b.onclick=function(){ S.tab=b.dataset.tab; render(); }; });
+  bindDateBar();
+  renderMain();
+}
+function tabBtn(id,ic,label,cnt){
+  return '<button data-tab="'+id+'" class="'+(S.tab===id?'on':'')+'">'+ic+' <span class="lbl">'+label+'</span>'+(cnt!==""?'<span class="cnt">'+cnt+'</span>':'')+'</button>';
+}
+function dateBar(){
+  var presets=["All time","This month","Last month","Last 3M","Last 6M","This year"];
+  return '<div class="datebar">'+
+    '<span class="flabel" style="margin-right:2px">📅 Range</span>'+
+    presets.map(function(p){return '<button class="chip '+(S.dlabel===p?'on':'')+'" data-preset="'+p+'">'+p+'</button>';}).join("")+
+    '<span style="width:1px;height:22px;background:var(--line);margin:0 4px"></span>'+
+    '<span class="sub">Custom</span>'+
+    '<input type="date" class="dinput" id="dfrom" value="'+S.from+'">'+
+    '<span class="sub">→</span>'+
+    '<input type="date" class="dinput" id="dto" value="'+S.to+'">'+
+    '<span class="sub" id="rangenote" style="margin-left:6px;color:var(--hd);font-weight:600"></span>'+
+  '</div>';
+}
+function bindDateBar(){
+  document.querySelectorAll(".chip[data-preset]").forEach(function(b){
+    b.onclick=function(){ applyPreset(b.dataset.preset); };
+  });
+  el("dfrom").onchange=function(e){ S.from=e.target.value; S.dlabel="Custom"; render(); };
+  el("dto").onchange=function(e){ S.to=e.target.value; S.dlabel="Custom"; render(); };
+  var note=el("rangenote");
+  if(note && (S.from||S.to)){ note.textContent=filtered().length+" tickets in range"; }
+}
+function applyPreset(label){
+  var now=new Date(), y=now.getFullYear(), m=now.getMonth();
+  function iso(d){ return d.toISOString().slice(0,10); }
+  S.dlabel=label; S.from=""; S.to="";
+  if(label==="This month"){ S.from=iso(new Date(y,m,1)); }
+  else if(label==="Last month"){ S.from=iso(new Date(y,m-1,1)); S.to=iso(new Date(y,m,0)); }
+  else if(label==="Last 3M"){ S.from=iso(new Date(y,m-2,1)); }
+  else if(label==="Last 6M"){ S.from=iso(new Date(y,m-5,1)); }
+  else if(label==="This year"){ S.from=iso(new Date(y,0,1)); }
+  render();
+}
+function render(){ renderShell(); }
+function renderMain(){
+  var main=el("main");
+  if(S.tab==="perf") main.innerHTML=viewPerf();
+  else if(S.tab==="trend") main.innerHTML=viewTrend();
+  else if(S.tab==="wow") main.innerHTML=viewWoW();
+  else if(S.tab==="pivots") main.innerHTML=viewPivots();
+  else main.innerHTML=viewExc();
+  bindMain();
+}
+
+/* ═══════════════════════════════ VIEW: HD PERFORMANCE ═══════════════════════════════ */
+function viewPerf(){
+  var f=filtered();
+  var total=f.length;
+  var hd=f.filter(function(t){return t.isHD;});
+  var eg=f.filter(function(t){return !t.isHD;});
+  var hdN=hd.length, egN=eg.length;
+  var hdPct=pct(hdN,total), egPct=100-hdPct;
+  var closed=f.filter(function(t){return t.status==="Closed";}).length;
+  var inc=f.filter(function(t){return t.issue==="Incident";}).length;
+  var srq=f.filter(function(t){return t.issue==="Service Request";}).length;
+
+  var scopeTxt=[S.svm||"all SVM staff", S.rc?('root cause "'+S.rc+'"'):"all root causes", S.issue||"all types"].join(" · ");
+
+  // per-SVM leaderboard
+  var bySvm={};
+  f.forEach(function(t){
+    var k=t.svm||"(unassigned)";
+    if(!bySvm[k]) bySvm[k]={total:0,hd:0,eg:0,closed:0};
+    bySvm[k].total++; if(t.isHD)bySvm[k].hd++; else bySvm[k].eg++;
+    if(t.status==="Closed")bySvm[k].closed++;
+  });
+  var svmRows=Object.keys(bySvm).map(function(k){var v=bySvm[k];return {name:k,total:v.total,hd:v.hd,eg:v.eg,closed:v.closed,hdp:pct(v.hd,v.total)};});
+  var sc=S.sortCol, dir=S.sortDir==="asc"?1:-1;
+  svmRows.sort(function(a,b){
+    if(sc==="name") return dir*a.name.localeCompare(b.name);
+    if(sc==="hdp") return dir*(a.hdp-b.hdp);
+    if(sc==="hd") return dir*(a.hd-b.hd);
+    if(sc==="eg") return dir*(a.eg-b.eg);
+    if(sc==="closed") return dir*(a.closed-b.closed);
+    return dir*(a.total-b.total);
+  });
+
+  // root cause breakdown (top 12)
+  var byRc={};
+  f.forEach(function(t){ var k=t.rc||"(blank)"; if(!byRc[k])byRc[k]={hd:0,eg:0}; if(t.isHD)byRc[k].hd++; else byRc[k].eg++; });
+  var rcRows=Object.keys(byRc).map(function(k){var v=byRc[k];return {name:k,hd:v.hd,eg:v.eg,total:v.hd+v.eg};}).sort(function(a,b){return b.total-a.total;}).slice(0,12);
+  var rcMax=rcRows.length?rcRows[0].total:1;
+
+  // monthly HD vs Engg (by resolved||created)
+  var byM={};
+  f.forEach(function(t){ var k=bucketMonth(t); if(!k)return; if(!byM[k])byM[k]={hd:0,eg:0}; if(t.isHD)byM[k].hd++; else byM[k].eg++; });
+  var mKeys=Object.keys(byM).sort();
+  var mMax=1; mKeys.forEach(function(k){ mMax=Math.max(mMax,byM[k].hd,byM[k].eg); });
+
+  var out='';
+  // hero
+  out+='<div class="up" style="margin-bottom:16px"><div class="eyebrow">HD Performance</div>'+
+    '<h1 style="font-size:23px;font-weight:700;letter-spacing:-.4px;margin-top:4px">Who resolved the work?</h1>'+
+    '<div class="sub" style="margin-top:3px">Scope: '+esc(scopeTxt)+'. <b style="color:var(--hd)">HD</b> = closed by Help Desk (no linked ticket) · <b style="color:var(--engg)">ENGG</b> = escalated to Engineering (has linked ticket).</div></div>';
+
+  // hero card
+  out+='<div class="card up d1 pad" style="margin-bottom:14px;display:flex;gap:28px;align-items:center;flex-wrap:wrap">'+
+    ring(hdPct,120,11,"var(--hd)",'<div class="mono" style="font-size:28px;font-weight:700;color:var(--hd)">'+hdPct+'%</div><div style="font-size:9.5px;color:var(--faint);font-weight:700;text-transform:uppercase;letter-spacing:.5px">HD share</div>')+
+    '<div style="flex:1;min-width:280px">'+
+      '<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:7px">'+
+        '<span style="color:var(--hd);font-weight:700">HD resolved · '+hdN.toLocaleString()+'</span>'+
+        '<span style="color:var(--engg);font-weight:700">'+egN.toLocaleString()+' · Engg resolved</span>'+
+      '</div>'+
+      '<div class="track" id="heroTrack">'+
+        '<div class="seg hd" data-side="hd" style="width:'+Math.max(hdPct,6)+'%">'+hdPct+'%</div>'+
+        '<div class="seg engg" data-side="eg" style="width:'+Math.max(egPct,6)+'%">'+egPct+'%</div>'+
+      '</div>'+
+      '<div class="sub" style="margin-top:10px">Out of <b>'+total.toLocaleString()+'</b> tickets in scope, the Help Desk closed <b style="color:var(--hd)">'+hdN.toLocaleString()+'</b> on its own and escalated <b style="color:var(--engg)">'+egN.toLocaleString()+'</b> to Engineering.</div>'+
+    '</div>'+
+  '</div>';
+
+  // KPIs
+  out+='<div class="grid up d2" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:16px">'+
+    kpi("📦","Total tickets",total.toLocaleString(),"var(--ink)","all",'In scope')+
+    kpi("🟢","HD resolved",hdN.toLocaleString(),"var(--hd)","hd",hdPct+"% of scope")+
+    kpi("🟣","Engg resolved",egN.toLocaleString(),"var(--engg)","eg",egPct+"% of scope")+
+    kpi("✅","Closed",closed.toLocaleString(),"var(--slate)","closed",pct(closed,total)+"% of scope")+
+    kpi("🔺","Incidents",inc.toLocaleString(),"var(--amber)","inc","")+
+    kpi("📨","Service Req.",srq.toLocaleString(),"var(--slate)","srq","")+
+  '</div>';
+  out+=note([
+    'HD resolved <b class="hd">'+hdN.toLocaleString()+' ('+hdPct+'%)</b> vs Engg <b class="eg">'+egN.toLocaleString()+' ('+egPct+'%)</b> — HD handled the <b>'+(hdPct>=50?'majority':'minority')+'</b> of this scope.',
+    'Closed <b>'+closed.toLocaleString()+'</b> ('+pct(closed,total)+'% of scope) · Incidents <b>'+inc.toLocaleString()+'</b> vs Service Requests <b>'+srq.toLocaleString()+'</b>.'
+  ]);
+
+  // charts row: root cause + monthly
+  out+='<div class="grid up d3" style="grid-template-columns:1fr 1fr;margin-bottom:14px">';
+  // root cause
+  out+='<div class="card pad"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px"><span class="sec-title">By root cause</span><span class="click">HD / Engg · click a bar</span></div>';
+  rcRows.forEach(function(r){
+    var w=Math.round(r.total/rcMax*100);
+    var hw=r.total?Math.round(r.hd/r.total*100):0;
+    out+='<div class="barrow" data-rc="'+esc(r.name)+'">'+
+      '<span class="lbl" title="'+esc(r.name)+'">'+esc(r.name)+'</span>'+
+      '<div class="track2" style="max-width:'+w+'%;min-width:60px"><div class="fillhd" style="width:'+hw+'%"></div><div class="fillengg" style="width:'+(100-hw)+'%"></div></div>'+
+      '<span class="num">'+r.hd+' / '+r.eg+'</span>'+
+    '</div>';
+  });
+  out+='</div>';
+  // monthly grouped
+  out+='<div class="card pad"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px"><span class="sec-title">HD vs Engg by month</span><span class="click">click a bar</span></div>';
+  if(mKeys.length){
+    out+='<div class="mbars">';
+    mKeys.forEach(function(k,i){
+      var v=byM[k];
+      out+='<div class="col">'+
+        '<div class="pair">'+
+          '<div class="bar hd" data-month="'+k+'" data-side="hd" style="height:'+Math.max(v.hd/mMax*100,3)+'%;animation-delay:'+(i*0.04)+'s"><span class="v">'+v.hd+'</span></div>'+
+          '<div class="bar engg" data-month="'+k+'" data-side="eg" style="height:'+Math.max(v.eg/mMax*100,3)+'%;animation-delay:'+(i*0.04+0.02)+'s"><span class="v">'+v.eg+'</span></div>'+
+        '</div>'+
+        '<span class="mx">'+mLabel(k)+'</span>'+
+      '</div>';
+    });
+    out+='</div><div class="legend" style="margin-top:14px"><span class="li"><span class="sw" style="background:var(--hd)"></span>HD resolved</span><span class="li"><span class="sw" style="background:var(--engg)"></span>Engg resolved</span></div>';
+  } else out+='<div class="empty">No dated tickets in scope.</div>';
+  out+='</div></div>';
+  out+=(function(){ var topRc=rcRows[0], reli=null;
+    rcRows.forEach(function(r){ if(r.total>=10){ var e=Math.round(r.eg/r.total*100); if(reli===null||e>reli.e) reli={name:r.name,e:e}; } });
+    var mTot={}; mKeys.forEach(function(k){ mTot[k]=byM[k].hd+byM[k].eg; });
+    var peak=mKeys.length?mKeys.reduce(function(a,b){return mTot[b]>mTot[a]?b:a;},mKeys[0]):null;
+    var f0=mKeys[0], l0=mKeys[mKeys.length-1];
+    var hpF=f0?pct(byM[f0].hd,mTot[f0]):0, hpL=l0?pct(byM[l0].hd,mTot[l0]):0;
+    return note([
+      topRc?('Largest driver: <b>'+esc(topRc.name)+'</b> — '+topRc.total.toLocaleString()+' tickets ('+pct(topRc.total,total)+'% of scope), '+topRc.hd+' HD / '+topRc.eg+' Engg.'):null,
+      reli?('Highest Engg reliance: <b>'+esc(reli.name)+'</b> — '+reli.e+'% escalated (among root causes with ≥10).'):null,
+      peak?('Peak month: <b>'+mLabel(peak)+'</b> with '+mTot[peak].toLocaleString()+' tickets.'):null,
+      mKeys.length>1?('HD share '+(hpL>=hpF?'rose':'fell')+' from <b>'+hpF+'%</b> ('+mLabel(f0)+') to <b>'+hpL+'%</b> ('+mLabel(l0)+').'):null
+    ]); })();
+
+  // SVM leaderboard
+  out+='<div class="card up d4" style="overflow:hidden;margin-bottom:14px">'+
+    '<div class="pad" style="border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:baseline"><span class="sec-title">SVM In Charge — resolution scorecard</span><span class="click">click a row to open that person\'s tickets</span></div>'+
+    '<div style="overflow:auto;max-height:460px"><table><thead><tr>'+
+      th("name","SVM In Charge")+th("total","Total")+th("hd","HD")+th("eg","Engg")+th("hdp","HD share")+
+      '<th class="static" style="min-width:150px">Split</th>'+th("closed","Closed")+
+    '</tr></thead><tbody>';
+  svmRows.forEach(function(r){
+    out+='<tr class="rowlink" data-svm="'+esc(r.name)+'">'+
+      '<td style="font-weight:600">'+esc(r.name)+'</td>'+
+      '<td class="mono" style="font-weight:700">'+r.total+'</td>'+
+      '<td class="mono" style="color:var(--hd);font-weight:700">'+r.hd+'</td>'+
+      '<td class="mono" style="color:var(--engg);font-weight:700">'+r.eg+'</td>'+
+      '<td class="mono" style="font-weight:700">'+r.hdp+'%</td>'+
+      '<td><div class="track mini"><div class="seg hd" style="width:'+r.hdp+'%"></div><div class="seg engg" style="width:'+(100-r.hdp)+'%"></div></div></td>'+
+      '<td class="mono" style="color:var(--muted)">'+r.closed+'</td>'+
+    '</tr>';
+  });
+  out+='</tbody></table></div>'+
+    (function(){ if(!svmRows.length) return "";
+      var byVol=svmRows.slice().sort(function(a,b){return b.total-a.total;})[0];
+      var elig=svmRows.filter(function(r){return r.total>=20 && r.name!=="(unassigned)";});
+      var best=elig.slice().sort(function(a,b){return b.hdp-a.hdp;})[0];
+      var worst=elig.slice().sort(function(a,b){return a.hdp-b.hdp;})[0];
+      return note([
+        'Highest backlog owner: <b>'+esc(byVol.name)+'</b> with <b>'+byVol.total.toLocaleString()+'</b> tickets ('+byVol.hdp+'% HD).',
+        (best&&worst&&best.name!==worst.name)?('Best HD self-resolution: <b class="hd">'+esc(best.name)+' ('+best.hdp+'%)</b>; leans on Engg most: <b class="dn">'+esc(worst.name)+' ('+worst.hdp+'%)</b> — among ≥20 tickets.'):null
+      ]); })()+
+  '</div>';
+  return out;
+}
+
+/* ═══════════════════════════════ VIEW: TREND ANALYSIS ═══════════════════════════════ */
+function viewTrend(){
+  var f=filtered(); // respects global svm/issue/date (and rc if set, but trend has own rc scope)
+  // trend scope: apply local root-cause + status on top of global (ignore global rc to avoid double-limiting; use tRc instead)
+  var base=RAW.filter(function(t){
+    if(!inRange(t)) return false;
+    if(S.svm && t.svm!==S.svm) return false;
+    if(S.cw && t.currentWorker!==S.cw) return false;
+    if(S.issue && t.issue!==S.issue) return false;
+    return true;
+  });
+  var scope=base.filter(function(t){
+    // root cause scope
+    if(S.tRc==="__CLAR__"){ if(!isClar(t.rc)) return false; }
+    else if(S.tRc==="__ALL__"){ /* all */ }
+    else { if(t.rc!==S.tRc) return false; }
+    // status scope
+    if(S.tStatus==="Closed"){ if(t.status!=="Closed") return false; }
+    else if(S.tStatus==="__ALL__"){ /* all */ }
+    else { if(t.status!==S.tStatus) return false; }
+    return true;
+  });
+
+  // month aggregation
+  var byM={};
+  scope.forEach(function(t){ var k=bucketMonth(t); if(!k)return; if(!byM[k])byM[k]={hd:[],eg:[]}; (t.isHD?byM[k].hd:byM[k].eg).push(t); });
+  var mKeys=Object.keys(byM).sort();
+
+  var rcList=[...new Set(RAW.map(function(t){return t.rc;}).filter(Boolean))].sort();
+  var stList=[...new Set(RAW.map(function(t){return t.status;}).filter(Boolean))].sort();
+  var rcName = S.tRc==="__CLAR__"?"Clarification": (S.tRc==="__ALL__"?"all root causes": S.tRc);
+  var stName = S.tStatus==="__ALL__"?"any status":S.tStatus;
+  var svmName = S.svm||"all SVM staff";
+  var workerNote = S.cw? (" · worker "+S.cw) : "";
+
+  var out='';
+  out+='<div class="up" style="margin-bottom:14px"><div class="eyebrow">Trend Analysis</div>'+
+    '<h1 style="font-size:23px;font-weight:700;letter-spacing:-.4px;margin-top:4px">Clarification: solved by HD or escalated?</h1>'+
+    '<div class="sub" style="margin-top:3px">For each month, how many <b>'+esc(rcName)+'</b> tickets (<b>'+esc(stName)+'</b>, <b>'+esc(svmName)+esc(workerNote)+'</b>) the Help Desk closed alone vs. sent to Engineering.</div></div>';
+
+  // local controls
+  out+='<div class="card up d1 pad" style="margin-bottom:16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap">'+
+    '<span class="flabel">Root cause</span>'+
+    '<select class="fsel" id="tRc"><option value="__CLAR__" '+(S.tRc==="__CLAR__"?"selected":"")+'>Clarification (default)</option><option value="__ALL__" '+(S.tRc==="__ALL__"?"selected":"")+'>All root causes</option>'+rcList.map(function(s){return '<option value="'+esc(s)+'" '+(S.tRc===s?"selected":"")+'>'+esc(s)+'</option>';}).join("")+'</select>'+
+    '<span class="flabel">Status</span>'+
+    '<select class="fsel" id="tStatus"><option value="Closed" '+(S.tStatus==="Closed"?"selected":"")+'>Closed (default)</option><option value="__ALL__" '+(S.tStatus==="__ALL__"?"selected":"")+'>Any status</option>'+stList.map(function(s){return '<option value="'+esc(s)+'" '+(S.tStatus===s?"selected":"")+'>'+esc(s)+'</option>';}).join("")+'</select>'+
+    '<span class="sub" style="margin-left:auto">SVM, Current Worker &amp; date use the top filters</span>'+
+  '</div>';
+
+  if(!mKeys.length){ out+='<div class="card pad"><div class="empty">No tickets match this scope. Try widening the root cause or status.</div></div>'; return out; }
+
+  // per-month cards
+  out+='<div class="grid up d2" style="grid-template-columns:repeat(auto-fit,minmax(330px,1fr));margin-bottom:16px">';
+  mKeys.forEach(function(k){
+    var v=byM[k]; var hdN=v.hd.length, egN=v.eg.length, tot=hdN+egN;
+    var hp=pct(hdN,tot), ep=100-hp;
+    out+='<div class="mcard">'+
+      '<div class="mtop"><span class="mmon">'+mLabel(k)+'</span><span class="mono sub">'+tot+' tickets</span></div>'+
+      '<div class="msent">HD closed <b class="hd">'+hdN+'</b> '+esc(rcName.toLowerCase())+' ticket'+(hdN!==1?'s':'')+' without Engineering, and <b class="eg">'+egN+'</b> went to Engineering. <b class="hd">HD '+hp+'%</b> · <b class="eg">Engg '+ep+'%</b>.</div>'+
+      '<div class="track" data-mk="'+k+'">'+
+        '<div class="seg hd" data-mk="'+k+'" data-side="hd" style="width:'+Math.max(hp,7)+'%">HD '+hdN+'</div>'+
+        '<div class="seg engg" data-mk="'+k+'" data-side="eg" style="width:'+Math.max(ep,7)+'%">Engg '+egN+'</div>'+
+      '</div>'+
+    '</div>';
+  });
+  out+='</div>';
+  out+=(function(){ var tHd=0,tEg=0; mKeys.forEach(function(k){tHd+=byM[k].hd.length;tEg+=byM[k].eg.length;}); var tot=tHd+tEg;
+    var bestM=null,worstM=null; mKeys.forEach(function(k){ var tt=byM[k].hd.length+byM[k].eg.length; var p=pct(byM[k].hd.length,tt); if(bestM===null||p>bestM.p)bestM={k:k,p:p}; if(worstM===null||p<worstM.p)worstM={k:k,p:p}; });
+    return note([
+      'HD closed <b class="hd">'+tHd+' ('+pct(tHd,tot)+'%)</b> of '+tot+' '+esc(rcName.toLowerCase())+' tickets alone; Engg handled <b class="eg">'+tEg+' ('+pct(tEg,tot)+'%)</b>.',
+      (bestM&&worstM&&bestM.k!==worstM.k)?('Best HD month: <b class="hd">'+mLabel(bestM.k)+' ('+bestM.p+'%)</b>; weakest: <b class="dn">'+mLabel(worstM.k)+' ('+worstM.p+'%)</b>.'):null
+    ]); })();
+
+  // bottom line chart: HD% and Engg% MoM
+  out+='<div class="card up d3 pad"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px"><span class="sec-title">HD % vs Engg % — month on month</span><span class="click">click a point to open those tickets</span></div>'+
+    lineChart(mKeys,byM)+
+    '<div class="legend" style="margin-top:10px"><span class="li"><span class="sw" style="background:var(--hd)"></span>HD %</span><span class="li"><span class="sw" style="background:var(--engg)"></span>Engg %</span></div>'+
+    (function(){ if(mKeys.length<2) return ""; var f=mKeys[0], l=mKeys[mKeys.length-1];
+      var pf=pct(byM[f].hd.length,byM[f].hd.length+byM[f].eg.length), pl=pct(byM[l].hd.length,byM[l].hd.length+byM[l].eg.length);
+      return note(['From <b>'+mLabel(f)+'</b> to <b>'+mLabel(l)+'</b>, HD share moved <b class="'+((pl-pf)>=0?'up':'dn')+'">'+arrow(pl-pf)+' '+Math.abs(pl-pf)+' pts</b> ('+pf+'% → '+pl+'%).']); })()+
+  '</div>';
+  return out;
+}
+
+function lineChart(mKeys,byM){
+  var W=Math.max(mKeys.length*120,480), H=200, padL=38, padR=18, padT=18, padB=30;
+  var iw=W-padL-padR, ih=H-padT-padB;
+  var n=mKeys.length;
+  function x(i){ return n===1? padL+iw/2 : padL + iw*(i/(n-1)); }
+  function y(p){ return padT + ih*(1-p/100); }
+  var hdPts=[], egPts=[];
+  mKeys.forEach(function(k,i){ var v=byM[k]; var tot=v.hd.length+v.eg.length; var hp=pct(v.hd.length,tot); hdPts.push([x(i),y(hp),hp]); egPts.push([x(i),y(100-hp),100-hp]); });
+  function poly(pts){ return pts.map(function(p){return p[0]+","+p[1];}).join(" "); }
+  function area(pts){ return "M"+padL+","+(padT+ih)+" L"+pts.map(function(p){return p[0]+","+p[1];}).join(" L")+" L"+(padL+iw)+","+(padT+ih)+" Z"; }
+  var grid="";
+  [0,25,50,75,100].forEach(function(g){ var yy=y(g); grid+='<line x1="'+padL+'" y1="'+yy+'" x2="'+(padL+iw)+'" y2="'+yy+'" stroke="var(--line)" stroke-width="1"/><text x="'+(padL-8)+'" y="'+(yy+3)+'" font-size="9" fill="var(--faint)" text-anchor="end" font-family="var(--mono)">'+g+'</text>'; });
+  var xlab=""; mKeys.forEach(function(k,i){ xlab+='<text x="'+x(i)+'" y="'+(H-10)+'" font-size="9.5" fill="var(--muted)" text-anchor="middle" font-weight="600">'+mLabel(k)+'</text>'; });
+  var dots="";
+  hdPts.forEach(function(p,i){ dots+='<circle class="lc-dot" cx="'+p[0]+'" cy="'+p[1]+'" r="5" fill="#fff" stroke="var(--hd)" stroke-width="2.5" data-lc="hd" data-mk="'+mKeys[i]+'" data-p="'+p[2]+'"/>'; });
+  egPts.forEach(function(p,i){ dots+='<circle class="lc-dot" cx="'+p[0]+'" cy="'+p[1]+'" r="5" fill="#fff" stroke="var(--engg)" stroke-width="2.5" data-lc="eg" data-mk="'+mKeys[i]+'" data-p="'+p[2]+'"/>'; });
+  var labels="";
+  hdPts.forEach(function(p){ var ly=Math.max(p[1]-12,11); labels+='<text x="'+p[0]+'" y="'+ly+'" font-size="11" font-weight="700" fill="var(--hd)" text-anchor="middle" font-family="var(--mono)" stroke="#fff" stroke-width="3" style="paint-order:stroke">'+p[2]+'%</text>'; });
+  egPts.forEach(function(p){ var ly=Math.min(p[1]+20,H-padB-2); labels+='<text x="'+p[0]+'" y="'+ly+'" font-size="11" font-weight="700" fill="var(--engg)" text-anchor="middle" font-family="var(--mono)" stroke="#fff" stroke-width="3" style="paint-order:stroke">'+p[2]+'%</text>'; });
+  return '<div class="linechart" style="overflow-x:auto"><div class="lc-tip" id="lctip"></div><svg viewBox="0 0 '+W+' '+H+'" width="100%" height="230" preserveAspectRatio="xMidYMid meet" style="min-width:'+W+'px">'+
+    grid+
+    '<path d="'+area(hdPts)+'" fill="var(--hd)" opacity="0.06"/>'+
+    '<polyline points="'+poly(hdPts)+'" fill="none" stroke="var(--hd)" stroke-width="2.5" stroke-linejoin="round"/>'+
+    '<polyline points="'+poly(egPts)+'" fill="none" stroke="var(--engg)" stroke-width="2.5" stroke-linejoin="round" stroke-dasharray="4 3"/>'+
+    dots+labels+xlab+
+  '</svg></div>';
+}
+
+/* ═══════════════════════════════ VIEW: EXCEPTIONS ═══════════════════════════════ */
+function viewExc(){
+  // exceptions are computed on the FULL dataset (data quality), independent of scope filters,
+  // but still respect the date range so you can clean a period at a time.
+  var pool=RAW.filter(inRange);
+  var noComp=pool.filter(function(t){return !t.components;});
+  var noSvm=pool.filter(function(t){return !t.svm;});
+  var noRc=pool.filter(function(t){return !t.rc;});
+  var bothMissing=pool.filter(function(t){return !t.svm && !t.rc;});
+  var flagged=pool.filter(function(t){return !t.components||!t.svm||!t.rc;});
+
+  var active=S._excFilter||null; // 'comp' | 'svm' | 'rc' | 'both'
+  var list=flagged;
+  if(active==="comp")list=noComp; else if(active==="svm")list=noSvm; else if(active==="rc")list=noRc; else if(active==="both")list=bothMissing;
+  list=list.slice().sort(function(a,b){return (b.created||0)-(a.created||0);});
+
+  var out='';
+  out+='<div class="card up pad" style="margin-bottom:14px;display:flex;gap:14px;align-items:center;border-color:var(--amber-soft);background:var(--amber-bg)">'+
+    '<div class="ic" style="width:40px;height:40px;border-radius:11px;background:#fff;border:1px solid var(--amber-soft);display:flex;align-items:center;justify-content:center;font-size:19px">⚠️</div>'+
+    '<div><div style="font-family:var(--disp);font-weight:700;font-size:15px;color:var(--amber)">Data quality exceptions</div>'+
+    '<div class="sub" style="margin-top:2px"><b>'+flagged.length.toLocaleString()+'</b> tickets are missing Components, SVM In Charge, or Root Cause'+((S.from||S.to)?' in the selected range':'')+'.</div></div></div>';
+
+  out+='<div class="grid up d1" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-bottom:16px">'+
+    excCard("comp","🧩","Missing Components",noComp.length,active==="comp")+
+    excCard("svm","👤","Missing SVM In Charge",noSvm.length,active==="svm")+
+    excCard("rc","🏷️","Missing Root Cause",noRc.length,active==="rc")+
+    excCard("both","🔻","Missing SVM & Root Cause",bothMissing.length,active==="both")+
+  '</div>';
+  out+=(function(){ var gaps=[["Components",noComp.length],["SVM In Charge",noSvm.length],["Root Cause",noRc.length]].sort(function(a,b){return b[1]-a[1];});
+    return note([
+      '<b>'+flagged.length.toLocaleString()+'</b> tickets need attention'+((S.from||S.to)?' in the selected range':'')+' — '+pct(flagged.length,pool.length)+'% of loaded data.',
+      'Most common gap: <b class="dn">'+gaps[0][0]+'</b> ('+gaps[0][1].toLocaleString()+' missing).',
+      bothMissing.length?('<b>'+bothMissing.length+'</b> tickets are missing <b>both</b> SVM In Charge and Root Cause.'):null
+    ]); })();
+
+  if(active){
+    out+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;padding:8px 14px;background:var(--rose-bg);border:1px solid var(--rose-soft);border-radius:9px">'+
+      '<span style="color:var(--rose);font-size:12px;font-weight:600">Filtered: '+({comp:"Missing Components",svm:"Missing SVM In Charge",rc:"Missing Root Cause",both:"Missing SVM & Root Cause"}[active])+'</span>'+
+      '<span class="mono" style="color:var(--rose);font-weight:700">→ '+list.length.toLocaleString()+'</span>'+
+      '<button class="ghost" id="excClear" style="margin-left:auto">✕ Clear</button></div>';
+  }
+
+  out+='<div class="card up d2" style="overflow:hidden">'+
+    '<div class="pad" style="border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center"><span class="sec-title">Tickets needing attention</span><button class="ghost" id="excCsv">Export CSV</button></div>'+
+    '<div style="overflow:auto;max-height:520px"><table><thead><tr>'+
+      '<th class="static">Key</th><th class="static">Summary</th><th class="static">SVM In Charge</th><th class="static">Current Worker</th><th class="static">Root Cause</th><th class="static">Components</th><th class="static">Status</th><th class="static">Missing</th>'+
+    '</tr></thead><tbody>';
+  list.slice(0,3000).forEach(function(t){
+    var miss=[]; if(!t.components)miss.push("Components"); if(!t.svm)miss.push("SVM In Charge"); if(!t.rc)miss.push("Root Cause");
+    out+='<tr>'+
+      '<td style="white-space:nowrap"><a class="jkey" href="'+JIRA+encodeURIComponent(t.key)+'" target="_blank" rel="noreferrer">'+esc(t.key)+'</a></td>'+
+      '<td class="trunc" title="'+esc(t.summary)+'" style="color:var(--ink2)">'+esc(t.summary)+'</td>'+
+      '<td style="white-space:nowrap">'+(t.svm?esc(t.svm):'<span style="color:var(--rose);font-weight:600">—</span>')+'</td>'+
+      '<td style="white-space:nowrap;color:var(--ink2)">'+(t.currentWorker?esc(t.currentWorker):'<span style="color:var(--faint)">—</span>')+'</td>'+
+      '<td style="white-space:nowrap">'+(t.rc?'<span class="pill">'+esc(t.rc)+'</span>':'<span style="color:var(--rose);font-weight:600">—</span>')+'</td>'+
+      '<td style="white-space:nowrap">'+(t.components?esc(t.components):'<span style="color:var(--rose);font-weight:600">—</span>')+'</td>'+
+      '<td style="color:var(--muted);font-size:11px;white-space:nowrap">'+esc(t.status)+'</td>'+
+      '<td><div style="display:flex;gap:4px;flex-wrap:wrap">'+miss.map(function(m){return '<span class="tag-miss">'+m+'</span>';}).join("")+'</div></td>'+
+    '</tr>';
+  });
+  out+='</tbody></table>'+(list.length>3000?'<div class="empty" style="padding:14px">Showing first 3000 of '+list.length.toLocaleString()+' — use the date range or a card filter to narrow down, or export the full set.</div>':'')+'</div></div>';
+  window.__excList=list;
+  return out;
+}
+function excCard(id,ic,label,n,on){
+  var col=n>300?"var(--rose)":n>0?"var(--amber)":"var(--hd)";
+  return '<div class="kpi card clk" data-exc="'+id+'" style="'+(on?'border-color:var(--amber);background:var(--amber-bg)':'')+'">'+
+    '<div class="tag">'+ic+'</div>'+
+    '<div class="kv" style="color:'+col+'">'+n.toLocaleString()+'</div>'+
+    '<div class="kl">'+label+'</div></div>';
+}
+
+/* ═══════════════════════════════ VIEW: PIVOTS ═══════════════════════════════ */
+function chip(k,v){ return '<span class="filtchip">'+esc(k)+': <b>'+esc(v)+'</b></span>'; }
+function pivHeader(title,chips,desc){
+  return '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:14px;flex-wrap:wrap">'+
+    '<div><div class="sec-title">'+esc(title)+'</div><div class="sub" style="margin-top:3px;max-width:660px">'+esc(desc)+'</div></div>'+
+    '<div style="display:flex;gap:6px;flex-wrap:wrap">'+chips.join("")+'</div></div>';
+}
+function groupLegend(){
+  return '<div class="pivnote"><b>Groups (mapped by SVM In Charge):</b>'+
+    GROUP_ORDER.map(function(g){return '<br>· <b>'+g+'</b> — '+esc(GROUP_MEMBERS[g]);}).join("")+'</div>';
+}
+function issueColDefs(pool){
+  var present=[...new Set(pool.map(function(t){return t.issue||"(blank)";}))];
+  present.sort(function(a,b){
+    function rank(x){ if(x==="Incident")return 0; if(x==="Service Request")return 1; if(x==="(blank)")return 9; return 5; }
+    return (rank(a)-rank(b))||a.localeCompare(b);
+  });
+  return present.map(function(k){return {key:k,label:k};});
+}
+/* sort that always pushes "(blank)" to the bottom */
+function blankLast(a,b){
+  var ab=(a==="(blank)"), bb=(b==="(blank)");
+  if(ab&&!bb) return 1; if(bb&&!ab) return -1;
+  return a.localeCompare(b);
+}
+function pivot2D(id,title,color,tickets,rowKeyFn,rowTitle,colDefs,colKeyFn){
+  var map={}, order=[], colTot={}, grand=0;
+  colDefs.forEach(function(c){colTot[c.key]=0;});
+  tickets.forEach(function(t){
+    var rk=rowKeyFn(t), ck=colKeyFn(t), ok=false;
+    for(var i=0;i<colDefs.length;i++){ if(colDefs[i].key===ck){ok=true;break;} }
+    if(!ok) return;
+    if(!map[rk]){ map[rk]={_t:0}; colDefs.forEach(function(c){map[rk][c.key]=0;}); order.push(rk); }
+    map[rk][ck]++; map[rk]._t++; colTot[ck]++; grand++;
+  });
+  order.sort(blankLast);
+  window.__piv[id]={tickets:tickets,rowKeyFn:rowKeyFn,colKeyFn:colKeyFn,title:title,color:color};
+  var h='<div class="pivscroll"><table class="ptable"><thead><tr><th class="rh">'+esc(rowTitle)+'</th>';
+  colDefs.forEach(function(c){ h+='<th>'+esc(c.label)+'</th>'; });
+  h+='<th>Grand Total</th></tr></thead><tbody>';
+  order.forEach(function(rk){
+    h+='<tr><td class="rl">'+esc(rk)+'</td>';
+    colDefs.forEach(function(c){ var v=map[rk][c.key];
+      h+='<td class="val'+(v===0?' zero':'')+'" data-piv="'+id+'" data-r="'+esc(rk)+'" data-c="'+esc(c.key)+'">'+(v||"")+'</td>'; });
+    h+='<td class="tot val" data-piv="'+id+'" data-r="'+esc(rk)+'" data-c="__all__">'+map[rk]._t+'</td></tr>';
+  });
+  h+='<tr class="grand"><td class="rl">Grand Total</td>';
+  colDefs.forEach(function(c){ h+='<td class="val" data-piv="'+id+'" data-r="__all__" data-c="'+esc(c.key)+'">'+(colTot[c.key]||"")+'</td>'; });
+  h+='<td class="val" data-piv="'+id+'" data-r="__all__" data-c="__all__">'+grand+'</td></tr>';
+  return h+'</tbody></table></div>';
+}
+function nestedGroupPivot(tix){
+  window.__pivNested={tickets:tix};
+  var workers=[...new Set(tix.map(function(t){return t.currentWorker||"(blank)";}))].sort(blankLast);
+  function counts(sub){ var m={}; workers.forEach(function(w){m[w]=0;}); var tot=0; sub.forEach(function(t){var w=t.currentWorker||"(blank)"; if(m[w]===undefined)m[w]=0; m[w]++; tot++;}); return {m:m,tot:tot}; }
+  function cells(sub,attrs){ var c=counts(sub), h="";
+    workers.forEach(function(w){ var v=c.m[w]; h+='<td class="val'+(v===0?' zero':'')+'" data-nested="1" data-worker="'+esc(w)+'" '+attrs+'>'+(v||"")+'</td>'; });
+    h+='<td class="tot val" data-nested="1" data-worker="__all__" '+attrs+'>'+c.tot+'</td>'; return h;
+  }
+  var h='<div class="pivscroll"><table class="ptable"><thead><tr><th class="rh">Group / Solved / SVM In Charge</th>';
+  workers.forEach(function(w){ h+='<th>'+esc(w)+'</th>'; });
+  h+='<th>Grand Total</th></tr></thead><tbody>';
+  GROUP_ORDER.forEach(function(g){
+    var gt=tix.filter(function(t){return t.group===g;}); if(!gt.length) return;
+    h+='<tr class="grouphdr"><td class="rl">'+g+'</td>'+cells(gt,'data-group="'+esc(g)+'" data-solved="__all__" data-svm="__all__"')+'</tr>';
+    ["ENGG","HD"].forEach(function(sv){
+      var st=gt.filter(function(t){return (t.isHD?"HD":"ENGG")===sv;}); if(!st.length) return;
+      h+='<tr class="solvedhdr"><td class="rl"><span class="'+(sv==="HD"?"bhd":"beg")+'">'+sv+'</span></td>'+cells(st,'data-group="'+esc(g)+'" data-solved="'+sv+'" data-svm="__all__"')+'</tr>';
+      var svms=[...new Set(st.map(function(t){return t.svm||"(blank)";}))].sort(blankLast);
+      svms.forEach(function(sm){
+        var smt=st.filter(function(t){return (t.svm||"(blank)")===sm;});
+        h+='<tr class="svmrow"><td class="rl">'+esc(sm)+'</td>'+cells(smt,'data-group="'+esc(g)+'" data-solved="'+sv+'" data-svm="'+esc(sm)+'"')+'</tr>';
+      });
+    });
+  });
+  var allc=counts(tix);
+  h+='<tr class="grand"><td class="rl">Grand Total</td>';
+  workers.forEach(function(w){ h+='<td class="val" data-nested="1" data-worker="'+esc(w)+'" data-group="__all__" data-solved="__all__" data-svm="__all__">'+(allc.m[w]||"")+'</td>'; });
+  h+='<td class="val" data-nested="1" data-worker="__all__" data-group="__all__" data-solved="__all__" data-svm="__all__">'+allc.tot+'</td></tr>';
+  return h+'</tbody></table></div>';
+}
+function viewPivots(){
+  window.__piv={};
+  var pool=RAW.filter(inRange);
+  var nav=[["hdworker","HD Worker Performance"],["overall","Overall Incidents"],["groupclar","Group-wise Clarifications"],["rootcause","Root Cause"],["component","Component Wise"],["svm","SVM In Charge Wise"]];
+  var out='';
+  out+='<div class="up" style="margin-bottom:14px"><div class="eyebrow">Pivots</div>'+
+    '<h1 style="font-size:23px;font-weight:700;letter-spacing:-.4px;margin-top:4px">Pivot tables</h1>'+
+    '<div class="sub" style="margin-top:3px">Excel-style cross-tabs. Every cell is clickable and opens those exact tickets, each linking to Jira. These pivots use the <b>date range only</b>'+((S.from||S.to)?' — '+pool.length.toLocaleString()+' tickets in range':'')+' (each keeps its own built-in filters, shown as chips).</div></div>';
+  out+='<div class="pivnav">'+nav.map(function(x){return '<button data-piv-nav="'+x[0]+'" class="'+(S.pivot===x[0]?"on":"")+'">'+esc(x[1])+'</button>';}).join("")+'</div>';
+  out+='<div class="card up d1 pad">';
+  if(S.pivot==="hdworker"){
+    var t1=pool.filter(function(t){return t.issue==="Incident" && t.rc==="Client Clarification";});
+    out+=pivHeader("HD Worker Performance",[chip("Issue Type","Incident"),chip("Root Cause","Client Clarification")],"Each current worker's clarification-incident load, split by who finally resolved it — HD (Help Desk alone) or ENGG (escalated to Engineering).");
+    out+=pivot2D("hdworker","HD Worker Performance","#0F766E",t1,function(t){return t.currentWorker||"(blank)";},"Current Worker",[{key:"HD",label:"HD"},{key:"ENGG",label:"ENGG"}],function(t){return t.isHD?"HD":"ENGG";});
+    var w1=cnt(t1,function(t){return t.currentWorker||"(blank)";}), tw1=topKey(w1,true), bw=bestWorstHD(t1,10);
+    out+=note([
+      hdSentence(t1),
+      tw1?('Busiest worker: <b>'+esc(tw1)+'</b> with <b>'+w1[tw1]+'</b> clarification-incidents.'):null,
+      (bw.best&&bw.worst&&bw.best!==bw.worst)?('Highest HD self-resolution: <b class="hd">'+esc(bw.best)+' ('+bw.s[bw.best].p+'%)</b>; lowest: <b class="dn">'+esc(bw.worst)+' ('+bw.s[bw.worst].p+'%)</b> — among workers with ≥10.'):null
+    ]);
+  } else if(S.pivot==="overall"){
+    var t2=pool.filter(function(t){return t.issue==="Incident";});
+    out+=pivHeader("Overall Incidents · Worker × Group",[chip("Issue Type","Incident")],"Incident volume per current worker across Group 1, Group 2 and Others.");
+    out+=pivot2D("overall","Overall Incidents","#5B57D8",t2,function(t){return t.currentWorker||"(blank)";},"Current Worker",GROUP_ORDER.map(function(g){return {key:g,label:g};}),function(t){return t.group;});
+    var g2=cnt(t2,function(t){return t.group;}), w2=cnt(t2,function(t){return t.currentWorker||"(blank)";}), tg=topKey(g2), tw2=topKey(w2,true);
+    out+=note([
+      'Incident split — <b>Group 1</b> '+(g2["Group 1"]||0)+' ('+pct(g2["Group 1"]||0,t2.length)+'%), <b>Group 2</b> '+(g2["Group 2"]||0)+' ('+pct(g2["Group 2"]||0,t2.length)+'%), <b>Others</b> '+(g2["Others"]||0)+' ('+pct(g2["Others"]||0,t2.length)+'%).',
+      tg?('Largest group: <b>'+esc(tg)+'</b> with <b>'+g2[tg]+'</b> incidents.'):null,
+      tw2?('Busiest worker: <b>'+esc(tw2)+'</b> ('+w2[tw2]+' incidents).'):null
+    ]);
+    out+=groupLegend();
+  } else if(S.pivot==="groupclar"){
+    var t3=pool.filter(function(t){return t.rc==="Client Clarification";});
+    out+=pivHeader("Group-wise Clarifications",[chip("Root Cause","Client Clarification")],"Client-clarification tickets broken down by Group → HD/ENGG → SVM In Charge (rows), columned by the current worker who handled them.");
+    out+=nestedGroupPivot(t3);
+    var gnotes=GROUP_ORDER.map(function(gp){ var sub=t3.filter(function(t){return t.group===gp;}); if(!sub.length)return null;
+      var hd=sub.filter(function(t){return t.isHD;}).length; return '<b>'+gp+'</b>: '+sub.length+' tickets — <b class="hd">'+hd+' HD</b> / <b class="eg">'+(sub.length-hd)+' Engg</b> ('+pct(hd,sub.length)+'% HD).'; }).filter(Boolean);
+    out+=note([hdSentence(t3)].concat(gnotes));
+    out+=groupLegend();
+  } else if(S.pivot==="rootcause"){
+    out+=pivHeader("Root Cause × Issue Type",[],"Ticket count by root cause, split by issue type.");
+    out+=pivot2D("rootcause","Root Cause","#B45309",pool,function(t){return t.rc||"(blank)";},"Root Cause",issueColDefs(pool),function(t){return t.issue||"(blank)";});
+    var rcM=cnt(pool,function(t){return t.rc||"(blank)";}), trc=topKey(rcM,true);
+    var incN=pool.filter(function(t){return t.issue==="Incident";}).length, srN=pool.filter(function(t){return t.issue==="Service Request";}).length;
+    out+=note([
+      trc?('Top root cause: <b>'+esc(trc)+'</b> with <b>'+rcM[trc].toLocaleString()+'</b> tickets ('+pct(rcM[trc],pool.length)+'% of all).'):null,
+      'Incidents <b>'+incN.toLocaleString()+'</b> vs Service Requests <b>'+srN.toLocaleString()+'</b> ('+pct(incN,pool.length)+'% / '+pct(srN,pool.length)+'%).',
+      (rcM["(blank)"]?('<b class="dn">'+rcM["(blank)"]+'</b> tickets have no root cause — see the Exceptions tab.'):null)
+    ]);
+  } else if(S.pivot==="component"){
+    out+=pivHeader("Component × Issue Type",[],"Ticket count by component, split by issue type.");
+    out+=pivot2D("component","Component","#0F766E",pool,function(t){return t.components||"(blank)";},"Components",issueColDefs(pool),function(t){return t.issue||"(blank)";});
+    var cM=cnt(pool,function(t){return t.components||"(blank)";}), tc=topKey(cM,true);
+    out+=note([
+      tc?('Top component: <b>'+esc(tc)+'</b> with <b>'+cM[tc].toLocaleString()+'</b> tickets.'):null,
+      (cM["(blank)"]?('<b class="dn">'+cM["(blank)"]+'</b> tickets have no component — see the Exceptions tab.'):'Every ticket has a component assigned.')
+    ]);
+  } else if(S.pivot==="svm"){
+    out+=pivHeader("SVM In Charge × Issue Type",[],"Ticket count by SVM In Charge, split by issue type.");
+    out+=pivot2D("svm","SVM In Charge","#5B57D8",pool,function(t){return t.svm||"(blank)";},"SVM In Charge",issueColDefs(pool),function(t){return t.issue||"(blank)";});
+    var sM=cnt(pool,function(t){return t.svm||"(blank)";}), ts=topKey(sM,true);
+    out+=note([
+      ts?('Highest volume: <b>'+esc(ts)+'</b> owns <b>'+sM[ts].toLocaleString()+'</b> tickets ('+pct(sM[ts],pool.length)+'%).'):null,
+      (sM["(blank)"]?('<b class="dn">'+sM["(blank)"]+'</b> tickets have no SVM In Charge — see the Exceptions tab.'):null)
+    ]);
+  }
+  out+='</div>';
+  return out;
+}
+
+/* ═══════════════════════════════ VIEW: WEEK ON WEEK ═══════════════════════════════ */
+function wowCard(label,a,b,isPct,color,metric){
+  var d=b-a, arrow=d>0?"▲":(d<0?"▼":"→"), cls=d>0?"up":(d<0?"down":"flat");
+  return '<div class="card kpi clk" data-wcard="'+metric+'" style="text-align:center;padding:16px 14px">'+
+    '<div class="kl">'+label+'</div>'+
+    '<div class="kv" style="color:'+color+';font-size:25px;margin-top:8px">'+b+(isPct?"%":"")+'</div>'+
+    '<div style="margin-top:9px"><span class="dchip '+cls+'">'+arrow+' '+Math.abs(d)+(isPct?" pts":"")+'</span> <span class="sub">vs '+a+(isPct?"%":"")+'</span></div>'+
+  '</div>';
+}
+function deltaCell(d,isPct,neg){
+  if(d===null||d===undefined) return '<span class="sub">—</span>';
+  var good=neg?-d:d, cls=good>0?"up":(good<0?"down":"flat"), sym=d>0?"▲":(d<0?"▼":"→");
+  return '<span class="dchip '+cls+'">'+sym+' '+Math.abs(d)+(isPct?" pts":"")+'</span>';
+}
+function viewWoW(){
+  window.__piv={};
+  var pool=weekPool();
+  var scopeNote=(S.svm||S.cw||S.rc||S.issue)?" (filters applied)":"";
+  var out='<div class="up" style="margin-bottom:14px"><div class="eyebrow">Week on Week</div>'+
+    '<h1 style="font-size:23px;font-weight:700;letter-spacing:-.4px;margin-top:4px">Week-on-week resolution</h1>'+
+    '<div class="sub" style="margin-top:3px">ISO week numbers built from each ticket\'s <b>Resolved date</b>. Pick two weeks below — that window drives every chart, table and pivot on this tab'+esc(scopeNote)+'.</div></div>';
+  if(!pool.length){ return out+'<div class="card pad"><div class="empty">No resolved tickets in scope. Week-on-week uses the Resolved date — try clearing filters or the date range.</div></div>'; }
+
+  function fk(d){ var iw=isoWeek(d); return iw.year+"-W"+String(iw.week).padStart(2,"0"); }
+  var wk={};
+  pool.forEach(function(t){ var key=fk(t.resolved);
+    if(!wk[key]) wk[key]={key:key,year:isoWeek(t.resolved).year,week:isoWeek(t.resolved).week,tix:[],hd:0,eg:0};
+    wk[key].tix.push(t); if(t.isHD)wk[key].hd++; else wk[key].eg++; });
+  var keys=Object.keys(wk).sort();
+  window.__wk=wk;
+  if(!S.weekB||!wk[S.weekB]) S.weekB=keys[keys.length-1];
+  if(!S.weekA||!wk[S.weekA]) S.weekA=keys.length>1?keys[keys.length-2]:keys[keys.length-1];
+
+  // the two selectors define an inclusive window
+  var lo=S.weekA<=S.weekB?S.weekA:S.weekB, hi=S.weekA<=S.weekB?S.weekB:S.weekA;
+  var vis=keys.filter(function(k){ return k>=lo && k<=hi; });
+  var poolR=pool.filter(function(t){ var k=fk(t.resolved); return k>=lo && k<=hi; });
+  var allSelected=(vis.length===keys.length);
+
+  function m(k){ var w=wk[k]; return {t:w.tix.length,hd:w.hd,eg:w.eg,hp:pct(w.hd,w.tix.length)}; }
+  var A=m(S.weekA), B=m(S.weekB);
+
+  var latest=keys[keys.length-1];
+  var windowTxt = vis.length===1 ? ('Showing <b>'+weekLabel(vis[0])+'</b>') : ('Showing <b>'+weekLabel(lo)+'</b>–<b>'+weekLabel(hi)+'</b> · '+vis.length+' weeks');
+  out+='<div class="card up d1 pad" style="margin-bottom:14px">'+
+    '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px">'+
+      '<span class="sec-title">Compare weeks</span>'+
+      '<select class="fsel" id="weekA">'+keys.map(function(k){return '<option value="'+k+'" '+(S.weekA===k?"selected":"")+'>'+weekLabel(k)+' · '+weekDates(wk[k].year,wk[k].week)+'</option>';}).join("")+'</select>'+
+      '<span class="sub">→</span>'+
+      '<select class="fsel" id="weekB">'+keys.map(function(k){return '<option value="'+k+'" '+(S.weekB===k?"selected":"")+'>'+weekLabel(k)+' · '+weekDates(wk[k].year,wk[k].week)+'</option>';}).join("")+'</select>'+
+      '<button class="chip'+(vis.length===2&&hi===latest?' on':'')+'" data-wowset="last2">Last 2 weeks</button>'+
+      '<button class="chip'+(allSelected?' on':'')+'" data-wowset="all">All weeks</button>'+
+      '<span class="click" style="margin-left:auto">'+windowTxt+' · click a metric to open tickets</span>'+
+    '</div>'+
+    '<div class="grid" style="grid-template-columns:repeat(4,1fr)">'+
+      wowCard("Resolved",A.t,B.t,false,"var(--ink)","all")+
+      wowCard("HD resolved",A.hd,B.hd,false,"var(--hd)","hd")+
+      wowCard("Engg resolved",A.eg,B.eg,false,"var(--engg)","eg")+
+      wowCard("HD share",A.hp,B.hp,true,"var(--hd)","hp")+
+    '</div>'+
+    note([
+      'From <b>'+weekLabel(S.weekA)+'</b> to <b>'+weekLabel(S.weekB)+'</b>, resolved '+((B.t-A.t)>=0?'rose':'fell')+' by <b>'+Math.abs(B.t-A.t)+'</b> ('+(A.t?Math.round((B.t-A.t)/A.t*100):0)+'%).',
+      'HD share moved <b class="'+((B.hp-A.hp)>=0?'up':'dn')+'">'+arrow(B.hp-A.hp)+' '+Math.abs(B.hp-A.hp)+' pts</b> ('+A.hp+'% → '+B.hp+'%).'
+    ])+
+  '</div>';
+
+  // trend bars — visible window only
+  var maxT=1; vis.forEach(function(k){ maxT=Math.max(maxT,wk[k].tix.length); });
+  var BAR=200;
+  out+='<div class="card up d2 pad" style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px"><span class="sec-title">Resolved per week — HD vs Engg</span><span class="click">'+(allSelected?"all weeks":weekLabel(lo)+"–"+weekLabel(hi))+' · click a segment</span></div><div class="stackwrap">';
+  vis.forEach(function(k){ var w=wk[k]; var tot=w.tix.length; var hpx=Math.max(Math.round(tot/maxT*BAR),10);
+    out+='<div class="col"><div class="tot">'+tot+'</div><div class="stack" style="height:'+hpx+'px">'+
+      (w.eg>0?'<div class="seg engg" data-wk="'+k+'" data-side="eg" style="flex:'+w.eg+' '+w.eg+' 0" title="Engg '+w.eg+'">'+(w.eg/tot*hpx>=16?'<span class="sv">'+w.eg+'</span>':'')+'</div>':'')+
+      (w.hd>0?'<div class="seg hd" data-wk="'+k+'" data-side="hd" style="flex:'+w.hd+' '+w.hd+' 0" title="HD '+w.hd+'">'+(w.hd/tot*hpx>=16?'<span class="sv">'+w.hd+'</span>':'')+'</div>':'')+
+    '</div><div class="wx">'+weekLabel(k)+'<br>'+weekDates(w.year,w.week)+'</div></div>';
+  });
+  out+='</div><div class="legend" style="margin-top:14px"><span class="li"><span class="sw" style="background:var(--hd)"></span>HD resolved</span><span class="li"><span class="sw" style="background:var(--engg)"></span>Engg resolved</span></div>'+
+    (function(){ var sum=vis.reduce(function(a,k){return a+wk[k].tix.length;},0);
+      var busiest=vis.reduce(function(a,b){return wk[b].tix.length>wk[a].tix.length?b:a;});
+      var lat=wk[vis[vis.length-1]];
+      return note([
+        'Window of <b>'+vis.length+'</b> week'+(vis.length!==1?'s':'')+' — <b>'+sum.toLocaleString()+'</b> resolved, averaging <b>'+Math.round(sum/vis.length)+'</b>/week.',
+        'Busiest in window: <b>'+weekLabel(busiest)+'</b> ('+weekDates(wk[busiest].year,wk[busiest].week)+') with <b>'+wk[busiest].tix.length+'</b> resolved.',
+        'Newest week <b>'+weekLabel(lat.key)+'</b> — HD share <b class="hd">'+pct(lat.hd,lat.tix.length)+'%</b> ('+lat.hd+' HD / '+lat.eg+' Engg).'
+      ]); })()+
+  '</div>';
+
+  // detail table with deltas — visible window
+  out+='<div class="card up d3" style="overflow:hidden;margin-bottom:14px"><div class="pad" style="border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center"><span class="sec-title">Week detail &amp; change vs previous week</span><span class="click">click a row, or an HD / Engg cell</span></div>'+
+    '<div style="overflow:auto;max-height:460px"><table class="ptable"><thead><tr><th class="rh">Week</th><th class="rh">Dates</th><th>Resolved</th><th>HD</th><th>Engg</th><th>HD %</th><th>Engg %</th><th>Δ Resolved</th><th>Δ HD %</th><th>Δ Engg %</th></tr></thead><tbody>';
+  vis.forEach(function(k,i){ var w=wk[k]; var tot=w.tix.length; var hp=pct(w.hd,tot);
+    var prev=i>0?wk[vis[i-1]]:null; var dTot=prev?tot-prev.tix.length:null; var dHp=prev?hp-pct(prev.hd,prev.tix.length):null;
+    out+='<tr class="rowlink" data-wk-row="'+k+'"><td class="rl">'+weekLabel(k)+'</td>'+
+      '<td class="rl" style="font-weight:400;color:var(--muted)">'+weekDates(w.year,w.week)+'</td>'+
+      '<td class="tot val" data-wkc="'+k+'" data-side="all">'+tot+'</td>'+
+      '<td class="val" data-wkc="'+k+'" data-side="hd" style="color:var(--hd);font-weight:700">'+w.hd+'</td>'+
+      '<td class="val" data-wkc="'+k+'" data-side="eg" style="color:var(--engg);font-weight:700">'+w.eg+'</td>'+
+      '<td class="mono">'+hp+'%</td>'+
+      '<td class="mono" style="color:var(--engg)">'+(100-hp)+'%</td>'+
+      '<td>'+deltaCell(dTot,false)+'</td><td>'+deltaCell(dHp,true)+'</td>'+
+      '<td>'+deltaCell(dHp===null?null:-dHp,true,true)+'</td></tr>';
+  });
+  out+='</tbody></table></div>'+
+    (function(){ if(vis.length<2) return ""; var jumps=[]; for(var i=1;i<vis.length;i++){ jumps.push({k:vis[i],d:wk[vis[i]].tix.length-wk[vis[i-1]].tix.length}); }
+      var up=jumps.reduce(function(a,b){return b.d>a.d?b:a;}), dn=jumps.reduce(function(a,b){return b.d<a.d?b:a;});
+      return note([
+        'Biggest week-over-week rise: <b class="up">'+weekLabel(up.k)+' (+'+up.d+')</b> vs the prior week.',
+        'Biggest drop: <b class="dn">'+weekLabel(dn.k)+' ('+dn.d+')</b> vs the prior week.'
+      ]); })()+
+  '</div>';
+
+  // pivots — visible window
+  out+='<div class="card up d4 pad" style="margin-bottom:14px">'+pivHeader("Week × Solved",[chip("Window",allSelected?"all weeks":weekLabel(lo)+"–"+weekLabel(hi))],"Resolved tickets per ISO week, split HD vs Engg.")+
+    pivot2D("wkhd","Week × Solved","#0F766E",poolR,function(t){return weekKeyLabel(t.resolved);},"Week",[{key:"HD",label:"HD"},{key:"ENGG",label:"ENGG"}],function(t){return t.isHD?"HD":"ENGG";})+
+    (function(){ var bh=null,bl=null; vis.forEach(function(k){ var p=pct(wk[k].hd,wk[k].tix.length); if(bh===null||p>pct(wk[bh].hd,wk[bh].tix.length))bh=k; if(bl===null||p<pct(wk[bl].hd,wk[bl].tix.length))bl=k; });
+      return note([ hdSentence(poolR),
+        (bh&&bl&&bh!==bl)?('Highest HD-share week: <b class="hd">'+weekLabel(bh)+' ('+pct(wk[bh].hd,wk[bh].tix.length)+'%)</b>; lowest: <b class="dn">'+weekLabel(bl)+' ('+pct(wk[bl].hd,wk[bl].tix.length)+'%)</b>.'):null ]); })()+
+  '</div>';
+  var gAll=cnt(poolR,function(t){return t.group;}), tgAll=topKey(gAll);
+  out+='<div class="card up d4 pad">'+pivHeader("Week × Group",[chip("Window",allSelected?"all weeks":weekLabel(lo)+"–"+weekLabel(hi))],"Resolved tickets per ISO week across Group 1 / Group 2 / Others.")+
+    pivot2D("wkgroup","Week × Group","#5B57D8",poolR,function(t){return weekKeyLabel(t.resolved);},"Week",GROUP_ORDER.map(function(g){return {key:g,label:g};}),function(t){return t.group;})+
+    note([ 'Resolved by group — <b>Group 1</b> '+(gAll["Group 1"]||0)+' ('+pct(gAll["Group 1"]||0,poolR.length)+'%), <b>Group 2</b> '+(gAll["Group 2"]||0)+' ('+pct(gAll["Group 2"]||0,poolR.length)+'%), <b>Others</b> '+(gAll["Others"]||0)+' ('+pct(gAll["Others"]||0,poolR.length)+'%).', tgAll?('Most resolved: <b>'+esc(tgAll)+'</b>.'):null ])+
+    groupLegend()+'</div>';
+  return out;
+}
+
+/* ═══════════════════════════════ small builders ═══════════════════════════════ */
+function kpi(ic,label,val,color,click,sub){
+  return '<div class="kpi card clk" data-kpi="'+click+'"><div class="tag">'+ic+'</div>'+
+    '<div class="kv" style="color:'+color+'">'+val+'</div>'+
+    '<div class="kl">'+label+'</div>'+(sub?'<div class="ks">'+sub+'</div>':'')+'</div>';
+}
+function th(col,label){
+  var arrow=S.sortCol===col?(S.sortDir==="asc"?" ↑":" ↓"):"";
+  return '<th data-sort="'+col+'">'+label+'<span style="color:var(--hd)">'+arrow+'</span></th>';
+}
+
+/* ═══════════════════════════════ BIND events per tab ═══════════════════════════════ */
+function bindPivotCells(){
+  // generic 2-D pivot cells (used by Pivots tab and Week-on-Week pivots)
+  document.querySelectorAll('.ptable td.val[data-piv]').forEach(function(td){
+    if(td.classList.contains("zero")) return;
+    td.onclick=function(){
+      var reg=window.__piv[td.dataset.piv]; if(!reg) return;
+      var r=td.dataset.r, c=td.dataset.c;
+      var sub=reg.tickets.filter(function(t){ return (r==="__all__"||reg.rowKeyFn(t)===r) && (c==="__all__"||reg.colKeyFn(t)===c); });
+      var title=reg.title+" — "+(r==="__all__"?"All rows":r)+(c==="__all__"?"":" · "+c);
+      openModal(title,"🧮",reg.color,sub);
+    };
+  });
+  // nested group pivot cells
+  document.querySelectorAll('.ptable td.val[data-nested]').forEach(function(td){
+    if(td.classList.contains("zero")) return;
+    td.onclick=function(){
+      var reg=window.__pivNested; if(!reg) return;
+      var g=td.dataset.group, sv=td.dataset.solved, sm=td.dataset.svm, w=td.dataset.worker;
+      var sub=reg.tickets.filter(function(t){
+        if(g!=="__all__"&&t.group!==g) return false;
+        if(sv!=="__all__"&&(t.isHD?"HD":"ENGG")!==sv) return false;
+        if(sm!=="__all__"&&(t.svm||"(blank)")!==sm) return false;
+        if(w!=="__all__"&&(t.currentWorker||"(blank)")!==w) return false;
+        return true;
+      });
+      var parts=[]; if(g!=="__all__")parts.push(g); if(sv!=="__all__")parts.push(sv); if(sm!=="__all__")parts.push(sm); if(w!=="__all__")parts.push("worker "+w);
+      openModal(parts.join(" · ")||"All clarification tickets","🧮","#0F766E",sub);
+    };
+  });
+}
+function bindMain(){
+  // sort headers
+  document.querySelectorAll("th[data-sort]").forEach(function(h){
+    h.onclick=function(){
+      var c=h.dataset.sort;
+      if(S.sortCol===c) S.sortDir=S.sortDir==="asc"?"desc":"asc";
+      else { S.sortCol=c; S.sortDir="desc"; }
+      renderMain();
+    };
+  });
+  bindPivotCells();
+
+  if(S.tab==="perf"){
+    var f=filtered();
+    var hd=f.filter(function(t){return t.isHD;});
+    var eg=f.filter(function(t){return !t.isHD;});
+    // hero track
+    var ht=el("heroTrack");
+    if(ht){ ht.querySelectorAll(".seg").forEach(function(s){ s.onclick=function(){ s.dataset.side==="hd"?openModal("HD resolved","🟢","#0F766E",hd):openModal("Engg resolved","🟣","#5B57D8",eg); }; }); }
+    // KPIs
+    document.querySelectorAll("[data-kpi]").forEach(function(c){
+      c.onclick=function(){
+        var k=c.dataset.kpi;
+        if(k==="all")openModal("All tickets in scope","📦","#111A2B",f);
+        else if(k==="hd")openModal("HD resolved","🟢","#0F766E",hd);
+        else if(k==="eg")openModal("Engg resolved","🟣","#5B57D8",eg);
+        else if(k==="closed")openModal("Closed tickets","✅","#334155",f.filter(function(t){return t.status==="Closed";}));
+        else if(k==="inc")openModal("Incidents","🔺","#B45309",f.filter(function(t){return t.issue==="Incident";}));
+        else if(k==="srq")openModal("Service Requests","📨","#334155",f.filter(function(t){return t.issue==="Service Request";}));
+      };
+    });
+    // root cause bars
+    document.querySelectorAll(".barrow[data-rc]").forEach(function(b){
+      b.onclick=function(){ var rc=b.dataset.rc; openModal('Root cause: '+rc,"🏷️","#0F766E",f.filter(function(t){return (t.rc||"(blank)")===rc;})); };
+    });
+    // monthly bars
+    document.querySelectorAll(".mbars .bar[data-month]").forEach(function(b){
+      b.onclick=function(){
+        var k=b.dataset.month, side=b.dataset.side;
+        var tix=f.filter(function(t){return bucketMonth(t)===k && (side==="hd"?t.isHD:!t.isHD);});
+        openModal(mLabel(k)+" · "+(side==="hd"?"HD":"Engg")+" resolved","📈",side==="hd"?"#0F766E":"#5B57D8",tix);
+      };
+    });
+    // svm rows
+    document.querySelectorAll("tr.rowlink[data-svm]").forEach(function(r){
+      r.onclick=function(){ var s=r.dataset.svm; openModal(s+" — all tickets in scope","👤","#0F766E",f.filter(function(t){return (t.svm||"(unassigned)")===s;})); };
+    });
+  }
+
+  if(S.tab==="trend"){
+    el("tRc").onchange=function(e){ S.tRc=e.target.value; renderMain(); };
+    el("tStatus").onchange=function(e){ S.tStatus=e.target.value; renderMain(); };
+    // rebuild scope to resolve clicks
+    var base=RAW.filter(function(t){ if(!inRange(t))return false; if(S.svm&&t.svm!==S.svm)return false; if(S.cw&&t.currentWorker!==S.cw)return false; if(S.issue&&t.issue!==S.issue)return false; return true; });
+    function scopeFn(t){
+      if(S.tRc==="__CLAR__"){ if(!isClar(t.rc))return false; } else if(S.tRc!=="__ALL__"){ if(t.rc!==S.tRc)return false; }
+      if(S.tStatus==="Closed"){ if(t.status!=="Closed")return false; } else if(S.tStatus!=="__ALL__"){ if(t.status!==S.tStatus)return false; }
+      return true;
+    }
+    var scope=base.filter(scopeFn);
+    // month card segments
+    document.querySelectorAll(".mcard .seg[data-mk]").forEach(function(s){
+      s.onclick=function(){
+        var k=s.dataset.mk, side=s.dataset.side;
+        var tix=scope.filter(function(t){return bucketMonth(t)===k && (side==="hd"?t.isHD:!t.isHD);});
+        openModal(mLabel(k)+" · "+(side==="hd"?"HD closed":"Engg")+" clarification","📈",side==="hd"?"#0F766E":"#5B57D8",tix);
+      };
+    });
+    // line chart dots + tooltip
+    var tip=el("lctip");
+    document.querySelectorAll(".lc-dot").forEach(function(d){
+      d.addEventListener("mousemove",function(ev){
+        if(!tip)return; var box=d.closest(".linechart").getBoundingClientRect();
+        tip.style.left=(ev.clientX-box.left)+"px"; tip.style.top=(ev.clientY-box.top)+"px";
+        tip.innerHTML=(d.dataset.lc==="hd"?"HD":"Engg")+" <span class='mono'>"+d.dataset.p+"%</span> · "+mLabel(d.dataset.mk);
+        tip.style.opacity="1";
+      });
+      d.addEventListener("mouseleave",function(){ if(tip)tip.style.opacity="0"; });
+      d.onclick=function(){
+        var k=d.dataset.mk, side=d.dataset.lc;
+        var tix=scope.filter(function(t){return bucketMonth(t)===k && (side==="hd"?t.isHD:!t.isHD);});
+        openModal(mLabel(k)+" · "+(side==="hd"?"HD":"Engg")+" ("+d.dataset.p+"%)","📈",side==="hd"?"#0F766E":"#5B57D8",tix);
+      };
+    });
+  }
+
+  if(S.tab==="pivots"){
+    document.querySelectorAll("[data-piv-nav]").forEach(function(b){ b.onclick=function(){ S.pivot=b.dataset.pivNav; renderMain(); }; });
+  }
+
+  if(S.tab==="wow"){
+    var wk=window.__wk||{};
+    var sa=el("weekA"); if(sa) sa.onchange=function(e){ S.weekA=e.target.value; renderMain(); };
+    var sb=el("weekB"); if(sb) sb.onchange=function(e){ S.weekB=e.target.value; renderMain(); };
+    // window presets
+    document.querySelectorAll("[data-wowset]").forEach(function(b){
+      b.onclick=function(){ var ks=Object.keys(window.__wk||{}).sort(); if(!ks.length) return;
+        if(b.dataset.wowset==="all"){ S.weekA=ks[0]; S.weekB=ks[ks.length-1]; }
+        else { S.weekA=ks.length>1?ks[ks.length-2]:ks[ks.length-1]; S.weekB=ks[ks.length-1]; }
+        renderMain();
+      };
+    });
+    // compare cards → week B tickets
+    document.querySelectorAll("[data-wcard]").forEach(function(c){
+      c.onclick=function(){
+        var w=wk[S.weekB]; if(!w) return; var side=c.dataset.wcard;
+        var tix = side==="hd"?w.tix.filter(function(t){return t.isHD;}) : side==="eg"?w.tix.filter(function(t){return !t.isHD;}) : w.tix;
+        var sfx = side==="hd"?" · HD":side==="eg"?" · Engg":"";
+        openModal(weekLabel(S.weekB)+" ("+weekDates(w.year,w.week)+") resolved"+sfx,"🗓️", side==="eg"?"#5B57D8":"#0F766E", tix);
+      };
+    });
+    // trend bar segments
+    document.querySelectorAll(".stackwrap .seg[data-wk]").forEach(function(s){
+      s.onclick=function(){ var w=wk[s.dataset.wk]; if(!w) return; var side=s.dataset.side;
+        var tix=side==="hd"?w.tix.filter(function(t){return t.isHD;}):w.tix.filter(function(t){return !t.isHD;});
+        openModal(weekLabel(w.key)+" · "+(side==="hd"?"HD":"Engg")+" resolved","🗓️",side==="hd"?"#0F766E":"#5B57D8",tix);
+      };
+    });
+    // detail table HD/Engg/total cells
+    document.querySelectorAll("td.val[data-wkc]").forEach(function(td){
+      td.onclick=function(ev){ ev.stopPropagation(); var w=wk[td.dataset.wkc]; if(!w) return; var side=td.dataset.side;
+        var tix=side==="hd"?w.tix.filter(function(t){return t.isHD;}):side==="eg"?w.tix.filter(function(t){return !t.isHD;}):w.tix;
+        var sfx=side==="hd"?" · HD":side==="eg"?" · Engg":"";
+        openModal(weekLabel(w.key)+" resolved"+sfx,"🗓️",side==="eg"?"#5B57D8":"#0F766E",tix);
+      };
+    });
+    // whole-row → week tickets
+    document.querySelectorAll("tr.rowlink[data-wk-row]").forEach(function(r){
+      r.onclick=function(){ var w=wk[r.dataset.wkRow]; if(!w) return; openModal(weekLabel(w.key)+" ("+weekDates(w.year,w.week)+") · all resolved","🗓️","#0F766E",w.tix); };
+    });
+  }
+
+  if(S.tab==="exc"){
+    document.querySelectorAll("[data-exc]").forEach(function(c){
+      c.onclick=function(){ S._excFilter = (S._excFilter===c.dataset.exc)? null : c.dataset.exc; renderMain(); };
+    });
+    var clr=el("excClear"); if(clr) clr.onclick=function(){ S._excFilter=null; renderMain(); };
+    var csv=el("excCsv"); if(csv) csv.onclick=function(){ exportCSV(window.__excList||[],"exceptions"); };
+  }
+}
+
+/* ═══════════════════════════════ UPLOAD FLOW ═══════════════════════════════ */
+function handleUpload(e){
+  var file=e.target.files&&e.target.files[0]; if(!file) return;
+  FILENAME=file.name;
+  var btn=el("uploadBtn"); if(btn){ btn.textContent="Reading…"; btn.disabled=true; }
+  readFile(file).then(function(rows){
+    RAW=normalize(rows).filter(function(t){return t.key;});
+    // reset view state on new upload
+    S.svm=""; S.cw=""; S.rc=""; S.issue=""; S.from=""; S.to=""; S.dlabel="All time"; S._excFilter=null;
+    S.tab="perf"; S.tRc="__CLAR__"; S.tStatus="Closed"; S.pivot="hdworker"; S.weekA=""; S.weekB=""; S.sortCol="total"; S.sortDir="desc";
+    render();
+    // footer
+  }).catch(function(err){ alert("Could not read file: "+err.message); if(btn){btn.textContent="Upload Jira Excel";btn.disabled=false;} });
+  e.target.value="";
+}
+
+function renderLanding(){
+  el("app").innerHTML=''+
+  '<div class="landing">'+
+    '<div class="deco b1"></div><div class="deco b2"></div>'+
+    '<div class="deco ring r1"></div><div class="deco ring r2"></div>'+
+    '<div class="landing-card up">'+
+      '<div class="brand-mark">'+
+        '<span class="bar"><i style="height:16px;background:var(--hd)"></i><i style="height:32px;background:var(--hd2)"></i><i style="height:12px;background:var(--engg2)"></i><i style="height:26px;background:var(--engg)"></i></span>'+
+        '<span style="font-family:var(--disp);font-weight:700;font-size:20px;letter-spacing:-.4px">HD Ticket Trend Tracker</span>'+
+      '</div>'+
+      '<p style="color:var(--ink2);font-size:13px;margin:-6px 0 22px;line-height:1.6">Upload your Jira export to see, month by month and person by person, how much the Help Desk resolved on its own versus escalating to Engineering.</p>'+
+      '<div class="upload-panel">'+
+        '<div class="dz" id="dz">'+
+          '<div style="font-size:34px;margin-bottom:8px">📊</div>'+
+          '<div style="font-family:var(--disp);font-weight:600;font-size:15px;margin-bottom:4px">Drop your Jira Excel here</div>'+
+          '<div class="sub" style="margin-bottom:16px">.xlsx exported from Jira · any size · the whole file is read in your browser</div>'+
+          '<button class="btn-primary" id="uploadBtn">Choose Excel file</button>'+
+        '</div>'+
+        '<div style="margin-top:18px;text-align:left">'+
+          '<div class="eyebrow" style="margin-bottom:8px">Columns the dashboard reads</div>'+
+          '<div class="hint-cols">'+
+            ["Issue Type","Key","Summary","SVM In Charge","Root Cause","Status","Components","Linked Issues","Solved BY","Created","Resolved"].map(function(c){return '<span>'+c+'</span>';}).join("")+
+          '</div>'+
+          '<div class="sub" style="margin-top:12px;line-height:1.6"><b style="color:var(--hd)">HD</b> vs <b style="color:var(--engg)">ENGG</b> is read from <b>Solved BY</b>; a value in <b>Linked Issues</b> confirms an Engineering escalation. Next month, upload the same-format file — everything recalculates automatically.</div>'+
+        '</div>'+
+      '</div>'+
+      '<input type="file" id="fileinput" accept=".xlsx,.xls">'+
+    '</div>'+
+  '</div>';
+  var fi=el("fileinput");
+  el("uploadBtn").onclick=function(){ fi.click(); };
+  el("dz").onclick=function(){ fi.click(); };
+  fi.onchange=handleUpload;
+  var dz=el("dz");
+  ["dragenter","dragover"].forEach(function(ev){ dz.addEventListener(ev,function(e){e.preventDefault();dz.classList.add("over");}); });
+  ["dragleave","drop"].forEach(function(ev){ dz.addEventListener(ev,function(e){e.preventDefault();dz.classList.remove("over");}); });
+  dz.addEventListener("drop",function(e){
+    var file=e.dataTransfer.files&&e.dataTransfer.files[0];
+    if(file){ FILENAME=file.name; readFile(file).then(function(rows){ RAW=normalize(rows).filter(function(t){return t.key;}); S.tab="perf"; render(); }).catch(function(err){alert("Could not read file: "+err.message);}); }
+  });
+}
+
+/* footer appended after each render */
+var _origRenderMain=renderMain;
+renderMain=function(){
+  _origRenderMain();
+  var main=el("main"); if(!main)return;
+  var fdiv=document.createElement("div"); fdiv.className="footer";
+  var inRangeCount=RAW.filter(inRange).length;
+  fdiv.innerHTML='<b>'+esc(FILENAME)+'</b> · '+RAW.length.toLocaleString()+' tickets loaded'+((S.from||S.to)?' · '+inRangeCount.toLocaleString()+' in range':'')+' · HD Ticket Trend Tracker';
+  main.appendChild(fdiv);
+};
+
+/* boot — load the shared Excel uploaded on the launcher (index.html) */
+function boot(){
+  if(!window.HDStore){ renderLanding(); return; }
+  HDStore.loadFile().then(function(rec){
+    if(!rec){ window.location.replace("index.html"); return; }
+    FILENAME=rec.name;
+    readFile(rec.blob).then(function(rows){
+      RAW=normalize(rows).filter(function(t){return t.key;});
+      render();
+    }).catch(function(err){ alert("Could not read stored file: "+err.message); window.location.replace("index.html"); });
+  });
+}
+boot();
+</script>
+</body>
+</html>

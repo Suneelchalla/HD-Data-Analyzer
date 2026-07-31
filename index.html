@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HD Dashboards</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23101828'/%3E%3Crect x='7' y='9' width='7' height='14' rx='2' fill='%232563EB'/%3E%3Crect x='18' y='9' width='7' height='14' rx='2' fill='%230F766E'/%3E%3C/svg%3E">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="hd-store.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EEF1F4; --card:#FFFFFF; --paper:#F6F8FA;
+  --ink:#101828; --ink2:#3E4C63; --muted:#6B7A90; --faint:#9AA7B8;
+  --line:#E3E8EE; --line2:#D2DAE3;
+  --blue:#2563EB; --blue-bg:#EFF4FF; --blue-line:#CFE0FF;
+  --teal:#0F766E; --teal-bg:#EEFAF7; --teal-line:#BEEAE2;
+  --rose:#BE1D42;
+  --disp:'Space Grotesk',sans-serif; --sans:'Inter',-apple-system,BlinkMacSystemFont,sans-serif; --mono:'JetBrains Mono',monospace;
+  --sh:0 1px 2px rgba(16,24,40,.05),0 1px 3px rgba(16,24,40,.04);
+  --sh2:0 10px 30px rgba(16,24,40,.10),0 2px 8px rgba(16,24,40,.06);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{font-size:14px}
+body{min-height:100vh;background:
+  radial-gradient(900px 520px at 12% -8%,#E9F1FF 0%,transparent 55%),
+  radial-gradient(900px 560px at 100% 108%,#E6F6F2 0%,transparent 55%),
+  var(--bg);
+  font-family:var(--sans);color:var(--ink);-webkit-font-smoothing:antialiased;
+  display:flex;align-items:center;justify-content:center;padding:32px 20px}
+::selection{background:var(--ink);color:#fff}
+h1,h2,.disp{font-family:var(--disp);letter-spacing:-.4px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+a{text-decoration:none;color:inherit}
+button{cursor:pointer;font-family:inherit;transition:all .18s}button:active{transform:translateY(1px)}
+input[type=file]{display:none}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.rise{animation:rise .5s cubic-bezier(.22,1,.36,1) both}
+.d1{animation-delay:.06s}.d2{animation-delay:.12s}.d3{animation-delay:.18s}
+.hidden{display:none!important}
+
+.wrap{width:100%;max-width:840px}
+.brand{display:flex;align-items:center;gap:11px;margin-bottom:6px}
+.brand .mk{display:flex;gap:4px;align-items:flex-end;height:24px}
+.brand .mk i{display:block;width:7px;border-radius:2px}
+.brand b{font-family:var(--disp);font-weight:700;font-size:17px}
+.eyebrow{font-size:10.5px;font-weight:700;color:var(--faint);text-transform:uppercase;letter-spacing:1.1px}
+.lead{color:var(--ink2);font-size:13.5px;line-height:1.6;margin-top:8px;max-width:620px}
+.lead b.b{color:var(--blue)} .lead b.t{color:var(--teal)}
+
+/* shared source spine */
+.source{background:var(--card);border:1px solid var(--line);border-radius:16px;box-shadow:var(--sh);padding:18px 20px;margin:22px 0 16px}
+.dz{border:2px dashed var(--line2);border-radius:13px;padding:26px 20px;text-align:center;background:var(--paper);cursor:pointer;transition:border-color .18s,background .18s}
+.dz:hover,.dz.over{border-color:var(--ink);background:#eef1f5}
+.dz .ic{font-size:30px;margin-bottom:6px}
+.dz .t{font-family:var(--disp);font-weight:600;font-size:15px}
+.dz .s{font-size:12px;color:var(--muted);margin-top:3px}
+.dz .btn{margin-top:15px;background:var(--ink);color:#fff;border:none;padding:11px 26px;border-radius:10px;font-family:var(--disp);font-weight:600;font-size:13.5px}
+.dz .btn:hover{background:#1c2740}
+
+/* loaded file chip */
+.filerow{display:flex;align-items:center;gap:13px}
+.filerow .fic{width:40px;height:40px;border-radius:11px;background:#E9F6F1;border:1px solid var(--teal-line);display:flex;align-items:center;justify-content:center;font-size:19px;flex-shrink:0}
+.filerow .fname{font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.filerow .fmeta{font-size:12px;color:var(--muted);margin-top:2px}
+.filerow .fmeta b{color:var(--ink2)}
+.filerow .ok{color:var(--teal);font-weight:700}
+.ghost{background:var(--paper);border:1px solid var(--line);color:var(--ink2);padding:8px 15px;border-radius:9px;font-size:12px;font-weight:600;white-space:nowrap}
+.ghost:hover{border-color:var(--line2)}
+.hint{margin-left:auto;font-size:11.5px;color:var(--faint)}
+
+/* the two lenses */
+.lenslabel{font-size:11px;color:var(--muted);margin:2px 0 12px;display:flex;align-items:center;gap:8px}
+.lenslabel .rule{flex:1;height:1px;background:var(--line)}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.card{position:relative;display:block;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:22px 22px 20px;box-shadow:var(--sh);transition:transform .18s,box-shadow .22s,border-color .18s;overflow:hidden}
+.card:hover{transform:translateY(-3px);box-shadow:var(--sh2)}
+.card::before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px}
+.card.fu::before{background:var(--blue)} .card.fu:hover{border-color:var(--blue-line)}
+.card.tr::before{background:var(--teal)} .card.tr:hover{border-color:var(--teal-line)}
+.card .top{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.card .badge{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px}
+.card.fu .badge{background:var(--blue-bg);border:1px solid var(--blue-line)}
+.card.tr .badge{background:var(--teal-bg);border:1px solid var(--teal-line)}
+.card .go{font-size:12px;font-weight:700;font-family:var(--disp);display:inline-flex;align-items:center;gap:5px}
+.card.fu .go{color:var(--blue)} .card.tr .go{color:var(--teal)}
+.card .go .ar{transition:transform .18s}
+.card:hover .go .ar{transform:translateX(3px)}
+.card h2{font-size:17px;font-weight:700}
+.card p{font-size:12.5px;color:var(--ink2);line-height:1.55;margin-top:6px}
+.card .feat{display:flex;flex-wrap:wrap;gap:5px;margin-top:13px}
+.card .feat span{font-size:10.5px;font-weight:600;color:var(--ink2);background:var(--paper);border:1px solid var(--line);padding:3px 9px;border-radius:20px}
+.cards.locked{opacity:.5;pointer-events:none;filter:grayscale(.3)}
+
+/* query helper */
+.qbox{margin-top:18px}
+.qhead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:9px}
+.qhead .l{display:flex;align-items:center;gap:9px}
+.qhead .l .qi{width:28px;height:28px;border-radius:8px;background:var(--paper);border:1px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:13px}
+.qhead .l .qt{font-size:12px;font-weight:700}
+.qhead .l .qs{font-size:10.5px;color:var(--muted);margin-top:1px}
+.qcopy{background:var(--ink);color:#fff;border:none;padding:7px 15px;border-radius:8px;font-size:11px;font-weight:700;display:flex;align-items:center;gap:5px}
+.qcopy.done{background:var(--teal)}
+.qcode{background:#0F172A;border-radius:11px;padding:13px 16px;font-family:var(--mono);font-size:11px;line-height:1.75;color:#E2E8F0;overflow-x:auto;white-space:pre-wrap;word-break:break-word}
+.qcode .k{color:#60A5FA}.qcode .o{color:#F472B6}.qcode .v{color:#34D399}.qcode .n{color:#FBBF24}
+.foot{margin-top:22px;text-align:center;font-size:11px;color:var(--faint);line-height:1.8}
+
+@media(max-width:640px){
+  .cards{grid-template-columns:1fr}
+  .filerow{flex-wrap:wrap}
+  .hint{display:none}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="rise">
+    <div class="brand">
+      <span class="mk"><i style="height:15px;background:var(--blue)"></i><i style="height:24px;background:#5B8DEF"></i><i style="height:13px;background:#3AA79A"></i><i style="height:20px;background:var(--teal)"></i></span>
+      <b>HD Dashboards</b>
+    </div>
+    <div class="eyebrow">One export · two lenses</div>
+    <p class="lead">Upload your Jira export once. The same file feeds both the <b class="b">Follow-up Tracker</b> and the <b class="t">HD Trend Tracker</b> — open either below, or right-click a card to open it in its own tab.</p>
+  </div>
+
+  <!-- shared source -->
+  <div class="source rise d1">
+    <!-- EMPTY state -->
+    <div id="empty">
+      <div class="dz" id="dz">
+        <div class="ic">📊</div>
+        <div class="t">Drop your Jira Excel here</div>
+        <div class="s">.xlsx exported from Jira · read in your browser, stored locally on this device</div>
+        <button class="btn" id="chooseBtn">Choose Excel file</button>
+      </div>
+    </div>
+    <!-- LOADED state -->
+    <div id="loaded" class="hidden">
+      <div class="filerow">
+        <div class="fic">📄</div>
+        <div style="min-width:0;flex:1">
+          <div class="fname" id="fname">—</div>
+          <div class="fmeta"><span class="ok">Ready</span> · <b id="fcount">0</b> tickets loaded · both dashboards are using this file</div>
+        </div>
+        <button class="ghost" id="changeBtn">Change file</button>
+      </div>
+    </div>
+    <input type="file" id="fileinput" accept=".xlsx,.xls">
+  </div>
+
+  <!-- the two lenses -->
+  <div class="lenslabel rise d2"><span>Open a dashboard</span><span class="rule"></span></div>
+  <div class="cards locked rise d2" id="cards">
+    <a class="card fu" href="followup.html">
+      <div class="top"><div class="badge">📌</div><span class="go">Open <span class="ar">→</span></span></div>
+      <h2>Follow-up Tracker</h2>
+      <p>Daily triage: what needs your action, what's waiting on the client, what's with engineering — plus SLA breaches, aging, and data gaps.</p>
+      <div class="feat"><span>HD action queue</span><span>SLA</span><span>Aging</span><span>Per-worker</span><span>Data gaps</span></div>
+    </a>
+    <a class="card tr" href="trend.html">
+      <div class="top"><div class="badge">📈</div><span class="go">Open <span class="ar">→</span></span></div>
+      <h2>HD Trend Tracker</h2>
+      <p>The bigger picture: how much HD resolved alone vs. escalated to engineering, month by month and week by week, with Excel-style pivots.</p>
+      <div class="feat"><span>HD vs Engg</span><span>Trends</span><span>Week on week</span><span>Pivots</span><span>Exceptions</span></div>
+    </a>
+  </div>
+
+  <!-- export helper -->
+  <div class="qbox rise d3">
+    <div class="qhead">
+      <div class="l">
+        <div class="qi">🔎</div>
+        <div><div class="qt">Need the export? Use this Jira query</div><div class="qs">Jira → Filters → Advanced search (JQL), then export to Excel (.xlsx)</div></div>
+      </div>
+      <button class="qcopy" id="qcopy">⧉ Copy</button>
+    </div>
+    <div class="qcode" id="qcode"><span class="k">issuetype</span> <span class="o">IN</span> <span class="v">(Incident, "Service Request")</span>
+<span class="o">AND</span> <span class="k">created</span> <span class="n">&gt;=</span> <span class="v">"2025-01-01"</span>
+<span class="o">AND</span> <span class="k">created</span> <span class="n">&lt;=</span> <span class="v">"2026-12-31"</span>
+<span class="o">AND</span> <span class="k">project</span> <span class="o">IN</span> <span class="v">(ALXSVM, BLWS, CSD, ESLGEN, ECCL, FMSC, GWFC, IBEX, HSL, LSC, MILAHA, LSCSAIL, SSL, SWIPHX, TSHG, TKC, TASLI, UGL, VCL, WLS, WLSV, UAFL, NPDL, GSS)</span></div>
+  </div>
+
+  <div class="foot" id="foot">Files stay on your device — nothing is uploaded to a server.</div>
+</div>
+
+<script>
+var QUERY = 'issuetype IN (Incident, "Service Request") AND created >= "2025-01-01" AND created <= "2026-12-31" AND project IN (ALXSVM, BLWS, CSD, ESLGEN, ECCL, FMSC, GWFC, IBEX, HSL, LSC, MILAHA, LSCSAIL, SSL, SWIPHX, TSHG, TKC, TASLI, UGL, VCL, WLS, WLSV, UAFL, NPDL, GSS)';
+function el(id){ return document.getElementById(id); }
+
+/* count tickets the same way the dashboards pick their sheet */
+function countTickets(file){
+  return new Promise(function(res){
+    var r = new FileReader();
+    r.onload = function(e){
+      try{
+        var wb = XLSX.read(e.target.result, { type:"array" });
+        var sn = wb.SheetNames.find(function(s){ return s.toLowerCase().indexOf("jira issues")>-1; })
+              || wb.SheetNames.find(function(s){ return s.toLowerCase().indexOf("issue")>-1; })
+              || wb.SheetNames[1] || wb.SheetNames[0];
+        res(XLSX.utils.sheet_to_json(wb.Sheets[sn], { defval:"" }).length);
+      }catch(err){ res(null); }
+    };
+    r.onerror = function(){ res(null); };
+    r.readAsArrayBuffer(file);
+  });
+}
+
+function showLoaded(name, count){
+  el("empty").classList.add("hidden");
+  el("loaded").classList.remove("hidden");
+  el("cards").classList.remove("locked");
+  el("fname").textContent = name;
+  el("fcount").textContent = (count==null ? "—" : count.toLocaleString());
+}
+function showEmpty(){
+  el("loaded").classList.add("hidden");
+  el("empty").classList.remove("hidden");
+  el("cards").classList.add("locked");
+}
+
+function handleFile(file){
+  if(!file) return;
+  var btn = el("chooseBtn"); if(btn){ btn.textContent = "Reading…"; btn.disabled = true; }
+  countTickets(file).then(function(count){
+    HDStore.saveFile(file, file.name).then(function(){
+      showLoaded(file.name, count);
+    }).catch(function(err){
+      alert("Couldn't store the file on this device: " + err.message);
+      if(btn){ btn.textContent = "Choose Excel file"; btn.disabled = false; }
+    });
+  });
+}
+
+/* wiring */
+el("chooseBtn").onclick = function(){ el("fileinput").click(); };
+el("dz").onclick = function(){ el("fileinput").click(); };
+el("fileinput").onchange = function(e){ handleFile(e.target.files && e.target.files[0]); e.target.value=""; };
+el("changeBtn").onclick = function(){ HDStore.clearFile().then(showEmpty); };
+
+var dz = el("dz");
+["dragenter","dragover"].forEach(function(ev){ dz.addEventListener(ev, function(e){ e.preventDefault(); dz.classList.add("over"); }); });
+["dragleave","drop"].forEach(function(ev){ dz.addEventListener(ev, function(e){ e.preventDefault(); dz.classList.remove("over"); }); });
+dz.addEventListener("drop", function(e){ handleFile(e.dataTransfer.files && e.dataTransfer.files[0]); });
+
+el("qcopy").onclick = function(){
+  var b = el("qcopy");
+  navigator.clipboard.writeText(QUERY).then(function(){ b.textContent="✓ Copied"; b.classList.add("done"); setTimeout(function(){ b.textContent="⧉ Copy"; b.classList.remove("done"); }, 1800); })
+  .catch(function(){ var ta=document.createElement("textarea"); ta.value=QUERY; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta); b.textContent="✓ Copied"; b.classList.add("done"); setTimeout(function(){ b.textContent="⧉ Copy"; b.classList.remove("done"); }, 1800); });
+};
+
+/* on load: if a file is already stored, jump straight to the ready state */
+HDStore.loadFile().then(function(rec){
+  if(rec && rec.blob){
+    countTickets(rec.blob).then(function(count){ showLoaded(rec.name, count); });
+  }
+});
+</script>
+</body>
+</html>
