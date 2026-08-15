@@ -259,6 +259,13 @@ tbody tr.rowlink:hover{background:var(--hd-bg)}
 .tmode-btn{padding:7px 16px;border-radius:8px;font-size:12px;font-weight:700;border:1px solid var(--line);background:var(--card);color:var(--muted);cursor:pointer;transition:all .15s;white-space:nowrap}
 .tmode-btn.on{background:var(--ink);color:#fff;border-color:var(--ink)}
 .tmode-btn:hover:not(.on){background:var(--paper);border-color:var(--line2)}
+/* Global search overlay */
+.gs-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:300;display:flex;align-items:flex-start;justify-content:center;padding-top:80px}
+.gs-box{background:#fff;border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.25);width:100%;max-width:680px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden}
+.gs-input{flex:1;border:none;outline:none;font-size:16px;font-weight:500;color:var(--ink);background:transparent;font-family:var(--sans)}
+.gs-row{display:flex;padding:10px 18px;border-bottom:1px solid var(--line);align-items:center}
+.gs-label{width:180px;font-size:11px;font-weight:600;color:var(--faint);flex-shrink:0}
+.gs-val{flex:1;font-size:13px;font-weight:600;word-break:break-word}
 </style>
 </head>
 <body>
@@ -397,7 +404,10 @@ function normalize(rows){
       project:String(pick(row,"project")||"").trim(),
       priority:String(pick(row,"priority")||"").trim(),
       currentWorker:String(pick(row,"current worker")||"").trim(),
-      typeOfFix:String(pick(row,"type of fix")||"").trim()
+      typeOfFix:String(pick(row,"type of fix")||"").trim(),
+      screenName:String(pick(row,"screen name")||"").trim(),
+      menuHead:String(pick(row,"menu head")||"").trim(),
+      _raw:row
     };
   });
 }
@@ -513,6 +523,56 @@ function ring(pctVal,size,sw,color,inner){
 function bars(cols){ // small logo bars markup
   return '<span class="bar">'+cols+'</span>';
 }
+/* ─── Global Ticket Search ─── */
+function openGlobalSearch(){
+  if(document.getElementById("gs-ov"))return;
+  var html='<div class="gs-overlay" id="gs-ov">'+
+    '<div class="gs-box">'+
+      '<div style="padding:18px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12">'+
+        '<span style="font-size:22px;color:var(--faint)">🔍</span>'+
+        '<input class="gs-input" id="gs-q" placeholder="Enter ticket number e.g. ALXSVM-1234" autofocus/>'+
+        '<button class="ghost" id="gs-close" style="padding:6px 10px">✕</button>'+
+      '</div>'+
+      '<div id="gs-result" style="flex:1;overflow-y:auto;padding:0 22px 22px">'+
+        '<div style="padding:40px 0;text-align:center;color:var(--faint)"><div style="font-size:36px;margin-bottom:12px">🔎</div><div style="font-size:13px">Type a ticket key to see its full details</div><div style="font-size:11px;margin-top:8px;color:var(--line2)">Searches across all '+RAW.length+' records</div></div>'+
+      '</div>'+
+    '</div></div>';
+  var d=document.createElement("div");d.innerHTML=html;document.body.appendChild(d.firstChild);
+  var ov=el("gs-ov"),q=el("gs-q");
+  ov.addEventListener("click",function(e){if(e.target===ov){ov.remove();}});
+  el("gs-close").onclick=function(){ov.remove();};
+  q.addEventListener("keydown",function(e){if(e.key==="Escape")ov.remove();});
+  q.addEventListener("input",function(){
+    var s=q.value.trim().toUpperCase();var res=el("gs-result");
+    if(!s){res.innerHTML='<div style="padding:40px 0;text-align:center;color:var(--faint)"><div style="font-size:36px;margin-bottom:12px">🔎</div><div>Type a ticket key</div></div>';return;}
+    var found=RAW.find(function(t){return t.key.toUpperCase()===s;});
+    if(!found)found=RAW.find(function(t){return t.key.toUpperCase().indexOf(s)>-1||t.summary.toUpperCase().indexOf(s)>-1;});
+    if(!found){res.innerHTML='<div style="padding:40px 0;text-align:center;color:var(--faint)"><div style="font-size:36px;margin-bottom:12px">🙅</div><div style="font-size:14px;font-weight:600;color:var(--ink)">No ticket found for "'+esc(q.value.trim())+'"</div></div>';return;}
+    var t=found;var age=Math.max(0,Math.floor((Date.now()-(t.resolved||t.created||new Date()).getTime())/864e5));
+    var rb=t.isHD;
+    res.innerHTML='<div style="margin-top:18px">'+
+      '<div style="display:flex;align-items:center;gap:14px;margin-bottom:18px">'+
+        '<div style="width:50px;height:50px;border-radius:12px;background:'+(rb?"var(--hd-bg)":"var(--engg-bg)")+';border:1px solid '+(rb?"var(--hd-line)":"var(--engg-line)")+';display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0">'+(rb?"🎯":"🔧")+'</div>'+
+        '<div style="flex:1"><div style="display:flex;align-items:center;gap:10px"><a href="'+JIRA+encodeURIComponent(t.key)+'" target="_blank" rel="noreferrer" style="font-size:20px;font-weight:900;color:var(--hd);font-family:var(--mono)">'+esc(t.key)+'</a><span class="badge '+(rb?"hd":"engg")+'">'+t.status+'</span></div>'+
+        '<div style="font-size:14px;color:var(--muted);margin-top:4px;line-height:1.5">'+esc(t.summary)+'</div></div></div>'+
+      '<div style="display:flex;gap:10px;margin-bottom:18px">'+
+        '<div style="flex:1;padding:14px 18px;border-radius:12px;background:'+(rb?"var(--hd-bg)":"var(--engg-bg)")+';border:1px solid '+(rb?"var(--hd-line)":"var(--engg-line)")+';text-align:center"><div style="font-size:22px;margin-bottom:4px">'+(rb?"🎯":"🔧")+'</div><div style="font-size:14px;font-weight:800;color:'+(rb?"var(--hd)":"var(--engg)")+'">'+( rb?"HD (Help Desk)":"Engineering")+'</div><div style="font-size:11px;color:var(--muted);margin-top:4px">Resolved by</div></div>'+
+        '<div style="flex:1;padding:14px 18px;border-radius:12px;background:var(--paper);border:1px solid var(--line);text-align:center"><div style="font-size:22px;margin-bottom:4px">📋</div><div style="font-size:14px;font-weight:800;color:var(--ink)">'+esc(t.issue||"—")+'</div><div style="font-size:11px;color:var(--muted);margin-top:4px">Issue Type</div></div></div>'+
+      '<div style="background:var(--paper);border-radius:14px;border:1px solid var(--line);overflow:hidden">'+
+        [["Current Worker",t.currentWorker,"var(--hd)"],["Priority",t.priority,"var(--ink)"],["Project",t.project,"var(--ink)"],["Root Cause",t.rc,"var(--muted)"],["Components",t.components,"var(--ink)"],["SVM In Charge",t.svm,"var(--ink)"],["Created",fdate(t.created),"var(--muted)"],["Resolved",fdate(t.resolved),"var(--hd)"],["Age",age+"d","var(--ink)"],["Linked Issues",t.linked||"— (none)","var(--engg)"],["Type of Fix",t.typeOfFix,"var(--muted)"]].map(function(row){
+          var v=row[1];if(blank(v))v="—";
+          return '<div class="gs-row"><div class="gs-label">'+row[0]+'</div><div class="gs-val" style="color:'+row[2]+'">'+esc(String(v))+'</div></div>';
+        }).join("")+
+      '</div>'+
+      '<div style="margin-top:16px;text-align:center"><a href="'+JIRA+encodeURIComponent(t.key)+'" target="_blank" rel="noreferrer" style="display:inline-flex;align-items:center;gap:8px;padding:10px 24px;background:var(--ink);color:#fff;border-radius:10px;font-size:13px;font-weight:700;text-decoration:none">Open in Jira →</a></div>'+
+    '</div>';
+  });
+}
+document.addEventListener("keydown",function(e){
+  if((e.ctrlKey||e.metaKey)&&e.key==="k"&&RAW.length){e.preventDefault();openGlobalSearch();}
+  if(e.key==="Escape"){var ov=document.getElementById("gs-ov");if(ov)ov.remove();}
+});
+
 function renderShell(){
   var f=filtered();
   var svmList=[...new Set(RAW.map(function(t){return t.svm;}).filter(Boolean))].sort();
@@ -544,6 +604,7 @@ function renderShell(){
       tabBtn("pivots","🧮","Pivots","")+
       tabBtn("exc","⚠️","Exceptions",exCount)+
     '</nav>'+
+    '<button class="ghost" id="gsearchbtn" style="display:flex;align-items:center;gap:5px">🔍 Search Ticket <kbd style="background:var(--line);padding:1px 5px;border-radius:4px;font-size:9px;font-weight:700;color:var(--faint);margin-left:3px">Ctrl+K</kbd></button>'+
     '<button class="ghost" id="newfile">↻ New file</button>'+
     '<input type="file" id="fileinput" accept=".xlsx,.xls">'+
   '</header>'+
@@ -555,6 +616,7 @@ function renderShell(){
   el("frc").onchange=function(e){ S.rc=e.target.value; render(); };
   el("fissue").onchange=function(e){ S.issue=e.target.value; render(); };
   el("newfile").onclick=function(){ window.location.href="index.html"; };
+  var gsb=el("gsearchbtn"); if(gsb) gsb.onclick=function(){ openGlobalSearch(); };
   el("fileinput").onchange=handleUpload;
   document.querySelectorAll(".tabs button").forEach(function(b){ b.onclick=function(){ S.tab=b.dataset.tab; render(); }; });
   bindDateBar();
@@ -1047,7 +1109,7 @@ function nestedGroupPivot(tix){
 function viewPivots(){
   window.__piv={};
   var pool=RAW.filter(inRange);
-  var nav=[["hdworker","HD Worker Performance"],["overall","Overall Incidents"],["groupclar","Group-wise Clarifications"],["rootcause","Root Cause"],["component","Component Wise"],["svm","SVM In Charge Wise"]];
+  var nav=[["hdworker","HD Worker Performance"],["overall","Overall Incidents"],["groupclar","Group-wise Clarifications"],["rootcause","Root Cause"],["component","Component Wise"],["svm","SVM In Charge Wise"],["custom","Custom Pivot"]];
   var out='';
   out+='<div class="up" style="margin-bottom:14px"><div class="eyebrow">Pivots</div>'+
     '<h1 style="font-size:23px;font-weight:700;letter-spacing:-.4px;margin-top:4px">Pivot tables</h1>'+
@@ -1109,6 +1171,26 @@ function viewPivots(){
       ts?('Highest volume: <b>'+esc(ts)+'</b> owns <b>'+sM[ts].toLocaleString()+'</b> tickets ('+pct(sM[ts],pool.length)+'%).'):null,
       (sM["(blank)"]?('<b class="dn">'+sM["(blank)"]+'</b> tickets have no SVM In Charge — see the Exceptions tab.'):null)
     ]);
+  } else if(S.pivot==="custom"){
+    var CROW_FIELDS=["Current Worker","Project","Priority","Issue Type","Root Cause","Components","SVM In Charge","Type of Fix","Screen Name","Menu Head","Status"];
+    var CCOL_FIELDS=["HD/Engg Split","Status","Priority","Issue Type","Root Cause","Type of Fix","Components"];
+    if(!S.cpRow) S.cpRow="Current Worker";
+    if(!S.cpCol) S.cpCol="Root Cause";
+    var cpRowFn=function(t){
+      var f=S.cpRow;
+      if(f==="Current Worker")return t.currentWorker||"(blank)";if(f==="Project")return t.project||"(blank)";if(f==="Priority")return t.priority||"(blank)";if(f==="Issue Type")return t.issue||"(blank)";if(f==="Root Cause")return t.rc||"(blank)";if(f==="SVM In Charge")return t.svm||"(blank)";if(f==="Status")return t.status||"(blank)";if(f==="Components")return t.components||"(blank)";if(f==="Type of Fix")return t.typeOfFix||"(blank)";if(f==="Screen Name")return t.screenName||"(blank)";if(f==="Menu Head")return t.menuHead||"(blank)";
+      return "(blank)";
+    };
+    var cpColVals=new Set();var cpColFn;
+    if(S.cpCol==="HD/Engg Split"){cpColFn=function(t){return t.isHD?"HD":"ENGG";};cpColVals.add("HD");cpColVals.add("ENGG");}
+    else{cpColFn=function(t){var f=S.cpCol;if(f==="Status")return t.status||"(blank)";if(f==="Priority")return t.priority||"(blank)";if(f==="Issue Type")return t.issue||"(blank)";if(f==="Root Cause")return t.rc||"(blank)";if(f==="Type of Fix")return t.typeOfFix||"(blank)";if(f==="Components")return t.components||"(blank)";return"(blank)";};pool.forEach(function(t){cpColVals.add(cpColFn(t));});}
+    var cpCols=[...cpColVals].sort().map(function(c){return{key:c,label:c};});
+    out+=pivHeader("Custom Pivot",[chip("Rows",S.cpRow),chip("Columns",S.cpCol)],"Build your own cross-tab by choosing row and column fields.");
+    out+='<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:16px">'+
+      '<span class="flabel">Rows</span><select class="fsel" id="cpRow">'+CROW_FIELDS.map(function(f){return '<option value="'+esc(f)+'" '+(S.cpRow===f?"selected":"")+'>'+esc(f)+'</option>';}).join("")+'</select>'+
+      '<span class="flabel">Columns</span><select class="fsel" id="cpCol">'+CCOL_FIELDS.map(function(f){return '<option value="'+esc(f)+'" '+(S.cpCol===f?"selected":"")+'>'+esc(f)+'</option>';}).join("")+'</select>'+
+    '</div>';
+    out+=pivot2D("custom","Custom Pivot","#2563EB",pool,cpRowFn,S.cpRow,cpCols,cpColFn);
   }
   out+='</div>';
   return out;
@@ -1380,6 +1462,8 @@ function bindMain(){
 
   if(S.tab==="pivots"){
     document.querySelectorAll("[data-piv-nav]").forEach(function(b){ b.onclick=function(){ S.pivot=b.dataset.pivNav; renderMain(); }; });
+    var cpR=el("cpRow"); if(cpR) cpR.onchange=function(e){ S.cpRow=e.target.value; renderMain(); };
+    var cpC=el("cpCol"); if(cpC) cpC.onchange=function(e){ S.cpCol=e.target.value; renderMain(); };
   }
 
   if(S.tab==="wow"){
