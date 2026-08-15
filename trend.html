@@ -922,6 +922,40 @@ function viewTrend(){
       return note(['From <b>'+mLabel(f)+'</b> to <b>'+mLabel(l)+'</b>, HD share moved <b class="'+((pl-pf)>=0?'up':'dn')+'">'+arrow(pl-pf)+' '+Math.abs(pl-pf)+' pts</b> ('+pf+'% → '+pl+'%).']); })()+
   '</div>';
   }
+
+  // bar chart in worker mode
+  if(S.tMode==="worker" && wKeys.length>0){
+  out+='<div class="card up d3 pad"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px"><span class="sec-title">HD vs Engg — per worker</span><span class="click">click a bar to open those tickets</span></div>';
+  var barH=Math.max(wKeys.length*38,120);
+  out+='<div class="wbar-chart" style="overflow-y:auto;max-height:600px">';
+  wKeys.forEach(function(k){
+    var v=byW[k]; var hdN=v.hd.length, egN=v.eg.length, tot=hdN+egN;
+    var hp=pct(hdN,tot), ep=100-hp;
+    var maxTot=byW[wKeys[0]].hd.length+byW[wKeys[0]].eg.length;
+    var barW=Math.max(pct(tot,maxTot),12);
+    out+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">'+
+      '<div style="width:140px;font-size:11px;font-weight:600;color:var(--ink);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0" title="'+esc(k)+'">'+esc(k)+'</div>'+
+      '<div style="flex:1;display:flex;border-radius:6px;overflow:hidden;height:28px;max-width:'+barW+'%">'+
+        (hdN>0?'<div class="wbar-seg" data-wk="'+esc(k)+'" data-ws="hd" style="width:'+hp+'%;background:var(--hd);display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:700;cursor:pointer;min-width:'+(hdN>0?'30px':'0')+'">'+hdN+'</div>':'')+
+        (egN>0?'<div class="wbar-seg" data-wk="'+esc(k)+'" data-ws="eg" style="width:'+ep+'%;background:var(--engg);display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;font-weight:700;cursor:pointer;min-width:'+(egN>0?'30px':'0')+'">'+egN+'</div>':'')+
+      '</div>'+
+      '<div class="mono" style="font-size:10px;color:var(--muted);min-width:50px;flex-shrink:0">'+tot+' <span style="color:var(--hd)">'+hp+'%</span></div>'+
+    '</div>';
+  });
+  out+='</div>';
+  out+='<div class="legend" style="margin-top:12px"><span class="li"><span class="sw" style="background:var(--hd)"></span>HD</span><span class="li"><span class="sw" style="background:var(--engg)"></span>Engg</span></div>';
+  // Find best and worst HD% workers
+  var bestW=null,worstW=null;
+  wKeys.forEach(function(k){ var v=byW[k]; var tot=v.hd.length+v.eg.length; if(tot<3)return; var p=pct(v.hd.length,tot);
+    if(bestW===null||p>bestW.p)bestW={k:k,p:p,t:tot};
+    if(worstW===null||p<worstW.p)worstW={k:k,p:p,t:tot};
+  });
+  if(bestW&&worstW&&bestW.k!==worstW.k){
+    out+=note(['Best HD rate: <b class="hd">'+esc(bestW.k)+' ('+bestW.p+'%</b> of '+bestW.t+'); lowest: <b class="dn">'+esc(worstW.k)+' ('+worstW.p+'%</b> of '+worstW.t+').']);
+  }
+  out+='</div>';
+  }
+
   return out;
 }
 
@@ -1456,6 +1490,14 @@ function bindMain(){
         var k=d.dataset.mk, side=d.dataset.lc;
         var tix=scope.filter(function(t){return bucketMonth(t)===k && (side==="hd"?t.isHD:!t.isHD);});
         openModal(mLabel(k)+" · "+(side==="hd"?"HD":"Engg")+" ("+d.dataset.p+"%)","📈",side==="hd"?"#0F766E":"#5B57D8",tix);
+      };
+    });
+    // worker bar chart segments
+    document.querySelectorAll(".wbar-seg[data-wk]").forEach(function(s){
+      s.onclick=function(){
+        var k=s.dataset.wk, side=s.dataset.ws;
+        var tix=scope.filter(function(t){return (t.currentWorker||"(unassigned)")===k && (side==="hd"?t.isHD:!t.isHD);});
+        openModal(k+" · "+(side==="hd"?"HD closed":"Engg escalated"),"👤",side==="hd"?"#0F766E":"#5B57D8",tix);
       };
     });
   }
