@@ -256,6 +256,9 @@ tbody tr.rowlink:hover{background:var(--hd-bg)}
   main{padding:18px 14px 60px}
   .tabs button span.lbl{display:none}
 }
+.tmode-btn{padding:7px 16px;border-radius:8px;font-size:12px;font-weight:700;border:1px solid var(--line);background:var(--card);color:var(--muted);cursor:pointer;transition:all .15s;white-space:nowrap}
+.tmode-btn.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.tmode-btn:hover:not(.on){background:var(--paper);border-color:var(--line2)}
 </style>
 </head>
 <body>
@@ -289,7 +292,7 @@ var S = {
   from:"", to:"", dlabel:"All time",
   sortCol:"total", sortDir:"desc",
   // trend tab local controls
-  tRc:"__CLAR__", tStatus:"Closed",
+  tRc:"__CLAR__", tStatus:"Closed", tMode:"month",
   pivot:"hdworker",
   weekA:"", weekB:""
 };
@@ -789,6 +792,11 @@ function viewTrend(){
   scope.forEach(function(t){ var k=bucketMonth(t); if(!k)return; if(!byM[k])byM[k]={hd:[],eg:[]}; (t.isHD?byM[k].hd:byM[k].eg).push(t); });
   var mKeys=Object.keys(byM).sort();
 
+  // worker aggregation
+  var byW={};
+  scope.forEach(function(t){ var k=t.currentWorker||"(unassigned)"; if(!byW[k])byW[k]={hd:[],eg:[]}; (t.isHD?byW[k].hd:byW[k].eg).push(t); });
+  var wKeys=Object.keys(byW).sort(function(a,b){ return (byW[b].hd.length+byW[b].eg.length)-(byW[a].hd.length+byW[a].eg.length); });
+
   var rcList=[...new Set(RAW.map(function(t){return t.rc;}).filter(Boolean))].sort();
   var stList=[...new Set(RAW.map(function(t){return t.status;}).filter(Boolean))].sort();
   var rcName = S.tRc==="__CLAR__"?"Clarification": (S.tRc==="__ALL__"?"all root causes": S.tRc);
@@ -799,7 +807,7 @@ function viewTrend(){
   var out='';
   out+='<div class="up" style="margin-bottom:14px"><div class="eyebrow">Trend Analysis</div>'+
     '<h1 style="font-size:23px;font-weight:700;letter-spacing:-.4px;margin-top:4px">Clarification: solved by HD or escalated?</h1>'+
-    '<div class="sub" style="margin-top:3px">For each month, how many <b>'+esc(rcName)+'</b> tickets (<b>'+esc(stName)+'</b>, <b>'+esc(svmName)+esc(workerNote)+'</b>) the Help Desk closed alone vs. sent to Engineering.</div></div>';
+    '<div class="sub" style="margin-top:3px">For each <b>'+(S.tMode==="month"?"month (by resolved date)":"current worker")+'</b>, how many <b>'+esc(rcName)+'</b> tickets (<b>'+esc(stName)+'</b>, <b>'+esc(svmName)+esc(workerNote)+'</b>) the Help Desk closed alone vs. sent to Engineering.</div></div>';
 
   // local controls
   out+='<div class="card up d1 pad" style="margin-bottom:16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap">'+
@@ -810,31 +818,40 @@ function viewTrend(){
     '<span class="sub" style="margin-left:auto">SVM, Current Worker &amp; date use the top filters</span>'+
   '</div>';
 
-  if(!mKeys.length){ out+='<div class="card pad"><div class="empty">No tickets match this scope. Try widening the root cause or status.</div></div>'; return out; }
+  // View toggle: By Month / By Worker
+  out+='<div style="display:flex;gap:6px;margin-bottom:16px">'+
+    '<button class="tmode-btn'+(S.tMode==="month"?" on":"")+'" data-tmode="month">📅 By Month</button>'+
+    '<button class="tmode-btn'+(S.tMode==="worker"?" on":"")+'" data-tmode="worker">👤 By Current Worker</button>'+
+  '</div>';
 
-  // per-month cards
+  var activeMap = S.tMode==="month" ? byM : byW;
+  var activeKeys = S.tMode==="month" ? mKeys : wKeys;
+
+  if(!activeKeys.length){ out+='<div class="card pad"><div class="empty">No tickets match this scope. Try widening the root cause or status.</div></div>'; return out; }
+
+  // per-card rendering (month or worker)
   out+='<div class="grid up d2" style="grid-template-columns:repeat(auto-fit,minmax(330px,1fr));margin-bottom:16px">';
-  mKeys.forEach(function(k){
-    var v=byM[k]; var hdN=v.hd.length, egN=v.eg.length, tot=hdN+egN;
+  activeKeys.forEach(function(k){
+    var v=activeMap[k]; var hdN=v.hd.length, egN=v.eg.length, tot=hdN+egN;
     var hp=pct(hdN,tot), ep=100-hp;
+    var labelText = S.tMode==="month" ? mLabel(k) : k;
     out+='<div class="mcard">'+
-      '<div class="mtop"><span class="mmon">'+mLabel(k)+'</span><span class="mono sub">'+tot+' tickets</span></div>'+
+      '<div class="mtop"><span class="mmon">'+esc(labelText)+'</span><span class="mono sub">'+tot+' tickets</span></div>'+
       '<div class="msent">HD closed <b class="hd">'+hdN+'</b> '+esc(rcName.toLowerCase())+' ticket'+(hdN!==1?'s':'')+' without Engineering, and <b class="eg">'+egN+'</b> went to Engineering. <b class="hd">HD '+hp+'%</b> · <b class="eg">Engg '+ep+'%</b>.</div>'+
-      '<div class="track" data-mk="'+k+'">'+
-        '<div class="seg hd" data-mk="'+k+'" data-side="hd" style="width:'+Math.max(hp,7)+'%">HD '+hdN+'</div>'+
-        '<div class="seg engg" data-mk="'+k+'" data-side="eg" style="width:'+Math.max(ep,7)+'%">Engg '+egN+'</div>'+
+      '<div class="track" data-mk="'+esc(k)+'">'+
+        '<div class="seg hd" data-mk="'+esc(k)+'" data-side="hd" style="width:'+Math.max(hp,7)+'%">HD '+hdN+'</div>'+
+        '<div class="seg engg" data-mk="'+esc(k)+'" data-side="eg" style="width:'+Math.max(ep,7)+'%">Engg '+egN+'</div>'+
       '</div>'+
     '</div>';
   });
   out+='</div>';
-  out+=(function(){ var tHd=0,tEg=0; mKeys.forEach(function(k){tHd+=byM[k].hd.length;tEg+=byM[k].eg.length;}); var tot=tHd+tEg;
-    var bestM=null,worstM=null; mKeys.forEach(function(k){ var tt=byM[k].hd.length+byM[k].eg.length; var p=pct(byM[k].hd.length,tt); if(bestM===null||p>bestM.p)bestM={k:k,p:p}; if(worstM===null||p<worstM.p)worstM={k:k,p:p}; });
+  out+=(function(){ var tHd=0,tEg=0; activeKeys.forEach(function(k){tHd+=activeMap[k].hd.length;tEg+=activeMap[k].eg.length;}); var tot=tHd+tEg;
     return note([
       'HD closed <b class="hd">'+tHd+' ('+pct(tHd,tot)+'%)</b> of '+tot+' '+esc(rcName.toLowerCase())+' tickets alone; Engg handled <b class="eg">'+tEg+' ('+pct(tEg,tot)+'%)</b>.',
-      (bestM&&worstM&&bestM.k!==worstM.k)?('Best HD month: <b class="hd">'+mLabel(bestM.k)+' ('+bestM.p+'%)</b>; weakest: <b class="dn">'+mLabel(worstM.k)+' ('+worstM.p+'%)</b>.'):null
     ]); })();
 
-  // bottom line chart: HD% and Engg% MoM
+  // line chart only in month mode
+  if(S.tMode==="month" && mKeys.length>1){
   out+='<div class="card up d3 pad"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px"><span class="sec-title">HD % vs Engg % — month on month</span><span class="click">click a point to open those tickets</span></div>'+
     lineChart(mKeys,byM)+
     '<div class="legend" style="margin-top:10px"><span class="li"><span class="sw" style="background:var(--hd)"></span>HD %</span><span class="li"><span class="sw" style="background:var(--engg)"></span>Engg %</span></div>'+
@@ -842,6 +859,7 @@ function viewTrend(){
       var pf=pct(byM[f].hd.length,byM[f].hd.length+byM[f].eg.length), pl=pct(byM[l].hd.length,byM[l].hd.length+byM[l].eg.length);
       return note(['From <b>'+mLabel(f)+'</b> to <b>'+mLabel(l)+'</b>, HD share moved <b class="'+((pl-pf)>=0?'up':'dn')+'">'+arrow(pl-pf)+' '+Math.abs(pl-pf)+' pts</b> ('+pf+'% → '+pl+'%).']); })()+
   '</div>';
+  }
   return out;
 }
 
@@ -1316,6 +1334,10 @@ function bindMain(){
   if(S.tab==="trend"){
     el("tRc").onchange=function(e){ S.tRc=e.target.value; renderMain(); };
     el("tStatus").onchange=function(e){ S.tStatus=e.target.value; renderMain(); };
+    // toggle mode buttons
+    document.querySelectorAll(".tmode-btn").forEach(function(b){
+      b.onclick=function(){ S.tMode=b.dataset.tmode; renderMain(); };
+    });
     // rebuild scope to resolve clicks
     var base=RAW.filter(function(t){ if(!inRange(t))return false; if(S.svm&&t.svm!==S.svm)return false; if(S.cw&&t.currentWorker!==S.cw)return false; if(S.issue&&t.issue!==S.issue)return false; return true; });
     function scopeFn(t){
@@ -1324,15 +1346,21 @@ function bindMain(){
       return true;
     }
     var scope=base.filter(scopeFn);
-    // month card segments
+    // card segment clicks — support both month and worker modes
     document.querySelectorAll(".mcard .seg[data-mk]").forEach(function(s){
       s.onclick=function(){
         var k=s.dataset.mk, side=s.dataset.side;
-        var tix=scope.filter(function(t){return bucketMonth(t)===k && (side==="hd"?t.isHD:!t.isHD);});
-        openModal(mLabel(k)+" · "+(side==="hd"?"HD closed":"Engg")+" clarification","📈",side==="hd"?"#0F766E":"#5B57D8",tix);
+        var tix;
+        if(S.tMode==="month"){
+          tix=scope.filter(function(t){return bucketMonth(t)===k && (side==="hd"?t.isHD:!t.isHD);});
+          openModal(mLabel(k)+" · "+(side==="hd"?"HD closed":"Engg")+" clarification","📈",side==="hd"?"#0F766E":"#5B57D8",tix);
+        }else{
+          tix=scope.filter(function(t){return (t.currentWorker||"(unassigned)")===k && (side==="hd"?t.isHD:!t.isHD);});
+          openModal(k+" · "+(side==="hd"?"HD closed":"Engg"),"👤",side==="hd"?"#0F766E":"#5B57D8",tix);
+        }
       };
     });
-    // line chart dots + tooltip
+    // line chart dots + tooltip (only present in month mode)
     var tip=el("lctip");
     document.querySelectorAll(".lc-dot").forEach(function(d){
       d.addEventListener("mousemove",function(ev){
