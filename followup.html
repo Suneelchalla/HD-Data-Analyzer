@@ -101,6 +101,20 @@ input[type="date"]:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,9
 .blob-1{width:300px;height:300px;background:rgba(37,99,235,.08);top:-5%;right:-5%;animation:ripple 8s ease-in-out infinite}
 .blob-2{width:250px;height:250px;background:rgba(124,58,237,.07);bottom:-5%;left:-3%;animation:ripple 10s ease-in-out infinite 2s}
 .blob-3{width:200px;height:200px;background:rgba(6,182,212,.06);top:40%;left:-8%;animation:ripple 12s ease-in-out infinite 4s}
+
+/* Pivot table styles */
+.pivot-table{width:100%;border-collapse:collapse;font-size:12px}
+.pivot-table th{padding:10px 14px;text-align:left;font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.6px;border-bottom:2px solid var(--border);background:var(--bg);position:sticky;top:0;z-index:2}
+.pivot-table th.num{text-align:right}
+.pivot-table td{padding:10px 14px;border-bottom:1px solid var(--border)}
+.pivot-table td.num{text-align:right;font-family:var(--mono);font-weight:600}
+.pivot-table tr:hover{background:var(--blue-bg)}
+.pivot-table tr.total-row{background:var(--bg);font-weight:800;border-top:2px solid var(--border)}
+.pivot-table tr.total-row td{border-bottom:none}
+.subnav{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+.subnav-btn{padding:7px 16px;border-radius:8px;font-size:12px;font-weight:700;border:1px solid var(--border);background:var(--card);color:var(--t2);transition:all .15s;white-space:nowrap}
+.subnav-btn.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+.subnav-btn:hover:not(.active){background:var(--bg);border-color:var(--border2)}
 </style>
 </head>
 <body>
@@ -216,11 +230,32 @@ function ABar({bk,total,onClick,active}){
 }
 
 function exportCSV(tickets,filename){
-  const cols=["Key","Summary","Status","Category","Project","Priority","Created","Updated","Age (days)","Current Worker","Linked Issues","Linked Ticket status"];
-  const rows=tickets.map(t=>[t.Key,`"${(t.Summary||'').replace(/"/g,'""')}"`,t.Status,CL[classify(t.Status)],t.Project,t.Priority,fd(t.Created),fd(t.Updated),ds(t.Updated||t.Created),t["Current Worker"],t["Linked Issues"],t["Linked Ticket status"]]);
+  const cols=["Key","Summary","Status","Category","Resolved By","Project","Priority","Created","Resolved","Updated","Age (days)","Current Worker","Linked Issues","Linked Ticket status"];
+  const rows=tickets.map(t=>{var li=t["Linked Issues"];var _has=li&&String(li).trim()!==""&&String(li).toLowerCase()!=="nan";return[t.Key,`"${(t.Summary||'').replace(/"/g,'""')}"`,t.Status,CL[classify(t.Status)],_has?"ENGG":"HD",t.Project,t.Priority,fd(t.Created),fd(t.Resolved),fd(t.Updated),ds(t.Updated||t.Created),t["Current Worker"],t["Linked Issues"],t["Linked Ticket status"]];});
   const csv=[cols.join(","),...rows.map(r=>r.join(","))].join("\n");
   const blob=new Blob([csv],{type:"text/csv"});
   const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=filename||"tickets.csv";a.click();URL.revokeObjectURL(url);
+}
+
+/* ─── Trend Card Component ─── */
+function TrendCard({label,total,hd,engg,onClick}){
+  var hdPct=total>0?Math.round(hd/total*100):0;
+  var engPct=total>0?Math.round(engg/total*100):0;
+  return(
+    <div className="card fu" onClick={onClick} style={{padding:"20px 22px",cursor:onClick?"pointer":"default",transition:"all .2s"}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"baseline",marginBottom:10}}>
+        <div style={{fontSize:18,fontWeight:800,color:"var(--t1)"}}>{label}</div>
+        <div style={{fontSize:12,color:"var(--t3)",fontFamily:"var(--mono)"}}>{total} tickets</div>
+      </div>
+      <div style={{fontSize:12,color:"var(--t2)",lineHeight:1.6,marginBottom:14}}>
+        HD closed <b style={{color:"var(--green)"}}>{hd}</b> without Engineering, and <b style={{color:"var(--violet)"}}>{engg}</b> went to Engineering. <b>HD {hdPct}%</b> &middot; <b>Engg {engPct}%</b>.
+      </div>
+      <div style={{display:"flex",borderRadius:8,overflow:"hidden",height:32}}>
+        {hd>0&&<div style={{width:hdPct+"%",background:"var(--green)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff",minWidth:hd>0?50:0,transition:"width .6s"}}>HD {hd}</div>}
+        {engg>0&&<div style={{width:engPct+"%",background:"var(--violet)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:700,color:"#fff",minWidth:engg>0?60:0,transition:"width .6s"}}>Engg {engg}</div>}
+      </div>
+    </div>
+  );
 }
 
 /* ─── Modal Component ─── */
@@ -267,12 +302,13 @@ function TicketModal({data,onClose}){
                   </td>
                   <td style={{padding:"9px 12px",color:"var(--t2)",maxWidth:280,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={t.Summary}>{t.Summary}</td>
                   <td style={{padding:"9px 12px"}}><span style={{background:cs.badge,color:"#fff",padding:"3px 10px",borderRadius:20,fontSize:10,fontWeight:600,whiteSpace:"nowrap"}}>{t.Status}</span></td>
+                  <td style={{padding:"9px 12px",textAlign:"center"}}><span style={{padding:"3px 10px",borderRadius:20,fontSize:10,fontWeight:700,background:_hasL?"var(--violet-bg)":"var(--green-bg)",color:_hasL?"var(--violet)":"var(--green)",border:"1px solid "+(_hasL?"var(--violet-border)":"var(--green-border)")}}>{_hasL?"ENGG":"HD"}</span></td>
                   <td style={{padding:"9px 12px",color:"var(--t3)",fontSize:11,whiteSpace:"nowrap",maxWidth:120,overflow:"hidden",textOverflow:"ellipsis"}}>{(t.Project||"").split(" ").slice(0,2).join(" ")}</td>
                   <td style={{padding:"9px 12px",fontSize:11,fontWeight:600,color:t.Priority==="Critical"||t.Priority==="Show Stopper"?"var(--rose)":t.Priority==="High"?"var(--amber)":"var(--t3)"}}>{t.Priority}</td>
                   <td style={{padding:"9px 12px",fontSize:10,maxWidth:130,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                     {linked?<a href={J+(linked.split(";")[0])} target="_blank" rel="noreferrer" style={{fontFamily:"var(--mono)",fontSize:10,color:"var(--blue)"}}>{linked.split(";")[0]}</a>:<span style={{color:"var(--t4)"}}>—</span>}
                   </td>
-                  <td style={{padding:"9px 12px",color:"var(--t3)",fontSize:11,whiteSpace:"nowrap"}}>{fd(t.Created)}</td>
+                  <td style={{padding:"9px 12px",color:"var(--t3)",fontSize:11,whiteSpace:"nowrap"}}>{t.Resolved?fd(t.Resolved):"—"}</td>
                   <td style={{padding:"9px 12px",textAlign:"right",fontWeight:700,color:AC[bk],fontFamily:"var(--mono)",fontSize:12}}>{a}d</td>
                 </tr>);
               })}
@@ -306,6 +342,16 @@ function App(){
   const[dtTo,setDtTo]=useState("");
   const[dtLabel,setDtLabel]=useState("All Time");
   const[modal,setModal]=useState(null); // {title, icon, color, tickets}
+  /* NEW: Trend, Pivot, Global Search state */
+  const[trendView,setTrendView]=useState("month");
+  const[trendRC,setTrendRC]=useState("Client Clarification");
+  const[trendStatus,setTrendStatus]=useState("Closed");
+  const[pivotView,setPivotView]=useState("worker-perf");
+  const[customPivotRow,setCustomPivotRow]=useState("Current Worker");
+  const[customPivotCol,setCustomPivotCol]=useState("Root Cause");
+  const[globalSearch,setGlobalSearch]=useState("");
+  const[gsResult,setGsResult]=useState(null);
+  const[gsOpen,setGsOpen]=useState(false);
   const fRef=useRef();
 
   const handleFile=useCallback(async function(e){
@@ -320,10 +366,25 @@ function App(){
 
   /* Keyboard: Esc closes modal */
   useEffect(function(){
-    function handleKey(e){if(e.key==="Escape"&&modal)setModal(null);}
+    function handleKey(e){
+      if(e.key==="Escape"){if(gsOpen)setGsOpen(false);else if(modal)setModal(null);}
+      if((e.ctrlKey||e.metaKey)&&e.key==="k"&&raw){e.preventDefault();setGsOpen(true);}
+    }
     document.addEventListener("keydown",handleKey);
     return function(){document.removeEventListener("keydown",handleKey);};
-  },[modal]);
+  },[modal,gsOpen,raw]);
+
+  /* ─── Global Ticket Search ─── */
+  function doGlobalSearch(q){
+    if(!raw||!q||!q.trim()){setGsResult(null);return;}
+    var s=q.trim().toUpperCase();
+    var found=raw.find(function(t){return(t.Key||"").toUpperCase()===s;});
+    if(!found){found=raw.find(function(t){return(t.Key||"").toUpperCase().includes(s)||(t.Summary||"").toUpperCase().includes(s);});}
+    if(found){
+      var li=found["Linked Issues"];var hasLRPS=li&&String(li).trim()!==""&&String(li).toLowerCase()!=="nan";
+      setGsResult({ticket:found,resolvedBy:hasLRPS?"Engineering (LRPS linked)":"HD (Help Desk alone)",hasLRPS:hasLRPS,cat:classify(found.Status),sla:checkSLA(found),linkedStatus:found["Linked Ticket status"]||""});
+    }else{setGsResult({notFound:true,query:q.trim()});}
+  }
 
   /* Load the shared Excel uploaded on the launcher (index.html) */
   useEffect(function(){
@@ -390,8 +451,9 @@ function App(){
     var fromMs=dtFrom?new Date(dtFrom+"T00:00:00").getTime():-Infinity;
     var toMs=dtTo?new Date(dtTo+"T23:59:59").getTime():Infinity;
     return raw.filter(function(t){
-      if(!t.Created)return false;
-      var d=t.Created instanceof Date?t.Created:new Date(t.Created);
+      var rd=t.Resolved||t.Created;
+      if(!rd)return false;
+      var d=rd instanceof Date?rd:new Date(rd);
       if(isNaN(d))return false;
       var ms=d.getTime();
       return ms>=fromMs&&ms<=toMs;
@@ -499,6 +561,69 @@ function App(){
     incClarClosed.forEach(function(t){var li=t["Linked Issues"];var has=li&&String(li).trim()!==""&&String(li).toLowerCase()!=="nan";if(has)engAsst++;else hdOnly++;});
     return{incidents:incidents.length,incClosed:incClosed.length,incClar:incClar.length,incClarClosed:incClarClosed.length,hdOnly:hdOnly,engAsst:engAsst};
   },[allFiltered,w,pf]);
+
+  /* ═══ TREND ANALYSIS DATA ═══ */
+  var trendRootCauses=useMemo(function(){
+    if(!dateFiltered)return[];
+    var s=new Set();dateFiltered.forEach(function(t){var rc=t["Root Cause"];if(rc&&String(rc).trim()&&String(rc).toLowerCase()!=="nan")s.add(rc);});
+    return["All root causes"].concat([...s].sort());
+  },[dateFiltered]);
+  var trendStatuses=useMemo(function(){return["All statuses","Closed","Open","Resolved","Waiting for customer","Development In Progress"];},[]);
+  var trendData=useMemo(function(){
+    if(!dateFiltered)return{byMonth:[],byWorker:[],totalFiltered:0};
+    var src=dateFiltered;
+    if(w)src=src.filter(function(t){return t["Current Worker"]===w;});
+    if(pf)src=src.filter(function(t){return t.Project===pf;});
+    if(trendRC&&trendRC!=="All root causes")src=src.filter(function(t){return t["Root Cause"]===trendRC;});
+    if(trendStatus&&trendStatus!=="All statuses")src=src.filter(function(t){return t.Status===trendStatus;});
+    var monthMap={};
+    src.forEach(function(t){var rd=t.Resolved||t.Created;if(!rd)return;var m=fm(rd);if(!m)return;if(!monthMap[m])monthMap[m]={total:0,hd:0,engg:0,tickets:[]};monthMap[m].total++;monthMap[m].tickets.push(t);var li=t["Linked Issues"];var hasLRPS=li&&String(li).trim()!==""&&String(li).toLowerCase()!=="nan";if(hasLRPS)monthMap[m].engg++;else monthMap[m].hd++;});
+    var byMonth=Object.entries(monthMap).map(function(e){return{label:e[0],total:e[1].total,hd:e[1].hd,engg:e[1].engg,tickets:e[1].tickets};});
+    var workerMap={};
+    src.forEach(function(t){var wk=t["Current Worker"]||"Unassigned";if(!workerMap[wk])workerMap[wk]={total:0,hd:0,engg:0,tickets:[]};workerMap[wk].total++;workerMap[wk].tickets.push(t);var li=t["Linked Issues"];var hasLRPS=li&&String(li).trim()!==""&&String(li).toLowerCase()!=="nan";if(hasLRPS)workerMap[wk].engg++;else workerMap[wk].hd++;});
+    var byWorker=Object.entries(workerMap).map(function(e){return{label:e[0],total:e[1].total,hd:e[1].hd,engg:e[1].engg,tickets:e[1].tickets};}).sort(function(a,b){return b.total-a.total;});
+    return{byMonth:byMonth,byWorker:byWorker,totalFiltered:src.length};
+  },[dateFiltered,w,pf,trendRC,trendStatus]);
+
+  /* ═══ PIVOT DATA ═══ */
+  var PIVOT_ROW_FIELDS=["Current Worker","Project","Priority","Issue Type","Root Cause","Components","SVM In Charge","Type of Fix","Screen Name","Menu Head","Status"];
+  var PIVOT_COL_FIELDS=["HD/Engg Split","Status","Priority","Issue Type","Root Cause","Type of Fix","Components"];
+  var pivotData=useMemo(function(){
+    if(!dateFiltered)return{};
+    var src=dateFiltered;if(w)src=src.filter(function(t){return t["Current Worker"]===w;});if(pf)src=src.filter(function(t){return t.Project===pf;});
+    var hasLRPS=function(t){var li=t["Linked Issues"];return li&&String(li).trim()!==""&&String(li).toLowerCase()!=="nan";};
+    // Worker Performance
+    var wpMap={};src.filter(function(t){return t["Issue Type"]==="Incident"&&t["Root Cause"]==="Client Clarification";}).forEach(function(t){var wk=t["Current Worker"]||"Unassigned";if(!wpMap[wk])wpMap[wk]={hd:0,engg:0,total:0,tickets:[]};wpMap[wk].total++;wpMap[wk].tickets.push(t);if(hasLRPS(t))wpMap[wk].engg++;else wpMap[wk].hd++;});
+    var workerPerf=Object.entries(wpMap).map(function(e){return{name:e[0],hd:e[1].hd,engg:e[1].engg,total:e[1].total,tickets:e[1].tickets};}).sort(function(a,b){return b.total-a.total;});
+    var wpTotals={hd:0,engg:0,total:0};workerPerf.forEach(function(r){wpTotals.hd+=r.hd;wpTotals.engg+=r.engg;wpTotals.total+=r.total;});
+    // Overall Incidents
+    var oiMap={};src.filter(function(t){return t["Issue Type"]==="Incident";}).forEach(function(t){var wk=t["Current Worker"]||"Unassigned";if(!oiMap[wk])oiMap[wk]={total:0,closed:0,open:0,tickets:[]};oiMap[wk].total++;oiMap[wk].tickets.push(t);if(t.Status==="Closed")oiMap[wk].closed++;else oiMap[wk].open++;});
+    var overallInc=Object.entries(oiMap).map(function(e){return{name:e[0],total:e[1].total,closed:e[1].closed,open:e[1].open,tickets:e[1].tickets};}).sort(function(a,b){return b.total-a.total;});
+    var oiTotals={total:0,closed:0,open:0};overallInc.forEach(function(r){oiTotals.total+=r.total;oiTotals.closed+=r.closed;oiTotals.open+=r.open;});
+    // Group-wise Clarifications
+    var gcMap={};src.filter(function(t){return t["Root Cause"]==="Client Clarification";}).forEach(function(t){var wk=t["Current Worker"]||"Unassigned";if(!gcMap[wk])gcMap[wk]={hd:0,engg:0,open:0,total:0,tickets:[]};gcMap[wk].total++;gcMap[wk].tickets.push(t);if(t.Status==="Closed"){if(hasLRPS(t))gcMap[wk].engg++;else gcMap[wk].hd++;}else gcMap[wk].open++;});
+    var groupClar=Object.entries(gcMap).map(function(e){return{name:e[0],hd:e[1].hd,engg:e[1].engg,open:e[1].open,total:e[1].total,tickets:e[1].tickets};}).sort(function(a,b){return b.total-a.total;});
+    var gcTotals={hd:0,engg:0,open:0,total:0};groupClar.forEach(function(r){gcTotals.hd+=r.hd;gcTotals.engg+=r.engg;gcTotals.open+=r.open;gcTotals.total+=r.total;});
+    // Root Cause
+    var rcMap={};src.forEach(function(t){var rc=t["Root Cause"]||"(empty)";if(String(rc).toLowerCase()==="nan")rc="(empty)";if(!rcMap[rc])rcMap[rc]={total:0,closed:0,open:0,tickets:[]};rcMap[rc].total++;rcMap[rc].tickets.push(t);if(t.Status==="Closed")rcMap[rc].closed++;else rcMap[rc].open++;});
+    var rootCause=Object.entries(rcMap).map(function(e){return{name:e[0],total:e[1].total,closed:e[1].closed,open:e[1].open,tickets:e[1].tickets};}).sort(function(a,b){return b.total-a.total;});
+    var rcTotals={total:0,closed:0,open:0};rootCause.forEach(function(r){rcTotals.total+=r.total;rcTotals.closed+=r.closed;rcTotals.open+=r.open;});
+    // Component Wise
+    var cwMap={};src.forEach(function(t){var comp=t["Components"]||"(empty)";if(String(comp).toLowerCase()==="nan"||String(comp).trim()==="")comp="(empty)";if(!cwMap[comp])cwMap[comp]={total:0,closed:0,open:0,tickets:[]};cwMap[comp].total++;cwMap[comp].tickets.push(t);if(t.Status==="Closed")cwMap[comp].closed++;else cwMap[comp].open++;});
+    var compWise=Object.entries(cwMap).map(function(e){return{name:e[0],total:e[1].total,closed:e[1].closed,open:e[1].open,tickets:e[1].tickets};}).sort(function(a,b){return b.total-a.total;});
+    var cwTotals={total:0,closed:0,open:0};compWise.forEach(function(r){cwTotals.total+=r.total;cwTotals.closed+=r.closed;cwTotals.open+=r.open;});
+    // SVM In Charge Wise
+    var svmMap={};src.forEach(function(t){var svm=t["SVM In Charge"]||"(empty)";if(String(svm).toLowerCase()==="nan"||String(svm).trim()==="")svm="(empty)";if(!svmMap[svm])svmMap[svm]={total:0,closed:0,open:0,hd:0,engg:0,tickets:[]};svmMap[svm].total++;svmMap[svm].tickets.push(t);if(t.Status==="Closed"){svmMap[svm].closed++;if(hasLRPS(t))svmMap[svm].engg++;else svmMap[svm].hd++;}else svmMap[svm].open++;});
+    var svmWise=Object.entries(svmMap).map(function(e){return{name:e[0],total:e[1].total,closed:e[1].closed,open:e[1].open,hd:e[1].hd,engg:e[1].engg,tickets:e[1].tickets};}).sort(function(a,b){return b.total-a.total;});
+    var svmTotals={total:0,closed:0,open:0,hd:0,engg:0};svmWise.forEach(function(r){svmTotals.total+=r.total;svmTotals.closed+=r.closed;svmTotals.open+=r.open;svmTotals.hd+=r.hd;svmTotals.engg+=r.engg;});
+    // Custom Pivot
+    var cpMap={};var colVals=new Set();
+    src.forEach(function(t){var rowVal=t[customPivotRow]||"(empty)";if(String(rowVal).toLowerCase()==="nan"||String(rowVal).trim()==="")rowVal="(empty)";var colVal;if(customPivotCol==="HD/Engg Split"){colVal=hasLRPS(t)?"Engg":"HD";}else{colVal=t[customPivotCol]||"(empty)";if(String(colVal).toLowerCase()==="nan"||String(colVal).trim()==="")colVal="(empty)";}colVals.add(colVal);if(!cpMap[rowVal])cpMap[rowVal]={_total:0,_tickets:[]};cpMap[rowVal]._total++;cpMap[rowVal]._tickets.push(t);cpMap[rowVal][colVal]=(cpMap[rowVal][colVal]||0)+1;});
+    var colArr=[...colVals].sort();
+    var customPivot=Object.entries(cpMap).map(function(e){var row={name:e[0],total:e[1]._total,tickets:e[1]._tickets};colArr.forEach(function(c){row[c]=e[1][c]||0;});return row;}).sort(function(a,b){return b.total-a.total;});
+    var cpTotals={total:0};colArr.forEach(function(c){cpTotals[c]=0;});customPivot.forEach(function(r){cpTotals.total+=r.total;colArr.forEach(function(c){cpTotals[c]+=r[c]||0;});});
+    return{workerPerf:workerPerf,wpTotals:wpTotals,overallInc:overallInc,oiTotals:oiTotals,groupClar:groupClar,gcTotals:gcTotals,rootCause:rootCause,rcTotals:rcTotals,compWise:compWise,cwTotals:cwTotals,svmWise:svmWise,svmTotals:svmTotals,customPivot:customPivot,cpTotals:cpTotals,colArr:colArr};
+  },[dateFiltered,w,pf,customPivotRow,customPivotCol]);
 
   const st=useMemo(()=>{
     const hd=[],cl=[],eng=[];const bk=[0,0,0,0,0];const sm={};const pm={};let ta=0;
@@ -638,19 +763,20 @@ function App(){
         <div style={{flex:1}}/>
 
         <nav style={{display:"flex",background:"var(--bg)",borderRadius:10,padding:3,gap:2,border:"1px solid var(--border)"}}>
-          {[["followup","📌 Follow-ups",op.length],["performance","📊 Performance",dateFiltered?dateFiltered.length:0],["gaps","⚠️ Data Gaps",gd.t.length]].map(function(x){var id=x[0],lb=x[1],cnt=x[2];return(
+          {[["followup","📌 Follow-ups",op.length],["trends","📈 Trends",trendData.totalFiltered||0],["performance","📊 Performance",dateFiltered?dateFiltered.length:0],["pivots","🔀 Pivots",dateFiltered?dateFiltered.length:0],["gaps","⚠️ Data Gaps",gd.t.length]].map(function(x){var id=x[0],lb=x[1],cnt=x[2];return(
             <button key={id} onClick={function(){setTab(id);clr();}} style={{background:tab===id?"var(--blue)":"transparent",color:tab===id?"#fff":"var(--t3)",border:"none",padding:"7px 16px",borderRadius:8,fontSize:11,fontWeight:700,display:"flex",alignItems:"center",gap:5}}>
               {lb} <span style={{background:tab===id?"rgba(255,255,255,.2)":"rgba(0,0,0,.06)",padding:"1px 6px",borderRadius:10,fontSize:10,fontWeight:800}}>{cnt}</span>
             </button>
           );})}
         </nav>
+        <button onClick={function(){setGsOpen(true);setGlobalSearch("");setGsResult(null);}} style={{background:"var(--bg)",border:"1px solid var(--border)",color:"var(--t2)",padding:"7px 14px",borderRadius:8,fontSize:11,fontWeight:600,display:"flex",alignItems:"center",gap:5}}>🔍 Search Ticket <kbd style={{background:"var(--border)",padding:"1px 5px",borderRadius:4,fontSize:9,fontWeight:700,color:"var(--t3)",marginLeft:4}}>Ctrl+K</kbd></button>
         <button onClick={function(){window.location.href="index.html";}} style={{background:"var(--bg)",border:"1px solid var(--border)",color:"var(--t2)",padding:"7px 14px",borderRadius:8,fontSize:11,fontWeight:600}}>↻ Change file</button>
         <input type="file" accept=".xlsx,.xls" ref={fRef} onChange={handleFile}/>
       </header>
 
       {/* ─── Date Range Filter Bar ─── */}
       <div style={{background:"#FFFFFF",borderBottom:"1px solid var(--border)",padding:"10px 28px",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",position:"sticky",top:58,zIndex:99}}>
-        <span style={{fontSize:11,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".5px",marginRight:4}}>📅 Date Range</span>
+        <span style={{fontSize:11,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".5px",marginRight:4}}>📅 Resolved Date Range</span>
 
         {/* Preset buttons */}
         <div style={{display:"flex",gap:4,flexWrap:"wrap"}}>
@@ -853,6 +979,7 @@ function App(){
                 <TH col="status">Status</TH>
                 <TH col="project">Project</TH>
                 <TH col="priority">Priority</TH>
+                <th style={{padding:"10px 12px",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".7px",borderBottom:"2px solid var(--border)",background:"var(--bg)",position:"sticky",top:0,zIndex:2,textAlign:"center"}}>Resolved By</th>
                 <th style={{padding:"10px 12px",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".7px",borderBottom:"2px solid var(--border)",background:"var(--bg)",position:"sticky",top:0,zIndex:2,textAlign:"left"}}>Linked</th>
                 <TH col="created">Created</TH>
                 <TH col="age" align="right">Age</TH>
@@ -860,6 +987,7 @@ function App(){
               <tbody>{disp.slice(0,300).map((t,i)=>{
                 const a=ds(t.Updated||t.Created);const bk=abk(a);const c=classify(t.Status);const cs=CS[c];
                 const linked=t["Linked Issues"]||"";const linkedSt=t["Linked Ticket status"]||"";
+                const _hasLRPS=linked&&String(linked).trim()!==""&&String(linked).toLowerCase()!=="nan";
                 return(<tr key={i} style={{borderBottom:"1px solid var(--border)"}}>
                   <td style={{padding:"10px 12px",whiteSpace:"nowrap"}}><a href={J+t.Key} target="_blank" rel="noreferrer" style={{fontWeight:700,fontFamily:"var(--mono)",fontSize:12}}>{t.Key}</a></td>
                   <td style={{padding:"10px 12px",color:"var(--t2)",maxWidth:240,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={t.Summary}>{t.Summary}</td>
@@ -867,6 +995,7 @@ function App(){
                   <td style={{padding:"10px 12px"}}><span style={{background:cs.badge,color:"#fff",padding:"3px 10px",borderRadius:20,fontSize:10,fontWeight:600,whiteSpace:"nowrap"}}>{t.Status}</span></td>
                   <td style={{padding:"10px 12px",color:"var(--t3)",fontSize:11,whiteSpace:"nowrap",maxWidth:120,overflow:"hidden",textOverflow:"ellipsis"}}>{(t.Project||"").split(" ").slice(0,2).join(" ")}</td>
                   <td style={{padding:"10px 12px",fontSize:11,fontWeight:600,color:t.Priority==="Critical"||t.Priority==="Show Stopper"?"var(--rose)":t.Priority==="High"?"var(--amber)":"var(--t3)"}}>{t.Priority}</td>
+                  <td style={{padding:"10px 12px",textAlign:"center"}}><span style={{padding:"3px 10px",borderRadius:20,fontSize:10,fontWeight:700,background:_hasLRPS?"var(--violet-bg)":"var(--green-bg)",color:_hasLRPS?"var(--violet)":"var(--green)",border:"1px solid "+(_hasLRPS?"var(--violet-border)":"var(--green-border)")}}>{_hasLRPS?"ENGG":"HD"}</span></td>
                   <td style={{padding:"10px 12px",fontSize:10,maxWidth:130,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={`${linked} — ${linkedSt}`}>
                     {linked?<><a href={J+(linked.split(";")[0])} target="_blank" rel="noreferrer" style={{fontFamily:"var(--mono)",fontSize:10}}>{linked.split(";")[0]}</a>
                     {linkedSt&&<span style={{color:"var(--t3)",marginLeft:4,fontSize:9}}>({linkedSt.split(" ").slice(0,2).join(" ")})</span>}</>:<span style={{color:"var(--t4)"}}>—</span>}
@@ -911,6 +1040,43 @@ function App(){
             </table></div>
           </div>
         )}
+      </>)}
+
+
+      {/* ═══ TREND ANALYSIS ═══ */}
+      {tab==="trends"&&(<>
+        <div className="fu" style={{marginBottom:6}}>
+          <div style={{fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".8px",marginBottom:6}}>TREND ANALYSIS</div>
+          <h2 style={{fontSize:22,fontWeight:800,letterSpacing:"-.3px",color:"var(--t1)"}}>Clarification: solved by HD or escalated?</h2>
+          <p style={{color:"var(--t2)",fontSize:13,marginTop:4}}>For each <b>{trendView==="month"?"month (by resolved date)":"current worker"}</b>, how many <b>Clarification</b> tickets (<b>{trendStatus}</b>{w?", "+w:""}{pf?", "+pf:""}) the Help Desk closed alone vs. sent to Engineering.</p>
+        </div>
+        <div className="fu fu1 card" style={{padding:"14px 20px",marginBottom:16,display:"flex",alignItems:"center",gap:16,flexWrap:"wrap"}}>
+          <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase"}}>ROOT CAUSE</span>
+            <select value={trendRC} onChange={function(e){setTrendRC(e.target.value);}} style={{background:"var(--bg)",color:"var(--t1)",border:"1px solid var(--border)",borderRadius:8,padding:"7px 14px",fontSize:12,fontWeight:600,minWidth:200}}>{trendRootCauses.map(function(rc){return <option key={rc} value={rc}>{rc==="Client Clarification"?rc+" (default)":rc}</option>;})}</select>
+          </div>
+          <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase"}}>STATUS</span>
+            <select value={trendStatus} onChange={function(e){setTrendStatus(e.target.value);}} style={{background:"var(--bg)",color:"var(--t1)",border:"1px solid var(--border)",borderRadius:8,padding:"7px 14px",fontSize:12,fontWeight:600,minWidth:160}}>{trendStatuses.map(function(s){return <option key={s} value={s}>{s==="Closed"?s+" (default)":s}</option>;})}</select>
+          </div>
+          <div style={{flex:1}}/><span style={{fontSize:10,color:"var(--t3)",fontStyle:"italic"}}>SVM, Current Worker & date use the top filters</span>
+        </div>
+        <div className="fu fu2" style={{display:"flex",gap:6,marginBottom:18}}>
+          <button onClick={function(){setTrendView("month");}} className={"subnav-btn"+(trendView==="month"?" active":"")}>📅 By Month</button>
+          <button onClick={function(){setTrendView("worker");}} className={"subnav-btn"+(trendView==="worker"?" active":"")}>👤 By Current Worker</button>
+        </div>
+        <div className="fu fu2" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12,marginBottom:18}}>
+          {(function(){var items=trendView==="month"?trendData.byMonth:trendData.byWorker;var totalAll=0,totalHd=0,totalEngg=0;items.forEach(function(it){totalAll+=it.total;totalHd+=it.hd;totalEngg+=it.engg;});var hdPct=totalAll>0?Math.round(totalHd/totalAll*100):0;return(<>
+            <div className="card" style={{padding:"16px 20px",textAlign:"center"}}><div style={{fontSize:28,fontWeight:900,color:"var(--t1)"}}>{totalAll.toLocaleString()}</div><div style={{fontSize:10,color:"var(--t3)",fontWeight:600,marginTop:4}}>Total Filtered</div></div>
+            <div className="card" style={{padding:"16px 20px",textAlign:"center"}}><div style={{fontSize:28,fontWeight:900,color:"var(--green)"}}>{totalHd.toLocaleString()}</div><div style={{fontSize:10,color:"var(--green)",fontWeight:600,marginTop:4}}>HD Resolved ({hdPct}%)</div></div>
+            <div className="card" style={{padding:"16px 20px",textAlign:"center"}}><div style={{fontSize:28,fontWeight:900,color:"var(--violet)"}}>{totalEngg.toLocaleString()}</div><div style={{fontSize:10,color:"var(--violet)",fontWeight:600,marginTop:4}}>Engg Escalated ({100-hdPct}%)</div></div>
+            <div className="card" style={{padding:"16px 20px",textAlign:"center"}}><div style={{fontSize:28,fontWeight:900,color:"var(--blue)"}}>{items.length}</div><div style={{fontSize:10,color:"var(--t3)",fontWeight:600,marginTop:4}}>{trendView==="month"?"Months":"Workers"}</div></div>
+          </>);})()}
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(340px,1fr))",gap:14}}>
+          {(trendView==="month"?trendData.byMonth:trendData.byWorker).map(function(item,idx){
+            return <TrendCard key={idx} label={item.label} total={item.total} hd={item.hd} engg={item.engg} onClick={function(){setModal({title:item.label+" — "+item.total+" tickets",icon:trendView==="month"?"📅":"👤",color:"#2563EB",tickets:item.tickets.sort(function(a,b){return ds(b.Updated||b.Created)-ds(a.Updated||a.Created);})});}}/>;
+          })}
+        </div>
+        {(trendView==="month"?trendData.byMonth:trendData.byWorker).length===0&&(<div className="card" style={{padding:40,textAlign:"center",color:"var(--t3)",fontSize:13}}>No data matching filters.</div>)}
       </>)}
 
       {/* ═══ PERFORMANCE ═══ */}
@@ -1280,6 +1446,50 @@ function App(){
         </>):null}
       </>)}
 
+
+      {/* ═══ PIVOTS ═══ */}
+      {tab==="pivots"&&(<>
+        <div className="fu" style={{marginBottom:6}}>
+          <div style={{fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".8px",marginBottom:6}}>PIVOTS</div>
+          <p style={{color:"var(--t2)",fontSize:13,marginTop:4}}>Excel-style cross-tabs. Every cell is clickable. These pivots use the <b>date range only</b>.</p>
+        </div>
+        <div className="subnav fu fu1">
+          {[["worker-perf","HD Worker Performance"],["overall-inc","Overall Incidents"],["group-clar","Group-wise Clarifications"],["root-cause","Root Cause"],["comp-wise","Component Wise"],["svm-wise","SVM In Charge Wise"],["custom","Custom Pivot"]].map(function(x){return <button key={x[0]} onClick={function(){setPivotView(x[0]);}} className={"subnav-btn"+(pivotView===x[0]?" active":"")}>{x[1]}</button>;})}
+        </div>
+        {pivotView==="worker-perf"&&pivotData.workerPerf&&(<div className="fu fu2 card" style={{padding:"22px 24px"}}>
+          <div style={{marginBottom:16}}><div style={{fontSize:16,fontWeight:800}}>HD Worker Performance</div><p style={{color:"var(--t2)",fontSize:12,marginTop:4}}>Clarification-incident load per worker — HD alone vs ENGG escalated.</p>
+            <div style={{display:"flex",gap:10,marginTop:10}}><span style={{fontSize:11,padding:"4px 12px",border:"1px solid var(--blue-light)",borderRadius:6,background:"var(--blue-bg)",color:"var(--blue)",fontWeight:600}}>Issue Type: Incident</span><span style={{fontSize:11,padding:"4px 12px",border:"1px solid var(--green-border)",borderRadius:6,background:"var(--green-bg)",color:"var(--green)",fontWeight:600}}>Root Cause: Client Clarification</span></div></div>
+          <div style={{overflowX:"auto"}}><table className="pivot-table"><thead><tr><th>CURRENT WORKER</th><th className="num">HD</th><th className="num">ENGG</th><th className="num">GRAND TOTAL</th></tr></thead><tbody>
+            {pivotData.workerPerf.map(function(r,i){return(<tr key={i}><td style={{fontWeight:600}}>{r.name}</td><td className="num" style={{cursor:r.hd>0?"pointer":"default",color:r.hd>0?"var(--green)":"var(--t4)"}} onClick={function(){if(r.hd>0){var tix=r.tickets.filter(function(t){var li=t["Linked Issues"];return!(li&&String(li).trim()!==""&&String(li).toLowerCase()!=="nan");});setModal({title:r.name+" — HD",icon:"🎯",color:"#059669",tickets:tix});}}}>{r.hd||""}</td><td className="num" style={{cursor:r.engg>0?"pointer":"default",color:r.engg>0?"var(--violet)":"var(--t4)"}} onClick={function(){if(r.engg>0){var tix=r.tickets.filter(function(t){var li=t["Linked Issues"];return li&&String(li).trim()!==""&&String(li).toLowerCase()!=="nan";});setModal({title:r.name+" — Engg",icon:"🔧",color:"#7C3AED",tickets:tix});}}}>{r.engg||""}</td><td className="num" style={{fontWeight:800,cursor:"pointer"}} onClick={function(){setModal({title:r.name,icon:"📋",color:"#2563EB",tickets:r.tickets});}}>{r.total}</td></tr>);})}
+            <tr className="total-row"><td style={{fontWeight:800}}>Grand Total</td><td className="num" style={{color:"var(--green)"}}>{pivotData.wpTotals.hd}</td><td className="num" style={{color:"var(--violet)"}}>{pivotData.wpTotals.engg}</td><td className="num">{pivotData.wpTotals.total}</td></tr>
+          </tbody></table></div></div>)}
+        {pivotView==="overall-inc"&&pivotData.overallInc&&(<div className="fu fu2 card" style={{padding:"22px 24px"}}><div style={{marginBottom:16}}><div style={{fontSize:16,fontWeight:800}}>Overall Incidents</div><p style={{color:"var(--t2)",fontSize:12,marginTop:4}}>All incidents by worker.</p></div><div style={{overflowX:"auto"}}><table className="pivot-table"><thead><tr><th>CURRENT WORKER</th><th className="num">TOTAL</th><th className="num">CLOSED</th><th className="num">OPEN</th></tr></thead><tbody>
+          {pivotData.overallInc.map(function(r,i){return(<tr key={i}><td style={{fontWeight:600}}>{r.name}</td><td className="num" style={{cursor:"pointer"}} onClick={function(){setModal({title:r.name,icon:"📋",color:"#2563EB",tickets:r.tickets});}}>{r.total}</td><td className="num" style={{color:"var(--green)",cursor:r.closed>0?"pointer":"default"}} onClick={function(){if(r.closed>0)setModal({title:r.name+" — Closed",icon:"✅",color:"#059669",tickets:r.tickets.filter(function(t){return t.Status==="Closed";})});}}>{r.closed||""}</td><td className="num" style={{color:"var(--amber)",cursor:r.open>0?"pointer":"default"}} onClick={function(){if(r.open>0)setModal({title:r.name+" — Open",icon:"📂",color:"#D97706",tickets:r.tickets.filter(function(t){return t.Status!=="Closed";})});}}>{r.open||""}</td></tr>);})}
+          <tr className="total-row"><td style={{fontWeight:800}}>Grand Total</td><td className="num">{pivotData.oiTotals.total}</td><td className="num" style={{color:"var(--green)"}}>{pivotData.oiTotals.closed}</td><td className="num" style={{color:"var(--amber)"}}>{pivotData.oiTotals.open}</td></tr></tbody></table></div></div>)}
+        {pivotView==="group-clar"&&pivotData.groupClar&&(<div className="fu fu2 card" style={{padding:"22px 24px"}}><div style={{marginBottom:16}}><div style={{fontSize:16,fontWeight:800}}>Group-wise Clarifications</div><p style={{color:"var(--t2)",fontSize:12,marginTop:4}}>Client Clarification tickets by worker — HD closed, Engg closed, still open.</p></div><div style={{overflowX:"auto"}}><table className="pivot-table"><thead><tr><th>CURRENT WORKER</th><th className="num">HD CLOSED</th><th className="num">ENGG CLOSED</th><th className="num">OPEN</th><th className="num">TOTAL</th></tr></thead><tbody>
+          {pivotData.groupClar.map(function(r,i){return(<tr key={i}><td style={{fontWeight:600}}>{r.name}</td><td className="num" style={{color:r.hd>0?"var(--green)":"var(--t4)"}}>{r.hd||""}</td><td className="num" style={{color:r.engg>0?"var(--violet)":"var(--t4)"}}>{r.engg||""}</td><td className="num" style={{color:r.open>0?"var(--amber)":"var(--t4)"}}>{r.open||""}</td><td className="num" style={{fontWeight:800,cursor:"pointer"}} onClick={function(){setModal({title:r.name,icon:"📋",color:"#2563EB",tickets:r.tickets});}}>{r.total}</td></tr>);})}
+          <tr className="total-row"><td style={{fontWeight:800}}>Grand Total</td><td className="num" style={{color:"var(--green)"}}>{pivotData.gcTotals.hd}</td><td className="num" style={{color:"var(--violet)"}}>{pivotData.gcTotals.engg}</td><td className="num" style={{color:"var(--amber)"}}>{pivotData.gcTotals.open}</td><td className="num">{pivotData.gcTotals.total}</td></tr></tbody></table></div></div>)}
+        {pivotView==="root-cause"&&pivotData.rootCause&&(<div className="fu fu2 card" style={{padding:"22px 24px"}}><div style={{marginBottom:16}}><div style={{fontSize:16,fontWeight:800}}>Root Cause</div></div><div style={{overflowX:"auto"}}><table className="pivot-table"><thead><tr><th>ROOT CAUSE</th><th className="num">TOTAL</th><th className="num">CLOSED</th><th className="num">OPEN</th></tr></thead><tbody>
+          {pivotData.rootCause.map(function(r,i){return(<tr key={i}><td style={{fontWeight:600}}>{r.name}</td><td className="num" style={{cursor:"pointer"}} onClick={function(){setModal({title:r.name,icon:"📋",color:"#2563EB",tickets:r.tickets});}}>{r.total}</td><td className="num" style={{color:"var(--green)"}}>{r.closed||""}</td><td className="num" style={{color:"var(--amber)"}}>{r.open||""}</td></tr>);})}
+          <tr className="total-row"><td style={{fontWeight:800}}>Grand Total</td><td className="num">{pivotData.rcTotals.total}</td><td className="num" style={{color:"var(--green)"}}>{pivotData.rcTotals.closed}</td><td className="num" style={{color:"var(--amber)"}}>{pivotData.rcTotals.open}</td></tr></tbody></table></div></div>)}
+        {pivotView==="comp-wise"&&pivotData.compWise&&(<div className="fu fu2 card" style={{padding:"22px 24px"}}><div style={{marginBottom:16}}><div style={{fontSize:16,fontWeight:800}}>Component Wise</div></div><div style={{overflowX:"auto"}}><table className="pivot-table"><thead><tr><th>COMPONENT</th><th className="num">TOTAL</th><th className="num">CLOSED</th><th className="num">OPEN</th></tr></thead><tbody>
+          {pivotData.compWise.map(function(r,i){return(<tr key={i}><td style={{fontWeight:600}}>{r.name}</td><td className="num" style={{cursor:"pointer"}} onClick={function(){setModal({title:r.name,icon:"📋",color:"#2563EB",tickets:r.tickets});}}>{r.total}</td><td className="num" style={{color:"var(--green)"}}>{r.closed||""}</td><td className="num" style={{color:"var(--amber)"}}>{r.open||""}</td></tr>);})}
+          <tr className="total-row"><td style={{fontWeight:800}}>Grand Total</td><td className="num">{pivotData.cwTotals.total}</td><td className="num" style={{color:"var(--green)"}}>{pivotData.cwTotals.closed}</td><td className="num" style={{color:"var(--amber)"}}>{pivotData.cwTotals.open}</td></tr></tbody></table></div></div>)}
+        {pivotView==="svm-wise"&&pivotData.svmWise&&(<div className="fu fu2 card" style={{padding:"22px 24px"}}><div style={{marginBottom:16}}><div style={{fontSize:16,fontWeight:800}}>SVM In Charge Wise</div></div><div style={{overflowX:"auto"}}><table className="pivot-table"><thead><tr><th>SVM IN CHARGE</th><th className="num">TOTAL</th><th className="num">CLOSED</th><th className="num">HD</th><th className="num">ENGG</th><th className="num">OPEN</th></tr></thead><tbody>
+          {pivotData.svmWise.map(function(r,i){return(<tr key={i}><td style={{fontWeight:600}}>{r.name}</td><td className="num" style={{cursor:"pointer"}} onClick={function(){setModal({title:r.name,icon:"📋",color:"#2563EB",tickets:r.tickets});}}>{r.total}</td><td className="num" style={{color:"var(--green)"}}>{r.closed||""}</td><td className="num" style={{color:r.hd>0?"#059669":"var(--t4)"}}>{r.hd||""}</td><td className="num" style={{color:r.engg>0?"var(--violet)":"var(--t4)"}}>{r.engg||""}</td><td className="num" style={{color:r.open>0?"var(--amber)":"var(--t4)"}}>{r.open||""}</td></tr>);})}
+          <tr className="total-row"><td style={{fontWeight:800}}>Grand Total</td><td className="num">{pivotData.svmTotals.total}</td><td className="num" style={{color:"var(--green)"}}>{pivotData.svmTotals.closed}</td><td className="num">{pivotData.svmTotals.hd}</td><td className="num">{pivotData.svmTotals.engg}</td><td className="num" style={{color:"var(--amber)"}}>{pivotData.svmTotals.open}</td></tr></tbody></table></div></div>)}
+        {pivotView==="custom"&&pivotData.customPivot&&(<div className="fu fu2 card" style={{padding:"22px 24px"}}>
+          <div style={{marginBottom:16}}><div style={{fontSize:16,fontWeight:800}}>Custom Pivot</div><p style={{color:"var(--t2)",fontSize:12,marginTop:4}}>Build your own cross-tab.</p>
+            <div style={{display:"flex",gap:16,marginTop:14,alignItems:"center",flexWrap:"wrap"}}>
+              <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase"}}>ROWS</span><select value={customPivotRow} onChange={function(e){setCustomPivotRow(e.target.value);}} style={{background:"var(--bg)",color:"var(--t1)",border:"1px solid var(--border)",borderRadius:8,padding:"7px 14px",fontSize:12,fontWeight:600,minWidth:180}}>{PIVOT_ROW_FIELDS.map(function(f){return <option key={f} value={f}>{f}</option>;})}</select></div>
+              <div style={{display:"flex",alignItems:"center",gap:8}}><span style={{fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase"}}>COLUMNS</span><select value={customPivotCol} onChange={function(e){setCustomPivotCol(e.target.value);}} style={{background:"var(--bg)",color:"var(--t1)",border:"1px solid var(--border)",borderRadius:8,padding:"7px 14px",fontSize:12,fontWeight:600,minWidth:180}}>{PIVOT_COL_FIELDS.map(function(f){return <option key={f} value={f}>{f}</option>;})}</select></div>
+            </div></div>
+          <div style={{overflowX:"auto",maxHeight:600,overflowY:"auto"}}><table className="pivot-table"><thead><tr><th>{customPivotRow.toUpperCase()}</th>{(pivotData.colArr||[]).map(function(c){return <th key={c} className="num">{c}</th>;})}<th className="num">GRAND TOTAL</th></tr></thead><tbody>
+            {pivotData.customPivot.map(function(r,i){return(<tr key={i}><td style={{fontWeight:600,maxWidth:250,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={r.name}>{r.name}</td>{(pivotData.colArr||[]).map(function(c){var v=r[c]||0;return(<td key={c} className="num" style={{cursor:v>0?"pointer":"default",color:v>0?"var(--blue)":"var(--t4)"}} onClick={function(){if(v>0){var tix=r.tickets.filter(function(t){if(customPivotCol==="HD/Engg Split"){var li=t["Linked Issues"];var hl=li&&String(li).trim()!==""&&String(li).toLowerCase()!=="nan";return c==="Engg"?hl:!hl;}var cv=t[customPivotCol]||"(empty)";if(String(cv).toLowerCase()==="nan"||String(cv).trim()==="")cv="(empty)";return cv===c;});setModal({title:r.name+" × "+c,icon:"🔀",color:"#2563EB",tickets:tix});}}}>{v||""}</td>);})}<td className="num" style={{fontWeight:800,cursor:"pointer"}} onClick={function(){setModal({title:r.name,icon:"📋",color:"#2563EB",tickets:r.tickets});}}>{r.total}</td></tr>);})}
+            <tr className="total-row"><td style={{fontWeight:800}}>Grand Total</td>{(pivotData.colArr||[]).map(function(c){return <td key={c} className="num">{pivotData.cpTotals[c]||0}</td>;})}<td className="num">{pivotData.cpTotals.total}</td></tr>
+          </tbody></table></div></div>)}
+      </>)}
+
       {/* ═══ DATA GAPS ═══ */}
       {tab==="gaps"&&(<>
         <div className="fu card" style={{padding:"16px 22px",marginBottom:14,display:"flex",alignItems:"center",gap:16,borderColor:"var(--amber-border)",background:"var(--amber-bg)"}}>
@@ -1331,6 +1541,38 @@ function App(){
         {" "}· {op.length} open · HD Follow-up Tracker
       </div>
       </main>
+
+
+      {/* ─── Global Ticket Search Panel ─── */}
+      {gsOpen&&(<div onClick={function(e){if(e.target===e.currentTarget)setGsOpen(false);}} style={{position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,.5)",backdropFilter:"blur(6px)",WebkitBackdropFilter:"blur(6px)",zIndex:250,display:"flex",alignItems:"flex-start",justifyContent:"center",paddingTop:80,animation:"fadeUp .2s cubic-bezier(.22,1,.36,1)"}}>
+        <div style={{background:"#fff",borderRadius:20,boxShadow:"0 20px 60px rgba(0,0,0,.25)",width:"100%",maxWidth:680,maxHeight:"80vh",display:"flex",flexDirection:"column",overflow:"hidden",animation:"modalIn .25s cubic-bezier(.22,1,.36,1)"}}>
+          <div style={{padding:"18px 22px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",gap:12}}>
+            <span style={{fontSize:22,color:"var(--t3)"}}>🔍</span>
+            <input type="text" autoFocus value={globalSearch} onChange={function(e){setGlobalSearch(e.target.value);doGlobalSearch(e.target.value);}} onKeyDown={function(e){if(e.key==="Escape")setGsOpen(false);}} placeholder="Enter ticket number e.g. ALXSVM-1234" style={{flex:1,border:"none",outline:"none",fontSize:16,fontWeight:500,color:"var(--t1)",background:"transparent",fontFamily:"var(--sans)"}}/>
+            <button onClick={function(){setGsOpen(false);}} style={{width:32,height:32,borderRadius:8,border:"1px solid var(--border)",background:"var(--bg)",fontSize:13,color:"var(--t2)",display:"flex",alignItems:"center",justifyContent:"center"}}>✕</button>
+          </div>
+          <div style={{flex:1,overflowY:"auto",padding:"0 22px 22px"}}>
+            {!gsResult&&globalSearch===""&&(<div style={{padding:"40px 0",textAlign:"center",color:"var(--t3)"}}><div style={{fontSize:36,marginBottom:12}}>🔎</div><div style={{fontSize:13}}>Type a ticket key to see its full details</div><div style={{fontSize:11,marginTop:8,color:"var(--t4)"}}>Searches across all {raw?raw.length:0} records</div></div>)}
+            {gsResult&&gsResult.notFound&&(<div style={{padding:"40px 0",textAlign:"center",color:"var(--t3)"}}><div style={{fontSize:36,marginBottom:12}}>🙅</div><div style={{fontSize:14,fontWeight:600,color:"var(--t1)"}}>No ticket found for "{gsResult.query}"</div></div>)}
+            {gsResult&&gsResult.ticket&&(function(){var t=gsResult.ticket;var cat=gsResult.cat;var cs=CS[cat];var sla=gsResult.sla;var hasLRPS=gsResult.hasLRPS;var age=ds(t.Updated||t.Created);
+              return(<div style={{marginTop:18}}>
+                <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:18}}>
+                  <div style={{width:50,height:50,borderRadius:12,background:cs.bg,border:"1px solid "+cs.br,display:"flex",alignItems:"center",justifyContent:"center",fontSize:24,flexShrink:0}}>{cs.icon}</div>
+                  <div style={{flex:1}}><div style={{display:"flex",alignItems:"center",gap:10}}><a href={J+t.Key} target="_blank" rel="noreferrer" style={{fontSize:20,fontWeight:900,color:"var(--blue)",fontFamily:"var(--mono)"}}>{t.Key}</a><span style={{background:cs.badge,color:"#fff",padding:"3px 10px",borderRadius:20,fontSize:10,fontWeight:700}}>{t.Status}</span>{sla.anyBreach&&<span style={{background:"#FEE2E2",color:"#BE123C",padding:"3px 8px",borderRadius:6,fontSize:9,fontWeight:700}}>⚡ SLA BREACH</span>}</div>
+                    <div style={{fontSize:14,color:"var(--t2)",marginTop:4,lineHeight:1.5}}>{t.Summary}</div></div></div>
+                <div style={{display:"flex",gap:10,marginBottom:18}}>
+                  <div style={{flex:1,padding:"14px 18px",borderRadius:12,background:hasLRPS?"var(--violet-bg)":"var(--green-bg)",border:"1px solid "+(hasLRPS?"var(--violet-border)":"var(--green-border)"),textAlign:"center"}}><div style={{fontSize:22,marginBottom:4}}>{hasLRPS?"🔧":"🎯"}</div><div style={{fontSize:14,fontWeight:800,color:hasLRPS?"var(--violet)":"var(--green)"}}>{hasLRPS?"Engineering":"HD (Help Desk)"}</div><div style={{fontSize:11,color:"var(--t2)",marginTop:4}}>Resolved by</div></div>
+                  <div style={{flex:1,padding:"14px 18px",borderRadius:12,background:cs.bg,border:"1px solid "+cs.br,textAlign:"center"}}><div style={{fontSize:22,marginBottom:4}}>{cs.icon}</div><div style={{fontSize:14,fontWeight:800,color:cs.badge}}>{CL[cat]}</div><div style={{fontSize:11,color:"var(--t2)",marginTop:4}}>Category</div></div></div>
+                <div style={{background:"var(--bg)",borderRadius:14,border:"1px solid var(--border)",overflow:"hidden"}}>
+                  {[["Current Worker",t["Current Worker"]||"—","var(--blue)"],["Priority",t.Priority||"—",PRIORITY_COLORS[t.Priority]||"var(--t2)"],["Project",t.Project||"—","var(--t1)"],["Issue Type",t["Issue Type"]||"—","var(--t1)"],["Root Cause",t["Root Cause"]||"—","var(--amber)"],["Components",t.Components&&String(t.Components)!=="nan"?t.Components:"—","var(--t1)"],["SVM In Charge",t["SVM In Charge"]&&String(t["SVM In Charge"])!=="nan"?t["SVM In Charge"]:"—","var(--t1)"],["Created Date",fd(t.Created),"var(--t2)"],["Resolved Date",t.Resolved?fd(t.Resolved):"— (not resolved)","var(--green)"],["Age (days)",age+"d",AC[abk(age)]],["Linked Issues",t["Linked Issues"]&&String(t["Linked Issues"])!=="nan"?t["Linked Issues"]:"— (none)","var(--violet)"],["Linked Ticket Status",gsResult.linkedStatus&&String(gsResult.linkedStatus)!=="nan"?gsResult.linkedStatus:"—","var(--t2)"],["Type of Fix",t["Type of Fix"]&&String(t["Type of Fix"])!=="nan"?t["Type of Fix"]:"—","var(--t2)"],["Sanity Test Done",t["Sanity Test Done"]||"—",t["Sanity Test Done"]==="Yes"?"var(--green)":"var(--t3)"],["Time to First Response",t["Time to first response"]||"—",sla.frBreach?"var(--rose)":"var(--green)"],["Time to Resolution",t["Time to resolution"]||"—",sla.resBreach?"var(--rose)":"var(--green)"]
+                  ].map(function(row,idx){return(<div key={idx} style={{display:"flex",padding:"10px 18px",borderBottom:idx<15?"1px solid var(--border)":"none",alignItems:"center"}}><div style={{width:180,fontSize:11,fontWeight:600,color:"var(--t3)",flexShrink:0}}>{row[0]}</div><div style={{flex:1,fontSize:13,fontWeight:600,color:row[2],wordBreak:"break-word"}}>{row[1]}</div></div>);})}
+                </div>
+                <div style={{marginTop:16,textAlign:"center"}}><a href={J+t.Key} target="_blank" rel="noreferrer" style={{display:"inline-flex",alignItems:"center",gap:8,padding:"10px 24px",background:"var(--blue)",color:"#fff",borderRadius:10,fontSize:13,fontWeight:700,textDecoration:"none"}}>Open in Jira →</a></div>
+              </div>);
+            })()}
+          </div>
+        </div>
+      </div>)}
 
       {/* ─── Ticket Modal ─── */}
       <TicketModal data={modal} onClose={closeModal}/>
