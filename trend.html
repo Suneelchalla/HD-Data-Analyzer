@@ -671,6 +671,16 @@ function tabBtn(id,ic,label,cnt){
 }
 function dateBar(){
   var presets=["All time","This month","Last month","Last 3M","Last 6M","This year"];
+  // Compute data's resolved date range
+  var minD=null, maxD=null;
+  RAW.forEach(function(t){
+    var d=t.resolved||t.created;
+    if(!d) return;
+    if(!minD||d<minD) minD=d;
+    if(!maxD||d>maxD) maxD=d;
+  });
+  var rangeLabel="";
+  if(minD&&maxD) rangeLabel='<span style="display:inline-flex;align-items:center;gap:5px;margin-left:auto;font-size:11px;color:var(--muted);background:var(--paper);border:1px solid var(--line);padding:4px 12px;border-radius:7px;white-space:nowrap">📊 Data range: <b style="color:var(--ink)">'+fdate(minD)+'</b> → <b style="color:var(--ink)">'+fdate(maxD)+'</b> <span style="color:var(--faint)">· '+RAW.length+' records (resolved date)</span></span>';
   return '<div class="datebar">'+
     '<span class="flabel" style="margin-right:2px">📅 Range</span>'+
     presets.map(function(p){return '<button class="chip '+(S.dlabel===p?'on':'')+'" data-preset="'+p+'">'+p+'</button>';}).join("")+
@@ -680,6 +690,7 @@ function dateBar(){
     '<span class="sub">→</span>'+
     '<input type="date" class="dinput" id="dto" value="'+S.to+'">'+
     '<span class="sub" id="rangenote" style="margin-left:6px;color:var(--hd);font-weight:600"></span>'+
+    rangeLabel+
   '</div>';
 }
 function bindDateBar(){
