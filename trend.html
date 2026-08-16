@@ -259,10 +259,7 @@ tbody tr.rowlink:hover{background:var(--hd-bg)}
 .tmode-btn{padding:7px 16px;border-radius:8px;font-size:12px;font-weight:700;border:1px solid var(--line);background:var(--card);color:var(--muted);cursor:pointer;transition:all .15s;white-space:nowrap}
 .tmode-btn.on{background:var(--ink);color:#fff;border-color:var(--ink)}
 .tmode-btn:hover:not(.on){background:var(--paper);border-color:var(--line2)}
-/* Global search overlay */
-.gs-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.5);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);z-index:300;display:flex;align-items:flex-start;justify-content:center;padding-top:80px}
-.gs-box{background:#fff;border-radius:20px;box-shadow:0 20px 60px rgba(0,0,0,.25);width:100%;max-width:680px;max-height:80vh;display:flex;flex-direction:column;overflow:hidden}
-.gs-input{flex:1;border:none;outline:none;font-size:16px;font-weight:500;color:var(--ink);background:transparent;font-family:var(--sans)}
+/* Global search inline */
 .gs-row{display:flex;padding:10px 18px;border-bottom:1px solid var(--line);align-items:center}
 .gs-label{width:180px;font-size:11px;font-weight:600;color:var(--faint);flex-shrink:0}
 .gs-val{flex:1;font-size:13px;font-weight:600;word-break:break-word}
@@ -523,54 +520,90 @@ function ring(pctVal,size,sw,color,inner){
 function bars(cols){ // small logo bars markup
   return '<span class="bar">'+cols+'</span>';
 }
-/* ─── Global Ticket Search ─── */
-function openGlobalSearch(){
-  if(document.getElementById("gs-ov"))return;
-  var html='<div class="gs-overlay" id="gs-ov">'+
-    '<div class="gs-box">'+
-      '<div style="padding:18px 22px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12">'+
-        '<span style="font-size:22px;color:var(--faint)">🔍</span>'+
-        '<input class="gs-input" id="gs-q" placeholder="Enter ticket number e.g. ALXSVM-1234" autofocus/>'+
-        '<button class="ghost" id="gs-close" style="padding:6px 10px">✕</button>'+
+/* ─── Global Ticket Search (Inline) ─── */
+function wireSearch(){
+  var inp=el("gs-input"), dd=el("gs-dropdown");
+  if(!inp||!dd) return;
+
+  function closeDD(){ dd.style.display="none"; dd.innerHTML=""; }
+
+  function doSearch(){
+    var q=inp.value.trim();
+    if(!q||q.length<2){ closeDD(); return; }
+    var s=q.toUpperCase();
+    // 1. exact key match
+    var exact=RAW.filter(function(t){ return t.key.toUpperCase()===s; });
+    // 2. key prefix match
+    var prefix=exact.length?[]:RAW.filter(function(t){ return t.key.toUpperCase().indexOf(s)===0; });
+    // 3. key contains
+    var contains=(exact.length||prefix.length)?[]:RAW.filter(function(t){ return t.key.toUpperCase().indexOf(s)>0; });
+    // 4. summary match (only if no key matches)
+    var summary=(exact.length||prefix.length||contains.length)?[]:RAW.filter(function(t){ return t.summary.toUpperCase().indexOf(s)>-1; });
+    var results=[].concat(exact,prefix,contains,summary).slice(0,25);
+    if(!results.length){ dd.style.display="block"; dd.innerHTML='<div style="padding:24px;text-align:center;color:var(--faint);font-size:12px">No tickets matching "'+esc(q)+'"</div>'; return; }
+    dd.style.display="block";
+    dd.innerHTML='<div style="padding:8px 12px;font-size:10px;font-weight:700;color:var(--faint);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--line)">'+results.length+(results.length===25?'+':'')+' match'+(results.length!==1?'es':'')+'</div>'+
+      results.map(function(t){
+        var age=Math.max(0,Math.floor((Date.now()-(t.resolved||t.created||new Date()).getTime())/864e5));
+        return '<div class="gs-item" data-gsk="'+esc(t.key)+'" style="padding:10px 14px;border-bottom:1px solid var(--line);cursor:pointer;transition:background .12s">'+
+          '<div style="display:flex;align-items:center;gap:8px">'+
+            '<span class="mono" style="font-size:12px;font-weight:700;color:var(--hd)">'+esc(t.key)+'</span>'+
+            '<span class="badge '+(t.isHD?'hd':'engg')+'" style="font-size:9px;padding:2px 7px">'+(t.isHD?'HD':'ENGG')+'</span>'+
+            '<span class="badge" style="font-size:9px;padding:2px 7px;background:var(--paper);color:var(--muted);border:1px solid var(--line)">'+esc(t.status)+'</span>'+
+            '<span style="margin-left:auto;font-size:10px;color:var(--faint);font-family:var(--mono)">'+age+'d</span>'+
+          '</div>'+
+          '<div style="font-size:11px;color:var(--muted);margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(t.summary)+'</div>'+
+          '<div style="font-size:10px;color:var(--faint);margin-top:3px">'+esc(t.currentWorker||"—")+' · '+esc(t.project||"—")+' · '+esc(t.rc||"—")+'</div>'+
+        '</div>';
+      }).join("");
+    // wire clicks
+    dd.querySelectorAll(".gs-item").forEach(function(item){
+      item.onmouseenter=function(){item.style.background="var(--paper)";};
+      item.onmouseleave=function(){item.style.background="";};
+      item.onclick=function(){ showTicketDetail(item.dataset.gsk); };
+    });
+  }
+
+  function showTicketDetail(key){
+    var t=RAW.find(function(r){return r.key===key;});
+    if(!t){ closeDD(); return; }
+    var age=Math.max(0,Math.floor((Date.now()-(t.resolved||t.created||new Date()).getTime())/864e5));
+    dd.style.display="block";
+    dd.innerHTML='<div style="padding:14px 16px">'+
+      '<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px">'+
+        '<button id="gs-back" style="border:none;background:var(--paper);border-radius:6px;padding:4px 10px;font-size:11px;font-weight:600;color:var(--muted);cursor:pointer">← Back</button>'+
+        '<span style="margin-left:auto;font-size:10px;color:var(--faint)">Ticket Detail</span>'+
       '</div>'+
-      '<div id="gs-result" style="flex:1;overflow-y:auto;padding:0 22px 22px">'+
-        '<div style="padding:40px 0;text-align:center;color:var(--faint)"><div style="font-size:36px;margin-bottom:12px">🔎</div><div style="font-size:13px">Type a ticket key to see its full details</div><div style="font-size:11px;margin-top:8px;color:var(--line2)">Searches across all '+RAW.length+' records</div></div>'+
+      '<div style="display:flex;align-items:center;gap:10px;margin:12px 0 10px">'+
+        '<div style="width:42px;height:42px;border-radius:10px;background:'+(t.isHD?'var(--hd-bg)':'var(--engg-bg)')+';border:1px solid '+(t.isHD?'var(--hd-line)':'var(--engg-line)')+';display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0">'+(t.isHD?'🎯':'🔧')+'</div>'+
+        '<div style="flex:1;min-width:0"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><a href="'+JIRA+encodeURIComponent(t.key)+'" target="_blank" rel="noreferrer" class="mono" style="font-size:16px;font-weight:800;color:var(--hd)">'+esc(t.key)+'</a><span class="badge '+(t.isHD?'hd':'engg')+'">'+t.status+'</span></div>'+
+        '<div style="font-size:12px;color:var(--muted);margin-top:3px;line-height:1.4">'+esc(t.summary)+'</div></div>'+
       '</div>'+
-    '</div></div>';
-  var d=document.createElement("div");d.innerHTML=html;document.body.appendChild(d.firstChild);
-  var ov=el("gs-ov"),q=el("gs-q");
-  ov.addEventListener("click",function(e){if(e.target===ov){ov.remove();}});
-  el("gs-close").onclick=function(){ov.remove();};
-  q.addEventListener("keydown",function(e){if(e.key==="Escape")ov.remove();});
-  q.addEventListener("input",function(){
-    var s=q.value.trim().toUpperCase();var res=el("gs-result");
-    if(!s){res.innerHTML='<div style="padding:40px 0;text-align:center;color:var(--faint)"><div style="font-size:36px;margin-bottom:12px">🔎</div><div>Type a ticket key</div></div>';return;}
-    var found=RAW.find(function(t){return t.key.toUpperCase()===s;});
-    if(!found)found=RAW.find(function(t){return t.key.toUpperCase().indexOf(s)>-1||t.summary.toUpperCase().indexOf(s)>-1;});
-    if(!found){res.innerHTML='<div style="padding:40px 0;text-align:center;color:var(--faint)"><div style="font-size:36px;margin-bottom:12px">🙅</div><div style="font-size:14px;font-weight:600;color:var(--ink)">No ticket found for "'+esc(q.value.trim())+'"</div></div>';return;}
-    var t=found;var age=Math.max(0,Math.floor((Date.now()-(t.resolved||t.created||new Date()).getTime())/864e5));
-    var rb=t.isHD;
-    res.innerHTML='<div style="margin-top:18px">'+
-      '<div style="display:flex;align-items:center;gap:14px;margin-bottom:18px">'+
-        '<div style="width:50px;height:50px;border-radius:12px;background:'+(rb?"var(--hd-bg)":"var(--engg-bg)")+';border:1px solid '+(rb?"var(--hd-line)":"var(--engg-line)")+';display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0">'+(rb?"🎯":"🔧")+'</div>'+
-        '<div style="flex:1"><div style="display:flex;align-items:center;gap:10px"><a href="'+JIRA+encodeURIComponent(t.key)+'" target="_blank" rel="noreferrer" style="font-size:20px;font-weight:900;color:var(--hd);font-family:var(--mono)">'+esc(t.key)+'</a><span class="badge '+(rb?"hd":"engg")+'">'+t.status+'</span></div>'+
-        '<div style="font-size:14px;color:var(--muted);margin-top:4px;line-height:1.5">'+esc(t.summary)+'</div></div></div>'+
-      '<div style="display:flex;gap:10px;margin-bottom:18px">'+
-        '<div style="flex:1;padding:14px 18px;border-radius:12px;background:'+(rb?"var(--hd-bg)":"var(--engg-bg)")+';border:1px solid '+(rb?"var(--hd-line)":"var(--engg-line)")+';text-align:center"><div style="font-size:22px;margin-bottom:4px">'+(rb?"🎯":"🔧")+'</div><div style="font-size:14px;font-weight:800;color:'+(rb?"var(--hd)":"var(--engg)")+'">'+( rb?"HD (Help Desk)":"Engineering")+'</div><div style="font-size:11px;color:var(--muted);margin-top:4px">Resolved by</div></div>'+
-        '<div style="flex:1;padding:14px 18px;border-radius:12px;background:var(--paper);border:1px solid var(--line);text-align:center"><div style="font-size:22px;margin-bottom:4px">📋</div><div style="font-size:14px;font-weight:800;color:var(--ink)">'+esc(t.issue||"—")+'</div><div style="font-size:11px;color:var(--muted);margin-top:4px">Issue Type</div></div></div>'+
-      '<div style="background:var(--paper);border-radius:14px;border:1px solid var(--line);overflow:hidden">'+
+      '<div style="display:flex;gap:8px;margin-bottom:12px">'+
+        '<div style="flex:1;padding:10px;border-radius:10px;background:'+(t.isHD?'var(--hd-bg)':'var(--engg-bg)')+';border:1px solid '+(t.isHD?'var(--hd-line)':'var(--engg-line)')+';text-align:center"><div style="font-size:12px;font-weight:800;color:'+(t.isHD?'var(--hd)':'var(--engg)')+'">'+(t.isHD?'HD (Help Desk)':'Engineering')+'</div><div style="font-size:10px;color:var(--muted);margin-top:2px">Resolved by</div></div>'+
+        '<div style="flex:1;padding:10px;border-radius:10px;background:var(--paper);border:1px solid var(--line);text-align:center"><div style="font-size:12px;font-weight:800;color:var(--ink)">'+esc(t.issue||"—")+'</div><div style="font-size:10px;color:var(--muted);margin-top:2px">Issue Type</div></div>'+
+      '</div>'+
+      '<div style="background:var(--paper);border-radius:10px;border:1px solid var(--line);overflow:hidden">'+
         [["Current Worker",t.currentWorker,"var(--hd)"],["Priority",t.priority,"var(--ink)"],["Project",t.project,"var(--ink)"],["Root Cause",t.rc,"var(--muted)"],["Components",t.components,"var(--ink)"],["SVM In Charge",t.svm,"var(--ink)"],["Created",fdate(t.created),"var(--muted)"],["Resolved",fdate(t.resolved),"var(--hd)"],["Age",age+"d","var(--ink)"],["Linked Issues",t.linked||"— (none)","var(--engg)"],["Type of Fix",t.typeOfFix,"var(--muted)"]].map(function(row){
           var v=row[1];if(blank(v))v="—";
-          return '<div class="gs-row"><div class="gs-label">'+row[0]+'</div><div class="gs-val" style="color:'+row[2]+'">'+esc(String(v))+'</div></div>';
+          return '<div style="display:flex;padding:8px 14px;border-bottom:1px solid var(--line);align-items:center"><div style="width:130px;font-size:10px;font-weight:600;color:var(--faint);flex-shrink:0">'+row[0]+'</div><div style="flex:1;font-size:12px;font-weight:600;color:'+row[2]+'">'+esc(String(v))+'</div></div>';
         }).join("")+
       '</div>'+
-      '<div style="margin-top:16px;text-align:center"><a href="'+JIRA+encodeURIComponent(t.key)+'" target="_blank" rel="noreferrer" style="display:inline-flex;align-items:center;gap:8px;padding:10px 24px;background:var(--ink);color:#fff;border-radius:10px;font-size:13px;font-weight:700;text-decoration:none">Open in Jira →</a></div>'+
+      '<div style="margin-top:12px;text-align:center"><a href="'+JIRA+encodeURIComponent(t.key)+'" target="_blank" rel="noreferrer" style="display:inline-flex;align-items:center;gap:6px;padding:8px 20px;background:var(--ink);color:#fff;border-radius:8px;font-size:12px;font-weight:700;text-decoration:none">Open in Jira →</a></div>'+
     '</div>';
+    el("gs-back").onclick=function(){ doSearch(); };
+  }
+
+  inp.addEventListener("input", doSearch);
+  inp.addEventListener("focus", function(){ if(inp.value.trim().length>=2) doSearch(); });
+  // Close dropdown on outside click
+  document.addEventListener("click",function(e){
+    if(!el("gs-wrap")) return;
+    if(!el("gs-wrap").contains(e.target)) closeDD();
   });
 }
 document.addEventListener("keydown",function(e){
-  if((e.ctrlKey||e.metaKey)&&e.key==="k"&&RAW.length){e.preventDefault();openGlobalSearch();}
-  if(e.key==="Escape"){var ov=document.getElementById("gs-ov");if(ov)ov.remove();}
+  if((e.ctrlKey||e.metaKey)&&e.key==="k"){e.preventDefault();var inp=el("gs-input");if(inp){inp.focus();inp.select();}}
 });
 
 function renderShell(){
@@ -604,7 +637,14 @@ function renderShell(){
       tabBtn("pivots","🧮","Pivots","")+
       tabBtn("exc","⚠️","Exceptions",exCount)+
     '</nav>'+
-    '<button class="ghost" id="gsearchbtn" style="display:flex;align-items:center;gap:5px">🔍 Search Ticket <kbd style="background:var(--line);padding:1px 5px;border-radius:4px;font-size:9px;font-weight:700;color:var(--faint);margin-left:3px">Ctrl+K</kbd></button>'+
+    '<div id="gs-wrap" style="position:relative;margin-left:auto">'+
+      '<div style="display:flex;align-items:center;gap:6px;background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:0 10px;height:34px">'+
+        '<span style="font-size:13px;color:var(--faint)">🔍</span>'+
+        '<input type="text" id="gs-input" placeholder="Search ticket key…" autocomplete="off" style="border:none;outline:none;background:transparent;font-size:12px;font-weight:500;color:var(--ink);width:180px;font-family:var(--sans)"/>'+
+        '<kbd style="background:var(--line);padding:1px 5px;border-radius:4px;font-size:9px;font-weight:700;color:var(--faint)">Ctrl+K</kbd>'+
+      '</div>'+
+      '<div id="gs-dropdown" style="display:none;position:absolute;top:40px;right:0;width:460px;max-height:480px;overflow-y:auto;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 40px rgba(16,24,40,.18);z-index:300"></div>'+
+    '</div>'+
     '<button class="ghost" id="newfile">↻ New file</button>'+
     '<input type="file" id="fileinput" accept=".xlsx,.xls">'+
   '</header>'+
@@ -616,7 +656,7 @@ function renderShell(){
   el("frc").onchange=function(e){ S.rc=e.target.value; render(); };
   el("fissue").onchange=function(e){ S.issue=e.target.value; render(); };
   el("newfile").onclick=function(){ window.location.href="index.html"; };
-  var gsb=el("gsearchbtn"); if(gsb) gsb.onclick=function(){ openGlobalSearch(); };
+  wireSearch();
   el("fileinput").onchange=handleUpload;
   document.querySelectorAll(".tabs button").forEach(function(b){ b.onclick=function(){ S.tab=b.dataset.tab; render(); }; });
   bindDateBar();
