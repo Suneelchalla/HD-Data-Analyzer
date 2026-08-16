@@ -260,6 +260,8 @@ tbody tr.rowlink:hover{background:var(--hd-bg)}
 .tmode-btn.on{background:var(--ink);color:#fff;border-color:var(--ink)}
 .tmode-btn:hover:not(.on){background:var(--paper);border-color:var(--line2)}
 /* Global search inline */
+.sarr{font-size:10px;color:var(--faint);margin-left:3px}
+.pivsort:hover{background:var(--line)!important}
 .gs-row{display:flex;padding:10px 18px;border-bottom:1px solid var(--line);align-items:center}
 .gs-label{width:180px;font-size:11px;font-weight:600;color:var(--faint);flex-shrink:0}
 .gs-val{flex:1;font-size:13px;font-weight:600;word-break:break-word}
@@ -1134,11 +1136,23 @@ function pivot2D(id,title,color,tickets,rowKeyFn,rowTitle,colDefs,colKeyFn){
     if(!map[rk]){ map[rk]={_t:0}; colDefs.forEach(function(c){map[rk][c.key]=0;}); order.push(rk); }
     map[rk][ck]++; map[rk]._t++; colTot[ck]++; grand++;
   });
-  order.sort(blankLast);
+  // Sort: use state if set for this pivot, else by name
+  var sortKey=S._pivSort&&S._pivSort[id]?S._pivSort[id].col:null;
+  var sortDir=S._pivSort&&S._pivSort[id]?S._pivSort[id].dir:"desc";
+  if(sortKey){
+    order.sort(function(a,b){
+      var va,vb;
+      if(sortKey==="_name"){va=a.toLowerCase();vb=b.toLowerCase();return sortDir==="asc"?va.localeCompare(vb):vb.localeCompare(va);}
+      if(sortKey==="_total"){va=map[a]._t;vb=map[b]._t;}
+      else{va=map[a][sortKey]||0;vb=map[b][sortKey]||0;}
+      return sortDir==="asc"?va-vb:vb-va;
+    });
+  } else { order.sort(blankLast); }
   window.__piv[id]={tickets:tickets,rowKeyFn:rowKeyFn,colKeyFn:colKeyFn,title:title,color:color};
-  var h='<div class="pivscroll"><table class="ptable"><thead><tr><th class="rh">'+esc(rowTitle)+'</th>';
-  colDefs.forEach(function(c){ h+='<th>'+esc(c.label)+'</th>'; });
-  h+='<th>Grand Total</th></tr></thead><tbody>';
+  function sArr(col){var act=sortKey===col;return act?(sortDir==="asc"?" ↑":" ↓"):" ↕";}
+  var h='<div class="pivscroll"><table class="ptable"><thead><tr><th class="rh pivsort" data-pivsort-id="'+id+'" data-pivsort-col="_name" style="cursor:pointer">'+esc(rowTitle)+'<span class="sarr">'+sArr("_name")+'</span></th>';
+  colDefs.forEach(function(c){ h+='<th class="pivsort" data-pivsort-id="'+id+'" data-pivsort-col="'+esc(c.key)+'" style="cursor:pointer">'+esc(c.label)+'<span class="sarr">'+sArr(c.key)+'</span></th>'; });
+  h+='<th class="pivsort" data-pivsort-id="'+id+'" data-pivsort-col="_total" style="cursor:pointer">Grand Total<span class="sarr">'+sArr("_total")+'</span></th></tr></thead><tbody>';
   order.forEach(function(rk){
     h+='<tr><td class="rl">'+esc(rk)+'</td>';
     colDefs.forEach(function(c){ var v=map[rk][c.key];
@@ -1546,6 +1560,17 @@ function bindMain(){
     document.querySelectorAll("[data-piv-nav]").forEach(function(b){ b.onclick=function(){ S.pivot=b.dataset.pivNav; renderMain(); }; });
     var cpR=el("cpRow"); if(cpR) cpR.onchange=function(e){ S.cpRow=e.target.value; renderMain(); };
     var cpC=el("cpCol"); if(cpC) cpC.onchange=function(e){ S.cpCol=e.target.value; renderMain(); };
+    // Pivot sort headers
+    if(!S._pivSort) S._pivSort={};
+    document.querySelectorAll(".pivsort").forEach(function(th){
+      th.onclick=function(){
+        var pid=th.dataset.pivsortId, col=th.dataset.pivsortCol;
+        if(!S._pivSort[pid]) S._pivSort[pid]={col:col,dir:"desc"};
+        else if(S._pivSort[pid].col===col) S._pivSort[pid].dir=S._pivSort[pid].dir==="desc"?"asc":"desc";
+        else S._pivSort[pid]={col:col,dir:"desc"};
+        renderMain();
+      };
+    });
   }
 
   if(S.tab==="wow"){
