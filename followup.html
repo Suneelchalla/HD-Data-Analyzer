@@ -594,7 +594,7 @@ function App(){
   },[dateFiltered]);
 
   /* Data Gaps */
-  const GF=["Root Cause","Components","SVM In Charge","Menu Head","Type of Fix","Screen Name"];
+  const GF=["Root Cause","Components","SVM In Charge"];
   const gd=useMemo(()=>{if(!dateFiltered)return{t:[],s:{}};let l=dateFiltered;if(w)l=l.filter(t=>t["Current Worker"]===w);if(pf)l=l.filter(t=>t.Project===pf);
     const ct={};GF.forEach(f=>ct[f]=0);const tx=[];
     l.forEach(t=>{const g=GF.filter(f=>{const v=t[f];return!v||String(v).trim()===""||String(v).trim().toLowerCase()==="nan";});if(g.length){g.forEach(x=>ct[x]++);tx.push({...t,_g:g});}});
