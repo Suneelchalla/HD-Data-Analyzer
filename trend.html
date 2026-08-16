@@ -527,11 +527,13 @@ function wireSearch(){
   var inp=el("gs-input"), dd=el("gs-dropdown");
   if(!inp||!dd) return;
 
-  function closeDD(){ dd.style.display="none"; dd.innerHTML=""; }
+  var _gsNavClick=false;
+
+  function closeDD(){ if(_gsNavClick){_gsNavClick=false;return;} dd.style.display="none"; dd.innerHTML=""; }
 
   function doSearch(){
     var q=inp.value.trim();
-    if(!q||q.length<2){ closeDD(); return; }
+    if(!q||q.length<2){ dd.style.display="none"; dd.innerHTML=""; return; }
     var s=q.toUpperCase();
     // 1. exact key match
     var exact=RAW.filter(function(t){ return t.key.toUpperCase()===s; });
@@ -562,7 +564,7 @@ function wireSearch(){
     dd.querySelectorAll(".gs-item").forEach(function(item){
       item.onmouseenter=function(){item.style.background="var(--paper)";};
       item.onmouseleave=function(){item.style.background="";};
-      item.onclick=function(){ showTicketDetail(item.dataset.gsk); };
+      item.onclick=function(){ _gsNavClick=true; showTicketDetail(item.dataset.gsk); };
     });
   }
 
@@ -593,7 +595,7 @@ function wireSearch(){
       '</div>'+
       '<div style="margin-top:12px;text-align:center"><a href="'+JIRA+encodeURIComponent(t.key)+'" target="_blank" rel="noreferrer" style="display:inline-flex;align-items:center;gap:6px;padding:8px 20px;background:var(--ink);color:#fff;border-radius:8px;font-size:12px;font-weight:700;text-decoration:none">Open in Jira →</a></div>'+
     '</div>';
-    el("gs-back").onclick=function(){ doSearch(); };
+    el("gs-back").onclick=function(){ _gsNavClick=true; doSearch(); };
   }
 
   inp.addEventListener("input", doSearch);
