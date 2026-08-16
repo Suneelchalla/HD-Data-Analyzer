@@ -141,6 +141,7 @@ input[type=file]{display:none}
         <div style="min-width:0;flex:1">
           <div class="fname" id="fname">—</div>
           <div class="fmeta"><span class="ok">Ready</span> · <b id="fcount">0</b> tickets loaded · both dashboards are using this file</div>
+          <div class="fmeta" id="fdaterange" style="margin-top:3px;display:none">📊 Resolved date range: <b id="fmindate">—</b> → <b id="fmaxdate">—</b></div>
         </div>
         <button class="ghost" id="changeBtn">Change file</button>
       </div>
@@ -187,30 +188,48 @@ input[type=file]{display:none}
 var QUERY = 'issuetype IN (Incident, "Service Request") AND created >= "2025-01-01" AND created <= "2026-12-31" AND project IN (ALXSVM, BLWS, CSD, ESLGEN, ECCL, FMSC, GWFC, IBEX, HSL, LSC, MILAHA, LSCSAIL, SSL, SWIPHX, TSHG, TKC, TASLI, UGL, VCL, WLS, WLSV, UAFL, NPDL, GSS)';
 function el(id){ return document.getElementById(id); }
 
-/* count tickets the same way the dashboards pick their sheet */
+/* count tickets and compute resolved date range */
 function countTickets(file){
   return new Promise(function(res){
     var r = new FileReader();
     r.onload = function(e){
       try{
-        var wb = XLSX.read(e.target.result, { type:"array" });
+        var wb = XLSX.read(e.target.result, { type:"array", cellDates:true });
         var sn = wb.SheetNames.find(function(s){ return s.toLowerCase().indexOf("jira issues")>-1; })
               || wb.SheetNames.find(function(s){ return s.toLowerCase().indexOf("issue")>-1; })
               || wb.SheetNames[1] || wb.SheetNames[0];
-        res(XLSX.utils.sheet_to_json(wb.Sheets[sn], { defval:"" }).length);
-      }catch(err){ res(null); }
+        var rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], { defval:"" });
+        var minD=null, maxD=null;
+        rows.forEach(function(row){
+          var d = row["Resolved"]||row["resolved"]||row["Created"]||row["created"];
+          if(!d) return;
+          var dt = d instanceof Date ? d : new Date(d);
+          if(isNaN(dt)) return;
+          if(!minD||dt<minD) minD=dt;
+          if(!maxD||dt>maxD) maxD=dt;
+        });
+        res({count:rows.length, minDate:minD, maxDate:maxD});
+      }catch(err){ res({count:null, minDate:null, maxDate:null}); }
     };
-    r.onerror = function(){ res(null); };
+    r.onerror = function(){ res({count:null, minDate:null, maxDate:null}); };
     r.readAsArrayBuffer(file);
   });
 }
+function fmtDate(d){ if(!d) return "—"; return d.toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"2-digit"}); }
 
-function showLoaded(name, count){
+function showLoaded(name, info){
+  var count = info && info.count!=null ? info.count : info;
   el("empty").classList.add("hidden");
   el("loaded").classList.remove("hidden");
   el("cards").classList.remove("locked");
   el("fname").textContent = name;
-  el("fcount").textContent = (count==null ? "—" : count.toLocaleString());
+  el("fcount").textContent = (count==null ? "—" : (typeof count==="number"?count.toLocaleString():count));
+  var dr=el("fdaterange");
+  if(dr && info && info.minDate && info.maxDate){
+    el("fmindate").textContent = fmtDate(info.minDate);
+    el("fmaxdate").textContent = fmtDate(info.maxDate);
+    dr.style.display = "block";
+  }
 }
 function showEmpty(){
   el("loaded").classList.add("hidden");
@@ -221,9 +240,9 @@ function showEmpty(){
 function handleFile(file){
   if(!file) return;
   var btn = el("chooseBtn"); if(btn){ btn.textContent = "Reading…"; btn.disabled = true; }
-  countTickets(file).then(function(count){
+  countTickets(file).then(function(info){
     HDStore.saveFile(file, file.name).then(function(){
-      showLoaded(file.name, count);
+      showLoaded(file.name, info);
     }).catch(function(err){
       alert("Couldn't store the file on this device: " + err.message);
       if(btn){ btn.textContent = "Choose Excel file"; btn.disabled = false; }
@@ -251,7 +270,7 @@ el("qcopy").onclick = function(){
 /* on load: if a file is already stored, jump straight to the ready state */
 HDStore.loadFile().then(function(rec){
   if(rec && rec.blob){
-    countTickets(rec.blob).then(function(count){ showLoaded(rec.name, count); });
+    countTickets(rec.blob).then(function(info){ showLoaded(rec.name, info); });
   }
 });
 </script>
