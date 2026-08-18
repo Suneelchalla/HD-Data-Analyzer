@@ -242,6 +242,7 @@ function handleFile(file){
   var btn = el("chooseBtn"); if(btn){ btn.textContent = "Reading…"; btn.disabled = true; }
   countTickets(file).then(function(info){
     HDStore.saveFile(file, file.name).then(function(){
+      HDStore.clearRows();  // new upload replaces any in-app edits
       showLoaded(file.name, info);
     }).catch(function(err){
       alert("Couldn't store the file on this device: " + err.message);
@@ -254,7 +255,7 @@ function handleFile(file){
 el("chooseBtn").onclick = function(){ el("fileinput").click(); };
 el("dz").onclick = function(){ el("fileinput").click(); };
 el("fileinput").onchange = function(e){ handleFile(e.target.files && e.target.files[0]); e.target.value=""; };
-el("changeBtn").onclick = function(){ HDStore.clearFile().then(showEmpty); };
+el("changeBtn").onclick = function(){ HDStore.clearRows(); HDStore.clearFile().then(showEmpty); };
 
 var dz = el("dz");
 ["dragenter","dragover"].forEach(function(ev){ dz.addEventListener(ev, function(e){ e.preventDefault(); dz.classList.add("over"); }); });
