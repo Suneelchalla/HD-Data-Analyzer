@@ -304,6 +304,7 @@ var S = {
   // trend tab local controls
   tRc:"__CLAR__", tStatus:"Closed", tMode:"month",
   pivot:"hdworker",
+  pIssue:"", pRc:"", pStatus:"", _pivFor:null,   // adjustable pivot filters
   weekA:"", weekB:""
 };
 
@@ -1127,6 +1128,45 @@ function pivHeader(title,chips,desc){
     '<div><div class="sec-title">'+esc(title)+'</div><div class="sub" style="margin-top:3px;max-width:660px">'+esc(desc)+'</div></div>'+
     '<div style="display:flex;gap:6px;flex-wrap:wrap">'+chips.join("")+'</div></div>';
 }
+/* ── Adjustable per-pivot filters (Issue Type · Root Cause · Status) ── */
+function pivField(t,f){ return f==="issue"?(t.issue||""):f==="rc"?(t.rc||""):(t.status||""); }
+function pivIsBlank(v){ return v===""||String(v).toLowerCase()==="nan"; }
+function pivDistinct(pool,f){
+  var s={}; pool.forEach(function(t){ var v=pivField(t,f); if(!pivIsBlank(v)) s[v]=1; });
+  var arr=Object.keys(s);
+  if(f==="issue") arr.sort(function(a,b){ function r(x){return x==="Incident"?0:x==="Service Request"?1:5;} return (r(a)-r(b))||a.localeCompare(b); });
+  else arr.sort(function(a,b){ return a.localeCompare(b); });
+  return arr;
+}
+function pivHasBlank(pool,f){ return pool.some(function(t){ return pivIsBlank(pivField(t,f)); }); }
+function pivDefaults(pivot){
+  if(pivot==="hdworker") return {issue:"Incident",rc:"Client Clarification",status:""};
+  if(pivot==="overall")  return {issue:"Incident",rc:"",status:""};
+  if(pivot==="groupclar")return {issue:"",rc:"Client Clarification",status:""};
+  return {issue:"",rc:"",status:""};
+}
+function applyPivFilters(pool){
+  return pool.filter(function(t){
+    function ok(val,f){ if(!val) return true; var v=pivField(t,f); return val==="__BLANK__"?pivIsBlank(v):v===val; }
+    return ok(S.pIssue,"issue") && ok(S.pRc,"rc") && ok(S.pStatus,"status");
+  });
+}
+function pivControls(pool){
+  function sel(id,label,f,val){
+    var opts='<option value="">All '+esc(label)+'</option>';
+    if(pivHasBlank(pool,f)) opts+='<option value="__BLANK__" '+(val==="__BLANK__"?"selected":"")+'>(blank)</option>';
+    pivDistinct(pool,f).forEach(function(v){ opts+='<option value="'+esc(v)+'" '+(val===v?"selected":"")+'>'+esc(v)+'</option>'; });
+    return '<span class="flabel">'+esc(label)+'</span><select class="fsel piv-f" id="'+id+'">'+opts+'</select>';
+  }
+  var active=(S.pIssue||S.pRc||S.pStatus);
+  return '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 14px;padding:11px 14px;background:var(--paper);border:1px solid var(--line);border-radius:12px">'+
+    '<span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-right:2px">🔎 Filters</span>'+
+    sel("pIssue","Issue Type","issue",S.pIssue||"")+
+    sel("pRc","Root Cause","rc",S.pRc||"")+
+    sel("pStatus","Status","status",S.pStatus||"")+
+    (active?'<button class="ghost" id="pivReset" style="margin-left:2px">↺ Reset to default</button>':'')+
+    '</div>';
+}
 function groupLegend(){
   return '<div class="pivnote"><b>Groups (mapped by SVM In Charge):</b>'+
     GROUP_ORDER.map(function(g){return '<br>· <b>'+g+'</b> — '+esc(GROUP_MEMBERS[g]);}).join("")+'</div>';
@@ -1220,12 +1260,16 @@ function viewPivots(){
   var out='';
   out+='<div class="up" style="margin-bottom:14px"><div class="eyebrow">Pivots</div>'+
     '<h1 style="font-size:23px;font-weight:700;letter-spacing:-.4px;margin-top:4px">Pivot tables</h1>'+
-    '<div class="sub" style="margin-top:3px">Excel-style cross-tabs. Every cell is clickable and opens those exact tickets, each linking to Jira. These pivots use the <b>date range only</b>'+((S.from||S.to)?' — '+pool.length.toLocaleString()+' tickets in range':'')+' (each keeps its own built-in filters, shown as chips).</div></div>';
+    '<div class="sub" style="margin-top:3px">Excel-style cross-tabs. Every cell is clickable and opens those exact tickets, each linking to Jira. These pivots use the <b>date range only</b>'+((S.from||S.to)?' — '+pool.length.toLocaleString()+' tickets in range':'')+', then the <b>Issue Type · Root Cause · Status</b> filters below (each pivot opens with its own sensible defaults — change or reset them anytime).</div></div>';
   out+='<div class="pivnav">'+nav.map(function(x){return '<button data-piv-nav="'+x[0]+'" class="'+(S.pivot===x[0]?"on":"")+'">'+esc(x[1])+'</button>';}).join("")+'</div>';
+  // (re)apply this pivot's default filters when the pivot changes; then let the user override
+  if(S._pivFor!==S.pivot){ var _pd=pivDefaults(S.pivot); S.pIssue=_pd.issue; S.pRc=_pd.rc; S.pStatus=_pd.status; S._pivFor=S.pivot; }
+  out+=pivControls(pool);
+  var ppool=applyPivFilters(pool);
   out+='<div class="card up d1 pad">';
   if(S.pivot==="hdworker"){
-    var t1=pool.filter(function(t){return t.issue==="Incident" && t.rc==="Client Clarification";});
-    out+=pivHeader("HD Worker Performance",[chip("Issue Type","Incident"),chip("Root Cause","Client Clarification")],"Each current worker's clarification-incident load, split by who finally resolved it — HD (Help Desk alone) or ENGG (escalated to Engineering).");
+    var t1=ppool;
+    out+=pivHeader("HD Worker Performance",[],"Each current worker's load for the current filters, split by who finally resolved it — HD (Help Desk alone) or ENGG (escalated to Engineering).");
     out+=pivot2D("hdworker","HD Worker Performance","#0F766E",t1,function(t){return t.currentWorker||"(blank)";},"Current Worker",[{key:"HD",label:"HD"},{key:"ENGG",label:"ENGG"}],function(t){return t.isHD?"HD":"ENGG";});
     var w1=cnt(t1,function(t){return t.currentWorker||"(blank)";}), tw1=topKey(w1,true), bw=bestWorstHD(t1,10);
     out+=note([
@@ -1234,8 +1278,8 @@ function viewPivots(){
       (bw.best&&bw.worst&&bw.best!==bw.worst)?('Highest HD self-resolution: <b class="hd">'+esc(bw.best)+' ('+bw.s[bw.best].p+'%)</b>; lowest: <b class="dn">'+esc(bw.worst)+' ('+bw.s[bw.worst].p+'%)</b> — among workers with ≥10.'):null
     ]);
   } else if(S.pivot==="overall"){
-    var t2=pool.filter(function(t){return t.issue==="Incident";});
-    out+=pivHeader("Overall Incidents · Worker × Group",[chip("Issue Type","Incident")],"Incident volume per current worker across Group 1, Group 2 and Others.");
+    var t2=ppool;
+    out+=pivHeader("Overall Incidents · Worker × Group",[],"Volume per current worker across Group 1, Group 2 and Others, for the current filters.");
     out+=pivot2D("overall","Overall Incidents","#5B57D8",t2,function(t){return t.currentWorker||"(blank)";},"Current Worker",GROUP_ORDER.map(function(g){return {key:g,label:g};}),function(t){return t.group;});
     var g2=cnt(t2,function(t){return t.group;}), w2=cnt(t2,function(t){return t.currentWorker||"(blank)";}), tg=topKey(g2), tw2=topKey(w2,true);
     out+=note([
@@ -1245,8 +1289,8 @@ function viewPivots(){
     ]);
     out+=groupLegend();
   } else if(S.pivot==="groupclar"){
-    var t3=pool.filter(function(t){return t.rc==="Client Clarification";});
-    out+=pivHeader("Group-wise Clarifications",[chip("Root Cause","Client Clarification")],"Client-clarification tickets broken down by Group → HD/ENGG → SVM In Charge (rows), columned by the current worker who handled them.");
+    var t3=ppool;
+    out+=pivHeader("Group-wise Clarifications",[],"Tickets (current filters) broken down by Group → HD/ENGG → SVM In Charge (rows), columned by the current worker who handled them.");
     out+=nestedGroupPivot(t3);
     var gnotes=GROUP_ORDER.map(function(gp){ var sub=t3.filter(function(t){return t.group===gp;}); if(!sub.length)return null;
       var hd=sub.filter(function(t){return t.isHD;}).length; return '<b>'+gp+'</b>: '+sub.length+' tickets — <b class="hd">'+hd+' HD</b> / <b class="eg">'+(sub.length-hd)+' Engg</b> ('+pct(hd,sub.length)+'% HD).'; }).filter(Boolean);
@@ -1254,28 +1298,28 @@ function viewPivots(){
     out+=groupLegend();
   } else if(S.pivot==="rootcause"){
     out+=pivHeader("Root Cause × Issue Type",[],"Ticket count by root cause, split by issue type.");
-    out+=pivot2D("rootcause","Root Cause","#B45309",pool,function(t){return t.rc||"(blank)";},"Root Cause",issueColDefs(pool),function(t){return t.issue||"(blank)";});
-    var rcM=cnt(pool,function(t){return t.rc||"(blank)";}), trc=topKey(rcM,true);
-    var incN=pool.filter(function(t){return t.issue==="Incident";}).length, srN=pool.filter(function(t){return t.issue==="Service Request";}).length;
+    out+=pivot2D("rootcause","Root Cause","#B45309",ppool,function(t){return t.rc||"(blank)";},"Root Cause",issueColDefs(ppool),function(t){return t.issue||"(blank)";});
+    var rcM=cnt(ppool,function(t){return t.rc||"(blank)";}), trc=topKey(rcM,true);
+    var incN=ppool.filter(function(t){return t.issue==="Incident";}).length, srN=ppool.filter(function(t){return t.issue==="Service Request";}).length;
     out+=note([
-      trc?('Top root cause: <b>'+esc(trc)+'</b> with <b>'+rcM[trc].toLocaleString()+'</b> tickets ('+pct(rcM[trc],pool.length)+'% of all).'):null,
-      'Incidents <b>'+incN.toLocaleString()+'</b> vs Service Requests <b>'+srN.toLocaleString()+'</b> ('+pct(incN,pool.length)+'% / '+pct(srN,pool.length)+'%).',
+      trc?('Top root cause: <b>'+esc(trc)+'</b> with <b>'+rcM[trc].toLocaleString()+'</b> tickets ('+pct(rcM[trc],ppool.length)+'% of all).'):null,
+      'Incidents <b>'+incN.toLocaleString()+'</b> vs Service Requests <b>'+srN.toLocaleString()+'</b> ('+pct(incN,ppool.length)+'% / '+pct(srN,ppool.length)+'%).',
       (rcM["(blank)"]?('<b class="dn">'+rcM["(blank)"]+'</b> tickets have no root cause — see the Exceptions tab.'):null)
     ]);
   } else if(S.pivot==="component"){
     out+=pivHeader("Component × Issue Type",[],"Ticket count by component, split by issue type.");
-    out+=pivot2D("component","Component","#0F766E",pool,function(t){return t.components||"(blank)";},"Components",issueColDefs(pool),function(t){return t.issue||"(blank)";});
-    var cM=cnt(pool,function(t){return t.components||"(blank)";}), tc=topKey(cM,true);
+    out+=pivot2D("component","Component","#0F766E",ppool,function(t){return t.components||"(blank)";},"Components",issueColDefs(ppool),function(t){return t.issue||"(blank)";});
+    var cM=cnt(ppool,function(t){return t.components||"(blank)";}), tc=topKey(cM,true);
     out+=note([
       tc?('Top component: <b>'+esc(tc)+'</b> with <b>'+cM[tc].toLocaleString()+'</b> tickets.'):null,
       (cM["(blank)"]?('<b class="dn">'+cM["(blank)"]+'</b> tickets have no component — see the Exceptions tab.'):'Every ticket has a component assigned.')
     ]);
   } else if(S.pivot==="svm"){
     out+=pivHeader("SVM In Charge × Issue Type",[],"Ticket count by SVM In Charge, split by issue type.");
-    out+=pivot2D("svm","SVM In Charge","#5B57D8",pool,function(t){return t.svm||"(blank)";},"SVM In Charge",issueColDefs(pool),function(t){return t.issue||"(blank)";});
-    var sM=cnt(pool,function(t){return t.svm||"(blank)";}), ts=topKey(sM,true);
+    out+=pivot2D("svm","SVM In Charge","#5B57D8",ppool,function(t){return t.svm||"(blank)";},"SVM In Charge",issueColDefs(ppool),function(t){return t.issue||"(blank)";});
+    var sM=cnt(ppool,function(t){return t.svm||"(blank)";}), ts=topKey(sM,true);
     out+=note([
-      ts?('Highest volume: <b>'+esc(ts)+'</b> owns <b>'+sM[ts].toLocaleString()+'</b> tickets ('+pct(sM[ts],pool.length)+'%).'):null,
+      ts?('Highest volume: <b>'+esc(ts)+'</b> owns <b>'+sM[ts].toLocaleString()+'</b> tickets ('+pct(sM[ts],ppool.length)+'%).'):null,
       (sM["(blank)"]?('<b class="dn">'+sM["(blank)"]+'</b> tickets have no SVM In Charge — see the Exceptions tab.'):null)
     ]);
   } else if(S.pivot==="custom"){
@@ -1290,14 +1334,14 @@ function viewPivots(){
     };
     var cpColVals=new Set();var cpColFn;
     if(S.cpCol==="HD/Engg Split"){cpColFn=function(t){return t.isHD?"HD":"ENGG";};cpColVals.add("HD");cpColVals.add("ENGG");}
-    else{cpColFn=function(t){var f=S.cpCol;if(f==="Status")return t.status||"(blank)";if(f==="Priority")return t.priority||"(blank)";if(f==="Issue Type")return t.issue||"(blank)";if(f==="Root Cause")return t.rc||"(blank)";if(f==="Type of Fix")return t.typeOfFix||"(blank)";if(f==="Components")return t.components||"(blank)";return"(blank)";};pool.forEach(function(t){cpColVals.add(cpColFn(t));});}
+    else{cpColFn=function(t){var f=S.cpCol;if(f==="Status")return t.status||"(blank)";if(f==="Priority")return t.priority||"(blank)";if(f==="Issue Type")return t.issue||"(blank)";if(f==="Root Cause")return t.rc||"(blank)";if(f==="Type of Fix")return t.typeOfFix||"(blank)";if(f==="Components")return t.components||"(blank)";return"(blank)";};ppool.forEach(function(t){cpColVals.add(cpColFn(t));});}
     var cpCols=[...cpColVals].sort().map(function(c){return{key:c,label:c};});
     out+=pivHeader("Custom Pivot",[chip("Rows",S.cpRow),chip("Columns",S.cpCol)],"Build your own cross-tab by choosing row and column fields.");
     out+='<div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:16px">'+
       '<span class="flabel">Rows</span><select class="fsel" id="cpRow">'+CROW_FIELDS.map(function(f){return '<option value="'+esc(f)+'" '+(S.cpRow===f?"selected":"")+'>'+esc(f)+'</option>';}).join("")+'</select>'+
       '<span class="flabel">Columns</span><select class="fsel" id="cpCol">'+CCOL_FIELDS.map(function(f){return '<option value="'+esc(f)+'" '+(S.cpCol===f?"selected":"")+'>'+esc(f)+'</option>';}).join("")+'</select>'+
     '</div>';
-    out+=pivot2D("custom","Custom Pivot","#2563EB",pool,cpRowFn,S.cpRow,cpCols,cpColFn);
+    out+=pivot2D("custom","Custom Pivot","#2563EB",ppool,cpRowFn,S.cpRow,cpCols,cpColFn);
   }
   out+='</div>';
   return out;
@@ -1577,6 +1621,11 @@ function bindMain(){
 
   if(S.tab==="pivots"){
     document.querySelectorAll("[data-piv-nav]").forEach(function(b){ b.onclick=function(){ S.pivot=b.dataset.pivNav; renderMain(); }; });
+    // adjustable Issue Type · Root Cause · Status filters
+    var pI=el("pIssue"); if(pI) pI.onchange=function(e){ S.pIssue=e.target.value; renderMain(); };
+    var pR=el("pRc");    if(pR) pR.onchange=function(e){ S.pRc=e.target.value; renderMain(); };
+    var pS=el("pStatus");if(pS) pS.onchange=function(e){ S.pStatus=e.target.value; renderMain(); };
+    var pRst=el("pivReset"); if(pRst) pRst.onclick=function(){ var d=pivDefaults(S.pivot); S.pIssue=d.issue; S.pRc=d.rc; S.pStatus=d.status; renderMain(); };
     var cpR=el("cpRow"); if(cpR) cpR.onchange=function(e){ S.cpRow=e.target.value; renderMain(); };
     var cpC=el("cpCol"); if(cpC) cpC.onchange=function(e){ S.cpCol=e.target.value; renderMain(); };
     // Pivot sort headers
@@ -1788,7 +1837,7 @@ function handleUpload(e){
     ED={ work:[], filters:{}, search:"", sortCol:null, sortDir:"asc", page:0, dirty:false, seq:0 };
     // reset view state on new upload
     S.svm=""; S.cw=""; S.rc=""; S.issue=""; S.from=""; S.to=""; S.dlabel="All time"; S._excFilter=null;
-    S.tab="perf"; S.tRc="__CLAR__"; S.tStatus="Closed"; S.pivot="hdworker"; S.weekA=""; S.weekB=""; S.sortCol="total"; S.sortDir="desc";
+    S.tab="perf"; S.tRc="__CLAR__"; S.tStatus="Closed"; S.pivot="hdworker"; S.pIssue=""; S.pRc=""; S.pStatus=""; S._pivFor=null; S.weekA=""; S.weekB=""; S.sortCol="total"; S.sortDir="desc";
     render();
     // footer
   }).catch(function(err){ alert("Could not read file: "+err.message); if(btn){btn.textContent="Upload Jira Excel";btn.disabled=false;} });
