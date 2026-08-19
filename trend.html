@@ -298,7 +298,7 @@ var ED = { work:[], filters:{}, search:"", sortCol:null, sortDir:"asc", page:0, 
 /* global filter + view state */
 var S = {
   tab:"perf",
-  svm:"", cw:"", rc:"", issue:"",     // global filters
+  svm:"", cw:"", rc:"", issue:"", proj:"",     // global filters
   from:"", to:"", dlabel:"All time",
   sortCol:"total", sortDir:"desc",
   // trend tab local controls
@@ -355,6 +355,7 @@ function weekPool(){
     if(S.cw && t.currentWorker!==S.cw) return false;
     if(S.rc && t.rc!==S.rc) return false;
     if(S.issue && t.issue!==S.issue) return false;
+    if(S.proj && t.project!==S.proj) return false;
     return true;
   });
 }
@@ -431,6 +432,7 @@ function filtered(){
     if(S.cw && t.currentWorker!==S.cw) return false;
     if(S.rc && t.rc!==S.rc) return false;
     if(S.issue && t.issue!==S.issue) return false;
+    if(S.proj && t.project!==S.proj) return false;
     return true;
   });
 }
@@ -621,7 +623,8 @@ function renderShell(){
   var cwList=[...new Set(RAW.map(function(t){return t.currentWorker;}).filter(Boolean))].sort();
   var rcList=[...new Set(RAW.map(function(t){return t.rc;}).filter(Boolean))].sort();
   var issueList=[...new Set(RAW.map(function(t){return t.issue;}).filter(Boolean))].sort();
-  var exCount=RAW.filter(function(t){return !t.components||!t.svm||!t.rc;}).length;
+  var projList=[...new Set(RAW.map(function(t){return t.project;}).filter(Boolean))].sort();
+  var exCount=RAW.filter(function(t){return (!t.components||!t.svm||!t.rc) && (!S.proj || t.project===S.proj);}).length;
 
   var app=el("app");
   app.innerHTML=''+
@@ -638,6 +641,8 @@ function renderShell(){
     '<select class="fsel" id="frc" style="min-width:135px"><option value="">All root causes</option>'+rcList.map(function(s){return '<option '+(S.rc===s?'selected':'')+' value="'+esc(s)+'">'+esc(s)+'</option>';}).join("")+'</select>'+
     '<span class="flabel">Type</span>'+
     '<select class="fsel" id="fissue"><option value="">All types</option>'+issueList.map(function(s){return '<option '+(S.issue===s?'selected':'')+' value="'+esc(s)+'">'+esc(s)+'</option>';}).join("")+'</select>'+
+    '<span class="flabel">Project</span>'+
+    '<select class="fsel" id="fproj" style="min-width:135px"><option value="">All projects</option>'+projList.map(function(s){return '<option '+(S.proj===s?'selected':'')+' value="'+esc(s)+'">'+esc(s)+'</option>';}).join("")+'</select>'+
     '<div style="flex:1"></div>'+
     '<nav class="tabs">'+
       tabBtn("perf","📊","HD Performance",f.length)+
@@ -665,6 +670,7 @@ function renderShell(){
   el("fcw").onchange=function(e){ S.cw=e.target.value; render(); };
   el("frc").onchange=function(e){ S.rc=e.target.value; render(); };
   el("fissue").onchange=function(e){ S.issue=e.target.value; render(); };
+  el("fproj").onchange=function(e){ S.proj=e.target.value; render(); };
   el("newfile").onclick=function(){ window.location.href="index.html"; };
   wireSearch();
   el("fileinput").onchange=handleUpload;
@@ -743,7 +749,7 @@ function viewPerf(){
   var inc=f.filter(function(t){return t.issue==="Incident";}).length;
   var srq=f.filter(function(t){return t.issue==="Service Request";}).length;
 
-  var scopeTxt=[S.svm||"all SVM staff", S.rc?('root cause "'+S.rc+'"'):"all root causes", S.issue||"all types"].join(" · ");
+  var scopeTxt=[S.svm||"all SVM staff", S.rc?('root cause "'+S.rc+'"'):"all root causes", S.issue||"all types", S.proj||"all projects"].join(" · ");
 
   // per-SVM leaderboard
   var bySvm={};
@@ -897,6 +903,7 @@ function viewTrend(){
     if(S.svm && t.svm!==S.svm) return false;
     if(S.cw && t.currentWorker!==S.cw) return false;
     if(S.issue && t.issue!==S.issue) return false;
+    if(S.proj && t.project!==S.proj) return false;
     return true;
   });
   var scope=base.filter(function(t){
@@ -927,11 +934,12 @@ function viewTrend(){
   var stName = S.tStatus==="__ALL__"?"any status":S.tStatus;
   var svmName = S.svm||"all SVM staff";
   var workerNote = S.cw? (" · worker "+S.cw) : "";
+  var projNote = S.proj? (" · project "+S.proj) : "";
 
   var out='';
   out+='<div class="up" style="margin-bottom:14px"><div class="eyebrow">Trend Analysis</div>'+
     '<h1 style="font-size:23px;font-weight:700;letter-spacing:-.4px;margin-top:4px">Clarification: solved by HD or escalated?</h1>'+
-    '<div class="sub" style="margin-top:3px">For each <b>'+(S.tMode==="month"?"month (by resolved date)":"current worker")+'</b>, how many <b>'+esc(rcName)+'</b> tickets (<b>'+esc(stName)+'</b>, <b>'+esc(svmName)+esc(workerNote)+'</b>) the Help Desk closed alone vs. sent to Engineering.</div></div>';
+    '<div class="sub" style="margin-top:3px">For each <b>'+(S.tMode==="month"?"month (by resolved date)":"current worker")+'</b>, how many <b>'+esc(rcName)+'</b> tickets (<b>'+esc(stName)+'</b>, <b>'+esc(svmName)+esc(workerNote)+esc(projNote)+'</b>) the Help Desk closed alone vs. sent to Engineering.</div></div>';
 
   // local controls
   out+='<div class="card up d1 pad" style="margin-bottom:16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap">'+
@@ -1051,9 +1059,8 @@ function lineChart(mKeys,byM){
 
 /* ═══════════════════════════════ VIEW: EXCEPTIONS ═══════════════════════════════ */
 function viewExc(){
-  // exceptions are computed on the FULL dataset (data quality), independent of scope filters,
-  // but still respect the date range so you can clean a period at a time.
-  var pool=RAW.filter(inRange);
+  // exceptions respect the date range and project filter so you can inspect one project at a time.
+  var pool=RAW.filter(function(t){ return inRange(t) && (!S.proj || t.project===S.proj); });
   var noComp=pool.filter(function(t){return !t.components;});
   var noSvm=pool.filter(function(t){return !t.svm;});
   var noRc=pool.filter(function(t){return !t.rc;});
@@ -1255,12 +1262,14 @@ function nestedGroupPivot(tix){
 }
 function viewPivots(){
   window.__piv={};
-  var pool=RAW.filter(inRange);
+  var pool=RAW.filter(function(t){ return inRange(t) && (!S.proj || t.project===S.proj); });
   var nav=[["hdworker","HD Worker Performance"],["overall","Overall Incidents"],["groupclar","Group-wise Clarifications"],["rootcause","Root Cause"],["component","Component Wise"],["svm","SVM In Charge Wise"],["custom","Custom Pivot"]];
   var out='';
+  var pivScopeNotes=['date range'];
+  if(S.proj) pivScopeNotes.push('project <b>'+esc(S.proj)+'</b>');
   out+='<div class="up" style="margin-bottom:14px"><div class="eyebrow">Pivots</div>'+
     '<h1 style="font-size:23px;font-weight:700;letter-spacing:-.4px;margin-top:4px">Pivot tables</h1>'+
-    '<div class="sub" style="margin-top:3px">Excel-style cross-tabs. Every cell is clickable and opens those exact tickets, each linking to Jira. These pivots use the <b>date range only</b>'+((S.from||S.to)?' — '+pool.length.toLocaleString()+' tickets in range':'')+', then the <b>Issue Type · Root Cause · Status</b> filters below (each pivot opens with its own sensible defaults — change or reset them anytime).</div></div>';
+    '<div class="sub" style="margin-top:3px">Excel-style cross-tabs. Every cell is clickable and opens those exact tickets, each linking to Jira. These pivots use the <b>'+pivScopeNotes.join(' + ')+'</b>'+((S.from||S.to||S.proj)?' — '+pool.length.toLocaleString()+' tickets in scope':'')+', then the <b>Issue Type · Root Cause · Status</b> filters below (each pivot opens with its own sensible defaults — change or reset them anytime).</div></div>';
   out+='<div class="pivnav">'+nav.map(function(x){return '<button data-piv-nav="'+x[0]+'" class="'+(S.pivot===x[0]?"on":"")+'">'+esc(x[1])+'</button>';}).join("")+'</div>';
   // (re)apply this pivot's default filters when the pivot changes; then let the user override
   if(S._pivFor!==S.pivot){ var _pd=pivDefaults(S.pivot); S.pIssue=_pd.issue; S.pRc=_pd.rc; S.pStatus=_pd.status; S._pivFor=S.pivot; }
@@ -1364,7 +1373,7 @@ function deltaCell(d,isPct,neg){
 function viewWoW(){
   window.__piv={};
   var pool=weekPool();
-  var scopeNote=(S.svm||S.cw||S.rc||S.issue)?" (filters applied)":"";
+  var scopeNote=(S.svm||S.cw||S.rc||S.issue||S.proj)?" (filters applied)":"";
   var out='<div class="up" style="margin-bottom:14px"><div class="eyebrow">Week on Week</div>'+
     '<h1 style="font-size:23px;font-weight:700;letter-spacing:-.4px;margin-top:4px">Week-on-week resolution</h1>'+
     '<div class="sub" style="margin-top:3px">ISO week numbers built from each ticket\'s <b>Resolved date</b>. Pick two weeks below — that window drives every chart, table and pivot on this tab'+esc(scopeNote)+'.</div></div>';
@@ -1572,7 +1581,7 @@ function bindMain(){
       b.onclick=function(){ S.tMode=b.dataset.tmode; renderMain(); };
     });
     // rebuild scope to resolve clicks
-    var base=RAW.filter(function(t){ if(!inRange(t))return false; if(S.svm&&t.svm!==S.svm)return false; if(S.cw&&t.currentWorker!==S.cw)return false; if(S.issue&&t.issue!==S.issue)return false; return true; });
+    var base=RAW.filter(function(t){ if(!inRange(t))return false; if(S.svm&&t.svm!==S.svm)return false; if(S.cw&&t.currentWorker!==S.cw)return false; if(S.issue&&t.issue!==S.issue)return false; if(S.proj&&t.project!==S.proj)return false; return true; });
     function scopeFn(t){
       if(S.tRc==="__CLAR__"){ if(!isClar(t.rc))return false; } else if(S.tRc!=="__ALL__"){ if(t.rc!==S.tRc)return false; }
       if(S.tStatus==="Closed"){ if(t.status!=="Closed")return false; } else if(S.tStatus!=="__ALL__"){ if(t.status!==S.tStatus)return false; }
@@ -1836,7 +1845,7 @@ function handleUpload(e){
     if(window.HDStore){ HDStore.clearRows(); HDStore.saveRows(rows); }
     ED={ work:[], filters:{}, search:"", sortCol:null, sortDir:"asc", page:0, dirty:false, seq:0 };
     // reset view state on new upload
-    S.svm=""; S.cw=""; S.rc=""; S.issue=""; S.from=""; S.to=""; S.dlabel="All time"; S._excFilter=null;
+    S.svm=""; S.cw=""; S.rc=""; S.issue=""; S.proj=""; S.from=""; S.to=""; S.dlabel="All time"; S._excFilter=null;
     S.tab="perf"; S.tRc="__CLAR__"; S.tStatus="Closed"; S.pivot="hdworker"; S.pIssue=""; S.pRc=""; S.pStatus=""; S._pivFor=null; S.weekA=""; S.weekB=""; S.sortCol="total"; S.sortDir="desc";
     render();
     // footer
@@ -1892,8 +1901,8 @@ renderMain=function(){
   _origRenderMain();
   var main=el("main"); if(!main)return;
   var fdiv=document.createElement("div"); fdiv.className="footer";
-  var inRangeCount=RAW.filter(inRange).length;
-  fdiv.innerHTML='<b>'+esc(FILENAME)+'</b> · '+RAW.length.toLocaleString()+' tickets loaded'+((S.from||S.to)?' · '+inRangeCount.toLocaleString()+' in range':'')+' · HD Ticket Trend Tracker';
+  var inScopeCount=RAW.filter(function(t){ return inRange(t) && (!S.proj || t.project===S.proj); }).length;
+  fdiv.innerHTML='<b>'+esc(FILENAME)+'</b> · '+RAW.length.toLocaleString()+' tickets loaded'+((S.from||S.to||S.proj)?' · '+inScopeCount.toLocaleString()+' in scope':'')+' · HD Ticket Trend Tracker';
   main.appendChild(fdiv);
 };
 
