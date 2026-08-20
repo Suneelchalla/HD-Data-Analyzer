@@ -80,18 +80,18 @@ h1,h2,h3,.disp{font-family:var(--disp)}
 .hint-cols span{font-size:10.5px;color:var(--ink2);background:#fff;border:1px solid var(--line);padding:4px 9px;border-radius:20px;font-weight:500}
 
 /* ── HEADER ── */
-header.top{background:rgba(255,255,255,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:90;padding:9px 24px;display:flex;flex-direction:column;gap:9px}
+header.top{background:rgba(255,255,255,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:90;padding:9px 24px;display:flex;flex-direction:column;gap:8px}
 .hrow{display:flex;align-items:center;gap:12px}
-.hrow1{flex-wrap:wrap}
+.hrow1{justify-content:space-between;flex-wrap:nowrap}
 .hspace{flex:1}
-.hactions{display:flex;align-items:center;gap:10px;margin-left:auto}
-.filters{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;align-items:end}
+.hactions{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.filters{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;align-items:end;border-top:1px solid var(--line);padding-top:8px}
 .fcell{display:flex;flex-direction:column;gap:4px;min-width:0}
 .fcell .flabel{margin:0}
 .fcell .fsel{width:100%}
-@media(max-width:1120px){.filters{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:1240px){.hrow1{flex-wrap:wrap;justify-content:flex-start}.tabs{overflow-x:visible;flex-wrap:wrap}}@media(max-width:1120px){.filters{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:680px){.filters{grid-template-columns:repeat(2,1fr)}.hactions{margin-left:0;width:100%}}
-.logo{display:flex;align-items:center;gap:9px}
+.logo{display:flex;align-items:center;gap:9px;flex-shrink:0}
 .logo .bar{display:flex;gap:3px;align-items:flex-end;height:22px}
 .logo .bar i{display:block;width:6px;border-radius:2px}
 .logo b{font-family:var(--disp);font-weight:700;font-size:15px;letter-spacing:-.3px}
@@ -100,8 +100,8 @@ header.top{background:rgba(255,255,255,.92);backdrop-filter:blur(10px);border-bo
 .fsel:hover{border-color:var(--line2)}
 .fsel:focus{border-color:var(--hd);box-shadow:0 0 0 3px rgba(15,118,110,.12)}
 .flabel{font-size:9.5px;font-weight:700;color:var(--faint);text-transform:uppercase;letter-spacing:.7px;margin-right:-6px}
-.tabs{display:flex;background:var(--paper);border:1px solid var(--line);border-radius:11px;padding:3px;gap:2px}
-.tabs button{background:none;border:none;padding:7px 15px;border-radius:8px;font-size:12px;font-weight:600;color:var(--muted);font-family:var(--disp);display:flex;align-items:center;gap:7px}
+.tabs{display:flex;background:var(--paper);border:1px solid var(--line);border-radius:11px;padding:3px;gap:2px;min-width:0;flex-shrink:1;overflow-x:auto;scrollbar-width:none}.tabs::-webkit-scrollbar{display:none}
+.tabs button{background:none;border:none;padding:6px 11px;border-radius:8px;font-size:11.5px;font-weight:600;color:var(--muted);font-family:var(--disp);display:flex;align-items:center;gap:6px;white-space:nowrap;flex-shrink:0}
 .tabs button.on{background:var(--ink);color:#fff}
 .tabs button .cnt{background:rgba(0,0,0,.07);padding:1px 7px;border-radius:10px;font-size:10px;font-family:var(--mono)}
 .tabs button.on .cnt{background:rgba(255,255,255,.18)}
@@ -109,7 +109,7 @@ header.top{background:rgba(255,255,255,.92);backdrop-filter:blur(10px);border-bo
 .ghost:hover{border-color:var(--line2)}
 
 /* ── DATE BAR ── */
-.datebar{background:transparent;border-top:1px solid var(--line);padding:9px 0 1px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;position:static}
+.datebar{background:transparent;border-top:1px solid var(--line);padding:8px 0 1px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;position:static}
 .chip{padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--line);background:#fff;color:var(--ink2)}
 .chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
 .chip:hover:not(.on){border-color:var(--line2)}
@@ -670,7 +670,7 @@ function renderShell(){
         '<div id="gs-wrap" style="position:relative">'+
           '<div style="display:flex;align-items:center;gap:6px;background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:0 10px;height:34px">'+
             '<span style="font-size:13px;color:var(--faint)">🔍</span>'+
-            '<input type="text" id="gs-input" placeholder="Search ticket key…" autocomplete="off" style="border:none;outline:none;background:transparent;font-size:12px;font-weight:500;color:var(--ink);width:170px;font-family:var(--sans)"/>'+
+            '<input type="text" id="gs-input" placeholder="Search ticket key…" autocomplete="off" style="border:none;outline:none;background:transparent;font-size:12px;font-weight:500;color:var(--ink);width:130px;font-family:var(--sans)"/>'+
             '<kbd style="background:var(--line);padding:1px 5px;border-radius:4px;font-size:9px;font-weight:700;color:var(--faint)">Ctrl+K</kbd>'+
           '</div>'+
           '<div id="gs-dropdown" style="display:none;position:absolute;top:40px;right:0;width:460px;max-height:480px;overflow-y:auto;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 40px rgba(16,24,40,.18);z-index:300"></div>'+
