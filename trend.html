@@ -80,7 +80,17 @@ h1,h2,h3,.disp{font-family:var(--disp)}
 .hint-cols span{font-size:10.5px;color:var(--ink2);background:#fff;border:1px solid var(--line);padding:4px 9px;border-radius:20px;font-weight:500}
 
 /* ── HEADER ── */
-header.top{background:rgba(255,255,255,.9);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:90;padding:6px 24px;min-height:56px;display:flex;align-items:center;gap:11px;flex-wrap:wrap}
+header.top{background:rgba(255,255,255,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:90;padding:9px 24px;display:flex;flex-direction:column;gap:9px}
+.hrow{display:flex;align-items:center;gap:12px}
+.hrow1{flex-wrap:wrap}
+.hspace{flex:1}
+.hactions{display:flex;align-items:center;gap:10px;margin-left:auto}
+.filters{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;align-items:end}
+.fcell{display:flex;flex-direction:column;gap:4px;min-width:0}
+.fcell .flabel{margin:0}
+.fcell .fsel{width:100%}
+@media(max-width:1120px){.filters{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:680px){.filters{grid-template-columns:repeat(2,1fr)}.hactions{margin-left:0;width:100%}}
 .logo{display:flex;align-items:center;gap:9px}
 .logo .bar{display:flex;gap:3px;align-items:flex-end;height:22px}
 .logo .bar i{display:block;width:6px;border-radius:2px}
@@ -99,7 +109,7 @@ header.top{background:rgba(255,255,255,.9);backdrop-filter:blur(10px);border-bot
 .ghost:hover{border-color:var(--line2)}
 
 /* ── DATE BAR ── */
-.datebar{background:#fff;border-bottom:1px solid var(--line);padding:6px 24px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;position:sticky;top:56px;z-index:89}
+.datebar{background:transparent;border-top:1px solid var(--line);padding:9px 0 1px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;position:static}
 .chip{padding:5px 12px;border-radius:20px;font-size:11px;font-weight:600;border:1px solid var(--line);background:#fff;color:var(--ink2)}
 .chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
 .chip:hover:not(.on){border-color:var(--line2)}
@@ -260,7 +270,7 @@ tbody tr.rowlink:hover{background:var(--hd-bg)}
 .footer{margin-top:16px;text-align:center;color:var(--faint);font-size:11px;line-height:1.9}
 .footer b{color:var(--muted);font-weight:600}
 @media(max-width:820px){
-  .datebar,header.top{padding-left:14px;padding-right:14px}
+  header.top{padding-left:14px;padding-right:14px}
   main{padding:18px 14px 60px}
   .tabs button span.lbl{display:none}
 }
@@ -635,43 +645,51 @@ function renderShell(){
   var exCount=RAW.filter(function(t){return (!t.components||!t.svm||!t.rc) && (!S.proj || t.project===S.proj);}).length;
 
   var app=el("app");
+  function fcell(label,id,allLabel,list,cur){
+    return '<label class="fcell"><span class="flabel">'+label+'</span>'+
+      '<select class="fsel" id="'+id+'"><option value="">'+allLabel+'</option>'+
+      list.map(function(s){return '<option '+(cur===s?'selected':'')+' value="'+esc(s)+'">'+esc(s)+'</option>';}).join("")+
+      '</select></label>';
+  }
   app.innerHTML=''+
   '<header class="top">'+
-    '<div class="logo"><span class="bar" style="display:flex;gap:3px;align-items:flex-end;height:22px">'+
-      '<i style="height:14px;background:var(--hd)"></i><i style="height:22px;background:var(--hd2)"></i><i style="height:11px;background:var(--engg2)"></i><i style="height:18px;background:var(--engg)"></i>'+
-    '</span><b>HD Trend Tracker</b></div>'+
-    '<div class="divider"></div>'+
-    '<span class="flabel">SVM</span>'+
-    '<select class="fsel" id="fsvm" style="min-width:135px"><option value="">All SVM In Charge</option>'+svmList.map(function(s){return '<option '+(S.svm===s?'selected':'')+' value="'+esc(s)+'">'+esc(s)+'</option>';}).join("")+'</select>'+
-    '<span class="flabel">Worker</span>'+
-    '<select class="fsel" id="fcw" style="min-width:135px"><option value="">All current workers</option>'+cwList.map(function(s){return '<option '+(S.cw===s?'selected':'')+' value="'+esc(s)+'">'+esc(s)+'</option>';}).join("")+'</select>'+
-    '<span class="flabel">Root cause</span>'+
-    '<select class="fsel" id="frc" style="min-width:135px"><option value="">All root causes</option>'+rcList.map(function(s){return '<option '+(S.rc===s?'selected':'')+' value="'+esc(s)+'">'+esc(s)+'</option>';}).join("")+'</select>'+
-    '<span class="flabel">Type</span>'+
-    '<select class="fsel" id="fissue"><option value="">All types</option>'+issueList.map(function(s){return '<option '+(S.issue===s?'selected':'')+' value="'+esc(s)+'">'+esc(s)+'</option>';}).join("")+'</select>'+
-    '<span class="flabel">Project</span>'+
-    '<select class="fsel" id="fproj" style="min-width:135px"><option value="">All projects</option>'+projList.map(function(s){return '<option '+(S.proj===s?'selected':'')+' value="'+esc(s)+'">'+esc(s)+'</option>';}).join("")+'</select>'+
-    '<div style="flex:1"></div>'+
-    '<nav class="tabs">'+
-      tabBtn("perf","📊","HD Performance",f.length)+
-      tabBtn("trend","📈","Trend Analysis","")+
-      tabBtn("wow","🗓️","Week on Week","")+
-      tabBtn("pivots","🧮","Pivots","")+
-      tabBtn("exc","⚠️","Exceptions",exCount)+
-      tabBtn("data","✏️","Edit Data",RAW_ROWS.length)+
-    '</nav>'+
-    '<div id="gs-wrap" style="position:relative;margin-left:auto">'+
-      '<div style="display:flex;align-items:center;gap:6px;background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:0 10px;height:34px">'+
-        '<span style="font-size:13px;color:var(--faint)">🔍</span>'+
-        '<input type="text" id="gs-input" placeholder="Search ticket key…" autocomplete="off" style="border:none;outline:none;background:transparent;font-size:12px;font-weight:500;color:var(--ink);width:180px;font-family:var(--sans)"/>'+
-        '<kbd style="background:var(--line);padding:1px 5px;border-radius:4px;font-size:9px;font-weight:700;color:var(--faint)">Ctrl+K</kbd>'+
+    /* row 1 — brand · tabs · actions */
+    '<div class="hrow hrow1">'+
+      '<div class="logo"><span class="bar" style="display:flex;gap:3px;align-items:flex-end;height:22px">'+
+        '<i style="height:14px;background:var(--hd)"></i><i style="height:22px;background:var(--hd2)"></i><i style="height:11px;background:var(--engg2)"></i><i style="height:18px;background:var(--engg)"></i>'+
+      '</span><b>HD Trend Tracker</b></div>'+
+      '<nav class="tabs">'+
+        tabBtn("perf","📊","HD Performance",f.length)+
+        tabBtn("trend","📈","Trend Analysis","")+
+        tabBtn("wow","🗓️","Week on Week","")+
+        tabBtn("pivots","🧮","Pivots","")+
+        tabBtn("exc","⚠️","Exceptions",exCount)+
+        tabBtn("data","✏️","Edit Data",RAW_ROWS.length)+
+      '</nav>'+
+      '<div class="hactions">'+
+        '<div id="gs-wrap" style="position:relative">'+
+          '<div style="display:flex;align-items:center;gap:6px;background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:0 10px;height:34px">'+
+            '<span style="font-size:13px;color:var(--faint)">🔍</span>'+
+            '<input type="text" id="gs-input" placeholder="Search ticket key…" autocomplete="off" style="border:none;outline:none;background:transparent;font-size:12px;font-weight:500;color:var(--ink);width:170px;font-family:var(--sans)"/>'+
+            '<kbd style="background:var(--line);padding:1px 5px;border-radius:4px;font-size:9px;font-weight:700;color:var(--faint)">Ctrl+K</kbd>'+
+          '</div>'+
+          '<div id="gs-dropdown" style="display:none;position:absolute;top:40px;right:0;width:460px;max-height:480px;overflow-y:auto;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 40px rgba(16,24,40,.18);z-index:300"></div>'+
+        '</div>'+
+        '<button class="ghost" id="newfile">↻ New file</button>'+
+        '<input type="file" id="fileinput" accept=".xlsx,.xls">'+
       '</div>'+
-      '<div id="gs-dropdown" style="display:none;position:absolute;top:40px;right:0;width:460px;max-height:480px;overflow-y:auto;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 40px rgba(16,24,40,.18);z-index:300"></div>'+
     '</div>'+
-    '<button class="ghost" id="newfile">↻ New file</button>'+
-    '<input type="file" id="fileinput" accept=".xlsx,.xls">'+
+    /* row 2 — five filters, evenly aligned */
+    '<div class="hrow filters">'+
+      fcell("SVM","fsvm","All SVM In Charge",svmList,S.svm)+
+      fcell("Worker","fcw","All current workers",cwList,S.cw)+
+      fcell("Root cause","frc","All root causes",rcList,S.rc)+
+      fcell("Type","fissue","All types",issueList,S.issue)+
+      fcell("Project","fproj","All projects",projList,S.proj)+
+    '</div>'+
+    /* row 3 — date range */
+    dateBar()+
   '</header>'+
-  dateBar()+
   '<main id="main"></main>';
 
   el("fsvm").onchange=function(e){ S.svm=e.target.value; render(); };
