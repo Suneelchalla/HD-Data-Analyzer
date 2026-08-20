@@ -180,14 +180,14 @@ function Ring({pct,sz=80,sw=6,color="#2563EB",track="#E2E8F0",children}){
 
 function KPI({label,value,color,bgColor,sub,onClick,active,icon}){
   return(<div className="card" onClick={onClick} style={{
-    padding:"20px 22px",cursor:onClick?"pointer":"default",
+    padding:"13px 16px",cursor:onClick?"pointer":"default",
     borderColor:active?color:"var(--border)",background:active?(bgColor||"var(--blue-bg)"):"var(--card)",
     transition:"all .2s"
   }}>
     <div style={{display:"flex",alignItems:"center",justifyContent:"space-between"}}>
       <div>
         {icon&&<div style={{fontSize:15,marginBottom:8}}>{icon}</div>}
-        <div style={{fontSize:30,fontWeight:900,color:color||"var(--t1)",letterSpacing:"-1.5px",lineHeight:1,fontFeatureSettings:'"tnum"'}}>{value}</div>
+        <div style={{fontSize:25,fontWeight:900,color:color||"var(--t1)",letterSpacing:"-1.5px",lineHeight:1,fontFeatureSettings:'"tnum"'}}>{value}</div>
         <div style={{fontSize:10,color:"var(--t3)",marginTop:8,fontWeight:700,textTransform:"uppercase",letterSpacing:".6px"}}>{label}</div>
       </div>
     </div>
@@ -246,14 +246,14 @@ function TicketModal({data,onClose}){
         <div style={{flex:1,overflowY:"auto",overflowX:"auto"}}>
           <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
             <thead><tr style={{background:"var(--bg)",position:"sticky",top:0,zIndex:2}}>
-              <th style={{padding:"10px 14px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".6px",borderBottom:"2px solid var(--border)"}}>Key</th>
-              <th style={{padding:"10px 12px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".6px",borderBottom:"2px solid var(--border)"}}>Summary</th>
-              <th style={{padding:"10px 12px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".6px",borderBottom:"2px solid var(--border)"}}>Status</th>
-              <th style={{padding:"10px 12px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".6px",borderBottom:"2px solid var(--border)"}}>Project</th>
-              <th style={{padding:"10px 12px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".6px",borderBottom:"2px solid var(--border)"}}>Priority</th>
-              <th style={{padding:"10px 12px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".6px",borderBottom:"2px solid var(--border)"}}>Linked</th>
-              <th style={{padding:"10px 12px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".6px",borderBottom:"2px solid var(--border)"}}>Created</th>
-              <th style={{padding:"10px 12px",textAlign:"right",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".6px",borderBottom:"2px solid var(--border)"}}>Age</th>
+              <th style={{padding:"7px 12px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".6px",borderBottom:"2px solid var(--border)"}}>Key</th>
+              <th style={{padding:"7px 10px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".6px",borderBottom:"2px solid var(--border)"}}>Summary</th>
+              <th style={{padding:"7px 10px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".6px",borderBottom:"2px solid var(--border)"}}>Status</th>
+              <th style={{padding:"7px 10px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".6px",borderBottom:"2px solid var(--border)"}}>Project</th>
+              <th style={{padding:"7px 10px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".6px",borderBottom:"2px solid var(--border)"}}>Priority</th>
+              <th style={{padding:"7px 10px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".6px",borderBottom:"2px solid var(--border)"}}>Linked</th>
+              <th style={{padding:"7px 10px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".6px",borderBottom:"2px solid var(--border)"}}>Created</th>
+              <th style={{padding:"7px 10px",textAlign:"right",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".6px",borderBottom:"2px solid var(--border)"}}>Age</th>
             </tr></thead>
             <tbody>
               {tix.slice(0,500).map(function(t,i){
@@ -261,19 +261,19 @@ function TicketModal({data,onClose}){
                 var linked=t["Linked Issues"]||"";var linkedSt=t["Linked Ticket status"]||"";
                 var sla=checkSLA(t);
                 return(<tr key={i} style={{borderBottom:"1px solid var(--border)",background:sla.anyBreach?"#FFF5F5":""}}>
-                  <td style={{padding:"9px 14px",whiteSpace:"nowrap"}}>
+                  <td style={{padding:"6px 12px",whiteSpace:"nowrap"}}>
                     <a href={J+t.Key} target="_blank" rel="noreferrer" style={{fontWeight:700,fontFamily:"var(--mono)",fontSize:12,color:"var(--blue)"}}>{t.Key}</a>
                     {sla.anyBreach&&<span title={"SLA Breach"+(sla.frBreach?" · Response":"")+(sla.resBreach?" · Resolution":"")} style={{marginLeft:5,background:"#FEE2E2",color:"#BE123C",padding:"1px 5px",borderRadius:4,fontSize:8,fontWeight:700}}>⚡SLA</span>}
                   </td>
-                  <td style={{padding:"9px 12px",color:"var(--t2)",maxWidth:280,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={t.Summary}>{t.Summary}</td>
-                  <td style={{padding:"9px 12px"}}><span style={{background:cs.badge,color:"#fff",padding:"3px 10px",borderRadius:20,fontSize:10,fontWeight:600,whiteSpace:"nowrap"}}>{t.Status}</span></td>
-                  <td style={{padding:"9px 12px",color:"var(--t3)",fontSize:11,whiteSpace:"nowrap",maxWidth:120,overflow:"hidden",textOverflow:"ellipsis"}}>{(t.Project||"").split(" ").slice(0,2).join(" ")}</td>
-                  <td style={{padding:"9px 12px",fontSize:11,fontWeight:600,color:t.Priority==="Critical"||t.Priority==="Show Stopper"?"var(--rose)":t.Priority==="High"?"var(--amber)":"var(--t3)"}}>{t.Priority}</td>
-                  <td style={{padding:"9px 12px",fontSize:10,maxWidth:130,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                  <td style={{padding:"6px 10px",color:"var(--t2)",maxWidth:280,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={t.Summary}>{t.Summary}</td>
+                  <td style={{padding:"6px 10px"}}><span style={{background:cs.badge,color:"#fff",padding:"3px 10px",borderRadius:20,fontSize:10,fontWeight:600,whiteSpace:"nowrap"}}>{t.Status}</span></td>
+                  <td style={{padding:"6px 10px",color:"var(--t3)",fontSize:11,whiteSpace:"nowrap",maxWidth:120,overflow:"hidden",textOverflow:"ellipsis"}}>{(t.Project||"").split(" ").slice(0,2).join(" ")}</td>
+                  <td style={{padding:"6px 10px",fontSize:11,fontWeight:600,color:t.Priority==="Critical"||t.Priority==="Show Stopper"?"var(--rose)":t.Priority==="High"?"var(--amber)":"var(--t3)"}}>{t.Priority}</td>
+                  <td style={{padding:"6px 10px",fontSize:10,maxWidth:130,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
                     {linked?<a href={J+(linked.split(";")[0])} target="_blank" rel="noreferrer" style={{fontFamily:"var(--mono)",fontSize:10,color:"var(--blue)"}}>{linked.split(";")[0]}</a>:<span style={{color:"var(--t4)"}}>—</span>}
                   </td>
-                  <td style={{padding:"9px 12px",color:"var(--t3)",fontSize:11,whiteSpace:"nowrap"}}>{fd(t.Created)}</td>
-                  <td style={{padding:"9px 12px",textAlign:"right",fontWeight:700,color:AC[bk],fontFamily:"var(--mono)",fontSize:12}}>{a}d</td>
+                  <td style={{padding:"6px 10px",color:"var(--t3)",fontSize:11,whiteSpace:"nowrap"}}>{fd(t.Created)}</td>
+                  <td style={{padding:"6px 10px",textAlign:"right",fontWeight:700,color:AC[bk],fontFamily:"var(--mono)",fontSize:12}}>{a}d</td>
                 </tr>);
               })}
             </tbody>
@@ -355,7 +355,7 @@ function DataEditor({rows,fileName,onApply,onRevert}){
   var inpStyle={width:"100%",minWidth:110,border:"1px solid transparent",borderRadius:6,padding:"5px 7px",fontSize:12,color:"var(--t1)",background:"transparent",fontFamily:"var(--sans)"};
 
   return(<>
-    <div className="card" style={{padding:"14px 18px",marginBottom:14,display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
+    <div className="card" style={{padding:"11px 15px",marginBottom:9,display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
       <div style={{width:42,height:42,borderRadius:10,background:"var(--blue-bg)",border:"1px solid var(--blue-light)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>✏️</div>
       <div style={{minWidth:0}}>
         <div style={{fontWeight:800,fontSize:15,color:"var(--t1)"}}>Edit Data {dirty&&<span style={{color:"var(--amber)",fontSize:11,fontWeight:700,marginLeft:6}}>● unsaved edits</span>}</div>
@@ -368,7 +368,7 @@ function DataEditor({rows,fileName,onApply,onRevert}){
       <button onClick={apply} disabled={!dirty} style={{background:dirty?"var(--blue)":"var(--border)",border:"none",color:"#fff",padding:"8px 18px",borderRadius:8,fontSize:12,fontWeight:800,cursor:dirty?"pointer":"default"}}>⟳ Apply &amp; Recalculate</button>
     </div>
 
-    {(Object.keys(filters).length>0||search)&&(<div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12,padding:"9px 16px",background:"var(--blue-bg)",borderRadius:8,border:"1px solid var(--blue-light)"}}>
+    {(Object.keys(filters).length>0||search)&&(<div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8,padding:"9px 16px",background:"var(--blue-bg)",borderRadius:8,border:"1px solid var(--blue-light)"}}>
       <span style={{color:"var(--blue-dark)",fontSize:12,fontWeight:600}}>Showing {view.length.toLocaleString()} of {data.length.toLocaleString()} rows</span>
       <button onClick={clearFilters} style={{marginLeft:"auto",background:"var(--blue)",color:"#fff",border:"none",padding:"5px 14px",borderRadius:6,fontSize:10,fontWeight:700}}>✕ Clear filters</button>
     </div>)}
@@ -763,14 +763,14 @@ function App(){
   const hasF=cf||af!==null||sf||search;
 
   /* Sortable header helper */
-  function TH(props){var col=props.col,children=props.children,align=props.align;return(<th onClick={function(){toggleSort(col);}} style={{cursor:"pointer",userSelect:"none",textAlign:align||"left",padding:"10px 12px",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".7px",borderBottom:"2px solid var(--border)",background:"var(--bg)",position:"sticky",top:0,zIndex:2,whiteSpace:"nowrap"}}>
+  function TH(props){var col=props.col,children=props.children,align=props.align;return(<th onClick={function(){toggleSort(col);}} style={{cursor:"pointer",userSelect:"none",textAlign:align||"left",padding:"7px 10px",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".7px",borderBottom:"2px solid var(--border)",background:"var(--bg)",position:"sticky",top:0,zIndex:2,whiteSpace:"nowrap"}}>
     {children} <span style={{color:"var(--blue)",fontSize:9}}>{sortIcon(col)}</span>
   </th>);}
 
   return(
     <div style={{minHeight:"100vh",background:"var(--bg)"}}>
       {/* ─── Header ─── */}
-      <header style={{background:"#FFFFFF",borderBottom:"1px solid var(--border)",padding:"0 28px",height:58,display:"flex",alignItems:"center",gap:14,position:"sticky",top:0,zIndex:100,boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
+      <header style={{background:"#FFFFFF",borderBottom:"1px solid var(--border)",padding:"0 24px",height:50,display:"flex",alignItems:"center",gap:14,position:"sticky",top:0,zIndex:100,boxShadow:"0 1px 3px rgba(0,0,0,.04)"}}>
         <Logo size={30}/>
         <span style={{fontWeight:800,fontSize:15,color:"var(--t1)",letterSpacing:"-.2px"}}>HD Tracker</span>
         <div style={{width:1,height:28,background:"var(--border)",margin:"0 6px"}}/>
@@ -797,7 +797,7 @@ function App(){
       </header>
 
       {/* ─── Date Range Filter Bar ─── */}
-      {tab!=="data"&&<div style={{background:"#FFFFFF",borderBottom:"1px solid var(--border)",padding:"10px 28px",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",position:"sticky",top:58,zIndex:99}}>
+      {tab!=="data"&&<div style={{background:"#FFFFFF",borderBottom:"1px solid var(--border)",padding:"7px 24px",display:"flex",alignItems:"center",gap:10,flexWrap:"wrap",position:"sticky",top:50,zIndex:99}}>
         <span style={{fontSize:11,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".5px",marginRight:4}}>📅 Date Range</span>
 
         {/* Preset buttons */}
@@ -835,13 +835,13 @@ function App(){
         )}
       </div>}
 
-      <main style={{padding:"20px 28px 60px",maxWidth:tab==="data"?"none":1360,margin:"0 auto"}}>
+      <main style={{padding:"12px 24px 30px",maxWidth:tab==="data"?"none":1500,margin:"0 auto"}}>
 
       {/* ═══ FOLLOW-UPS ═══ */}
       {tab==="followup"&&(<>
 
         {/* Greeting */}
-        <div className="fu" style={{marginBottom:18}}>
+        <div className="fu" style={{marginBottom:10}}>
           <h2 style={{fontSize:22,fontWeight:800,letterSpacing:"-.3px",color:"var(--t1)"}}>
             {greeting()}{w?`, ${w.split(" ")[0]}`:""}!
           </h2>
@@ -856,7 +856,7 @@ function App(){
 
         {/* HD action banner */}
         {w&&st.hd.length>0&&(
-          <div className="fu fu1 card" style={{padding:"16px 22px",marginBottom:12,display:"flex",alignItems:"center",gap:16,borderColor:"var(--cyan-border)",background:"var(--cyan-bg)"}}>
+          <div className="fu fu1 card" style={{padding:"11px 18px",marginBottom:8,display:"flex",alignItems:"center",gap:16,borderColor:"var(--cyan-border)",background:"var(--cyan-bg)"}}>
             <div style={{width:42,height:42,borderRadius:10,background:"#fff",border:"1px solid var(--cyan-border)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>🎯</div>
             <div style={{flex:1}}><div style={{color:"var(--cyan)",fontWeight:800,fontSize:14}}>{st.hd.length} ticket{st.hd.length!==1?"s":""} need YOUR action</div>
             <div style={{color:"var(--t2)",fontSize:12,marginTop:2}}>Resolved / Acknowledged / Open — act on these to close them.</div></div>
@@ -864,7 +864,7 @@ function App(){
           </div>
         )}
         {w&&st.dng>0&&(
-          <div className="fu fu1 card" style={{padding:"14px 22px",marginBottom:12,display:"flex",alignItems:"center",gap:16,borderColor:"var(--rose-border)",background:"var(--rose-bg)"}}>
+          <div className="fu fu1 card" style={{padding:"11px 18px",marginBottom:8,display:"flex",alignItems:"center",gap:16,borderColor:"var(--rose-border)",background:"var(--rose-bg)"}}>
             <div style={{width:42,height:42,borderRadius:10,background:"#fff",border:"1px solid var(--rose-border)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>⏰</div>
             <div><div style={{color:"var(--rose)",fontWeight:800,fontSize:14}}>{st.dng} ticket{st.dng!==1?"s":""} stale for 90+ days</div>
             <div style={{color:"var(--t2)",fontSize:12,marginTop:2}}>These need immediate attention or closure decision.</div></div>
@@ -872,7 +872,7 @@ function App(){
         )}
 
         {/* KPIs */}
-        <div className="fu fu2" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(145px,1fr))",gap:12,marginBottom:16}}>
+        <div className="fu fu2" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(145px,1fr))",gap:12,marginBottom:10}}>
           <KPI icon="📝" label="Total Created" value={totalCreated.toLocaleString()} color="#6366F1" bgColor="#EEF2FF" sub="In selected range"/>
           <KPI icon="✅" label="Total Closed" value={totalClosed.toLocaleString()} color="var(--green)" bgColor="var(--green-bg)" sub="In selected range"/>
           <KPI icon="📂" label="Still Open" value={st.n} color="var(--blue)" bgColor="var(--blue-bg)" onClick={function(){openAllModal();}} active={false}/>
@@ -890,10 +890,10 @@ function App(){
         </div>
 
         {/* Priority Distribution + SLA summary row */}
-        <div className="fu fu3" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:14}}>
+        <div className="fu fu3" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:9}}>
           {/* Priority */}
-          <div className="card" style={{padding:"18px 22px"}}>
-            <div style={{fontSize:13,fontWeight:700,marginBottom:12,color:"var(--t1)"}}>Priority Distribution <span style={{fontWeight:400,color:"var(--t3)",fontSize:11}}>· click to view</span></div>
+          <div className="card" style={{padding:"13px 16px"}}>
+            <div style={{fontSize:13,fontWeight:700,marginBottom:8,color:"var(--t1)"}}>Priority Distribution <span style={{fontWeight:400,color:"var(--t3)",fontSize:11}}>· click to view</span></div>
             <div style={{display:"flex",gap:8,alignItems:"flex-end",height:80}}>
               {["Show Stopper","Critical","High","Medium","Low"].map(function(p){
                 var c=prioDist[p]||0;var mx=Math.max.apply(null,Object.values(prioDist))||1;
@@ -906,9 +906,9 @@ function App(){
             </div>
           </div>
           {/* SLA Summary — computed on ALL tickets in range */}
-          <div className="card" style={{padding:"18px 22px"}}>
-            <div style={{fontSize:13,fontWeight:700,marginBottom:12,color:"var(--t1)"}}>SLA Performance <span style={{fontWeight:400,color:"var(--t3)",fontSize:11}}>· all {slaData.total} tickets</span></div>
-            <div style={{display:"flex",gap:14,alignItems:"center",marginBottom:14}}>
+          <div className="card" style={{padding:"13px 16px"}}>
+            <div style={{fontSize:13,fontWeight:700,marginBottom:8,color:"var(--t1)"}}>SLA Performance <span style={{fontWeight:400,color:"var(--t3)",fontSize:11}}>· all {slaData.total} tickets</span></div>
+            <div style={{display:"flex",gap:14,alignItems:"center",marginBottom:9}}>
               <Ring pct={slaData.total>0?Math.round((slaData.total-slaData.all.length)/slaData.total*100):100} sz={70} sw={5} color={slaData.all.length>0?"#D97706":"#059669"} track="#E2E8F0">
                 <div style={{fontSize:15,fontWeight:900,color:slaData.all.length>0?"var(--amber)":"var(--green)"}}>{slaData.total>0?Math.round((slaData.total-slaData.all.length)/slaData.total*100):100}%</div>
               </Ring>
@@ -934,13 +934,13 @@ function App(){
         </div>
 
         {/* Aging */}
-        <div className="fu fu3 card" style={{padding:"18px 22px",marginBottom:14}}>
+        <div className="fu fu3 card" style={{padding:"13px 16px",marginBottom:9}}>
           <div style={{fontSize:13,fontWeight:700,marginBottom:10,color:"var(--t1)"}}>Aging Distribution</div>
           <ABar bk={st.bk} total={st.n} onClick={function(i){openAgeModal(i);}} active={null}/>
         </div>
 
         {/* Status pills grouped — collapsible */}
-        <div className="fu fu4 card" style={{padding:"18px 22px",marginBottom:14}}>
+        <div className="fu fu4 card" style={{padding:"13px 16px",marginBottom:9}}>
           <div onClick={function(){setStatusOpen(!statusOpen);}} style={{fontSize:13,fontWeight:700,color:"var(--t1)",display:"flex",alignItems:"center",justifyContent:"space-between",cursor:"pointer",userSelect:"none"}}>
             <span>By Status <span style={{fontWeight:400,color:"var(--t3)",fontSize:11}}>· click to filter</span></span>
             <span style={{fontSize:18,color:"var(--t3)",transition:"transform .2s",transform:statusOpen?"rotate(0deg)":"rotate(-90deg)",display:"inline-block"}}>▾</span>
@@ -950,7 +950,7 @@ function App(){
             var entries=Object.entries(st.sm).filter(function(x){return classify(x[0])===ck;}).sort(function(a,b){return b[1]-a[1];});
             if(!entries.length)return null;
             var cs=CS[ck];
-            return(<div key={ck} style={{marginBottom:14}}>
+            return(<div key={ck} style={{marginBottom:9}}>
               <div style={{fontSize:10,fontWeight:700,color:cs.badge,textTransform:"uppercase",letterSpacing:".6px",marginBottom:8,display:"flex",alignItems:"center",gap:6}}>
                 <span>{cs.icon}</span>{CL[ck]}
               </div>
@@ -969,7 +969,7 @@ function App(){
         </div>
 
         {/* Search + Filter bar + Export */}
-        <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:12,flexWrap:"wrap"}}>
+        <div style={{display:"flex",gap:10,alignItems:"center",marginBottom:8,flexWrap:"wrap"}}>
           <div style={{position:"relative",flex:"1 1 260px",maxWidth:360}}>
             <span style={{position:"absolute",left:12,top:"50%",transform:"translateY(-50%)",color:"var(--t3)",fontSize:14}}>🔍</span>
             <input type="text" value={search} onChange={function(e){setSearch(e.target.value);}} placeholder="Search by Key or Summary…"
@@ -991,17 +991,17 @@ function App(){
         </div>
 
         {/* Ticket Table */}
-        <div className="card" style={{overflow:"hidden",marginBottom:16}}>
+        <div className="card" style={{overflow:"hidden",marginBottom:10}}>
           <div style={{overflowX:"auto",maxHeight:540,overflowY:"auto"}}>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
               <thead><tr>
                 <TH col="key">Key</TH>
-                <th style={{padding:"10px 12px",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".7px",borderBottom:"2px solid var(--border)",background:"var(--bg)",position:"sticky",top:0,zIndex:2,textAlign:"left"}}>Summary</th>
-                <th style={{padding:"10px 12px",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".7px",borderBottom:"2px solid var(--border)",background:"var(--bg)",position:"sticky",top:0,zIndex:2,textAlign:"left"}}>Category</th>
+                <th style={{padding:"7px 10px",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".7px",borderBottom:"2px solid var(--border)",background:"var(--bg)",position:"sticky",top:0,zIndex:2,textAlign:"left"}}>Summary</th>
+                <th style={{padding:"7px 10px",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".7px",borderBottom:"2px solid var(--border)",background:"var(--bg)",position:"sticky",top:0,zIndex:2,textAlign:"left"}}>Category</th>
                 <TH col="status">Status</TH>
                 <TH col="project">Project</TH>
                 <TH col="priority">Priority</TH>
-                <th style={{padding:"10px 12px",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".7px",borderBottom:"2px solid var(--border)",background:"var(--bg)",position:"sticky",top:0,zIndex:2,textAlign:"left"}}>Linked</th>
+                <th style={{padding:"7px 10px",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".7px",borderBottom:"2px solid var(--border)",background:"var(--bg)",position:"sticky",top:0,zIndex:2,textAlign:"left"}}>Linked</th>
                 <TH col="created">Created</TH>
                 <TH col="age" align="right">Age</TH>
               </tr></thead>
@@ -1009,18 +1009,18 @@ function App(){
                 const a=ds(t.Updated||t.Created);const bk=abk(a);const c=classify(t.Status);const cs=CS[c];
                 const linked=t["Linked Issues"]||"";const linkedSt=t["Linked Ticket status"]||"";
                 return(<tr key={i} style={{borderBottom:"1px solid var(--border)"}}>
-                  <td style={{padding:"10px 12px",whiteSpace:"nowrap"}}><a href={J+t.Key} target="_blank" rel="noreferrer" style={{fontWeight:700,fontFamily:"var(--mono)",fontSize:12}}>{t.Key}</a></td>
-                  <td style={{padding:"10px 12px",color:"var(--t2)",maxWidth:240,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={t.Summary}>{t.Summary}</td>
-                  <td style={{padding:"10px 12px"}}><span style={{background:cs.bg,color:cs.badge,border:`1px solid ${cs.br}`,padding:"3px 9px",borderRadius:6,fontSize:10,fontWeight:700,whiteSpace:"nowrap"}}>{cs.icon} {cs.tag}</span></td>
-                  <td style={{padding:"10px 12px"}}><span style={{background:cs.badge,color:"#fff",padding:"3px 10px",borderRadius:20,fontSize:10,fontWeight:600,whiteSpace:"nowrap"}}>{t.Status}</span></td>
-                  <td style={{padding:"10px 12px",color:"var(--t3)",fontSize:11,whiteSpace:"nowrap",maxWidth:120,overflow:"hidden",textOverflow:"ellipsis"}}>{(t.Project||"").split(" ").slice(0,2).join(" ")}</td>
-                  <td style={{padding:"10px 12px",fontSize:11,fontWeight:600,color:t.Priority==="Critical"||t.Priority==="Show Stopper"?"var(--rose)":t.Priority==="High"?"var(--amber)":"var(--t3)"}}>{t.Priority}</td>
-                  <td style={{padding:"10px 12px",fontSize:10,maxWidth:130,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={`${linked} — ${linkedSt}`}>
+                  <td style={{padding:"7px 10px",whiteSpace:"nowrap"}}><a href={J+t.Key} target="_blank" rel="noreferrer" style={{fontWeight:700,fontFamily:"var(--mono)",fontSize:12}}>{t.Key}</a></td>
+                  <td style={{padding:"7px 10px",color:"var(--t2)",maxWidth:240,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={t.Summary}>{t.Summary}</td>
+                  <td style={{padding:"7px 10px"}}><span style={{background:cs.bg,color:cs.badge,border:`1px solid ${cs.br}`,padding:"3px 9px",borderRadius:6,fontSize:10,fontWeight:700,whiteSpace:"nowrap"}}>{cs.icon} {cs.tag}</span></td>
+                  <td style={{padding:"7px 10px"}}><span style={{background:cs.badge,color:"#fff",padding:"3px 10px",borderRadius:20,fontSize:10,fontWeight:600,whiteSpace:"nowrap"}}>{t.Status}</span></td>
+                  <td style={{padding:"7px 10px",color:"var(--t3)",fontSize:11,whiteSpace:"nowrap",maxWidth:120,overflow:"hidden",textOverflow:"ellipsis"}}>{(t.Project||"").split(" ").slice(0,2).join(" ")}</td>
+                  <td style={{padding:"7px 10px",fontSize:11,fontWeight:600,color:t.Priority==="Critical"||t.Priority==="Show Stopper"?"var(--rose)":t.Priority==="High"?"var(--amber)":"var(--t3)"}}>{t.Priority}</td>
+                  <td style={{padding:"7px 10px",fontSize:10,maxWidth:130,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={`${linked} — ${linkedSt}`}>
                     {linked?<><a href={J+(linked.split(";")[0])} target="_blank" rel="noreferrer" style={{fontFamily:"var(--mono)",fontSize:10}}>{linked.split(";")[0]}</a>
                     {linkedSt&&<span style={{color:"var(--t3)",marginLeft:4,fontSize:9}}>({linkedSt.split(" ").slice(0,2).join(" ")})</span>}</>:<span style={{color:"var(--t4)"}}>—</span>}
                   </td>
-                  <td style={{padding:"10px 12px",color:"var(--t3)",fontSize:11,whiteSpace:"nowrap"}}>{fd(t.Created)}</td>
-                  <td style={{padding:"10px 12px",textAlign:"right",fontWeight:700,color:AC[bk],fontFamily:"var(--mono)",fontSize:12}}>{a}d</td>
+                  <td style={{padding:"7px 10px",color:"var(--t3)",fontSize:11,whiteSpace:"nowrap"}}>{fd(t.Created)}</td>
+                  <td style={{padding:"7px 10px",textAlign:"right",fontWeight:700,color:AC[bk],fontFamily:"var(--mono)",fontSize:12}}>{a}d</td>
                 </tr>);
               })}</tbody>
             </table>
@@ -1031,13 +1031,13 @@ function App(){
         {/* Worker leaderboard */}
         {!w&&!hasF&&(
           <div className="card" style={{overflow:"hidden"}}>
-            <div style={{padding:"16px 22px",borderBottom:"1px solid var(--border)",fontWeight:700,fontSize:13,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <div style={{padding:"11px 18px",borderBottom:"1px solid var(--border)",fontWeight:700,fontSize:13,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <span>Worker Backlog Overview</span>
               <span style={{fontSize:11,color:"var(--t3)",fontWeight:400}}>Click a row to drill in</span>
             </div>
             <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
               <thead><tr style={{borderBottom:"2px solid var(--border)",background:"var(--bg)"}}>
-                <th style={{padding:"10px 14px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".6px"}}>Worker</th>
+                <th style={{padding:"7px 12px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".6px"}}>Worker</th>
                 <th style={{padding:"10px 8px",textAlign:"right",fontSize:10,fontWeight:700,color:"var(--blue)"}}>Open</th>
                 <th style={{padding:"10px 8px",textAlign:"right",fontSize:10,fontWeight:700,color:"var(--cyan)"}}>🎯 HD</th>
                 <th style={{padding:"10px 8px",textAlign:"right",fontSize:10,fontWeight:700,color:"var(--amber)"}}>💬 Client</th>
@@ -1048,7 +1048,7 @@ function App(){
                 const wt=op.filter(t=>t["Current Worker"]===n);const bk=[0,0,0,0,0];let hd=0,cl=0,eng=0;
                 wt.forEach(t=>{bk[abk(ds(t.Updated||t.Created))]++;const cat=classify(t.Status);if(cat==="hd")hd++;else if(cat==="client")cl++;else eng++;});
                 return(<tr key={n} onClick={function(){setW(n);clr();}} style={{cursor:"pointer",borderBottom:"1px solid var(--border)",transition:"background .15s"}} onMouseOver={function(e){e.currentTarget.style.background="var(--blue-bg)";}} onMouseOut={function(e){e.currentTarget.style.background="";}}>
-                  <td style={{padding:"10px 14px",fontWeight:600}}>{n}</td>
+                  <td style={{padding:"7px 12px",fontWeight:600}}>{n}</td>
                   <td style={{padding:"10px 8px",textAlign:"right",fontWeight:800,color:"var(--blue)",fontFamily:"var(--mono)"}}>{c}</td>
                   <td style={{padding:"10px 8px",textAlign:"right",fontWeight:hd?700:400,color:hd?"var(--cyan)":"var(--t4)",fontFamily:"var(--mono)"}}>{hd||"·"}</td>
                   <td style={{padding:"10px 8px",textAlign:"right",fontWeight:cl?700:400,color:cl?"var(--amber)":"var(--t4)",fontFamily:"var(--mono)"}}>{cl||"·"}</td>
@@ -1096,8 +1096,8 @@ function App(){
           </div>
 
           {/* Resolution Classification */}
-          <div className="fu fu2 card" style={{padding:"22px 24px",marginBottom:16}}>
-            <div style={{fontSize:13,fontWeight:700,marginBottom:14,color:"var(--t1)"}}>Resolution Classification</div>
+          <div className="fu fu2 card" style={{padding:"22px 24px",marginBottom:10}}>
+            <div style={{fontSize:13,fontWeight:700,marginBottom:9,color:"var(--t1)"}}>Resolution Classification</div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16}}>
               <div onClick={function(){pmHdOnly();}} style={{textAlign:"center",padding:16,background:"var(--green-bg)",borderRadius:12,border:"1px solid var(--green-border)",cursor:"pointer",transition:"box-shadow .2s"}}>                <div style={{fontSize:32,fontWeight:900,color:"var(--green)",letterSpacing:"-1px"}}>{teamPerf.hdOnly.toLocaleString()}</div>
                 <div style={{fontSize:11,fontWeight:700,color:"var(--green)",marginTop:4}}>Closed by HD</div>
@@ -1127,9 +1127,9 @@ function App(){
           </div>
 
           {/* Incident + Clarification Breakdown */}
-          <div className="fu fu2 card" style={{padding:"22px 24px",marginBottom:16}}>
+          <div className="fu fu2 card" style={{padding:"22px 24px",marginBottom:10}}>
             <div style={{fontSize:13,fontWeight:700,marginBottom:4,color:"var(--t1)"}}>Incident Clarification Analysis</div>
-            <div style={{fontSize:11,color:"var(--t3)",marginBottom:14}}>Incidents with Root Cause = "Client Clarification" — how many resolved by HD alone vs. with engineering</div>
+            <div style={{fontSize:11,color:"var(--t3)",marginBottom:9}}>Incidents with Root Cause = "Client Clarification" — how many resolved by HD alone vs. with engineering</div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12}}>
               <div onClick={function(){pmIncidents();}} style={{textAlign:"center",padding:14,background:"var(--bg)",borderRadius:10,border:"1px solid var(--border)",cursor:"pointer"}}>
                 <div style={{fontSize:24,fontWeight:900,color:"var(--t1)"}}>{incClarData.incidents}</div>
@@ -1165,8 +1165,8 @@ function App(){
 
           {/* Monthly trend */}
           {teamPerf.months.length>0&&(
-            <div className="fu fu2 card" style={{padding:"22px 24px",marginBottom:16}}>
-              <div style={{fontSize:13,fontWeight:700,marginBottom:16,color:"var(--t1)"}}>Monthly Volume <span style={{fontWeight:400,color:"var(--t3)",fontSize:11}}>· click bars to view tickets</span></div>
+            <div className="fu fu2 card" style={{padding:"22px 24px",marginBottom:10}}>
+              <div style={{fontSize:13,fontWeight:700,marginBottom:10,color:"var(--t1)"}}>Monthly Volume <span style={{fontWeight:400,color:"var(--t3)",fontSize:11}}>· click bars to view tickets</span></div>
               <div style={{display:"flex",alignItems:"flex-end",gap:8,height:140,padding:"0 4px"}}>
                 {teamPerf.months.map(function(x,i){var m=x[0],d=x[1];var mx=Math.max.apply(null,teamPerf.months.map(function(z){return Math.max(z[1].cr,z[1].cl);}));mx=mx||1;
                   return(<div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
@@ -1190,35 +1190,35 @@ function App(){
           )}
 
           {/* Worker Leaderboard */}
-          <div className="fu fu3 card" style={{overflow:"hidden",marginBottom:16}}>
-            <div style={{padding:"16px 22px",borderBottom:"1px solid var(--border)",fontWeight:700,fontSize:13,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div className="fu fu3 card" style={{overflow:"hidden",marginBottom:10}}>
+            <div style={{padding:"11px 18px",borderBottom:"1px solid var(--border)",fontWeight:700,fontSize:13,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
               <span>Worker Leaderboard</span>
               <span style={{fontSize:11,color:"var(--t3)",fontWeight:400}}>Click a row to see individual performance</span>
             </div>
             <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
               <thead><tr style={{borderBottom:"2px solid var(--border)",background:"var(--bg)"}}>
-                <th style={{padding:"10px 14px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".6px"}}>#</th>
-                <th style={{padding:"10px 14px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".6px"}}>Worker</th>
+                <th style={{padding:"7px 12px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".6px"}}>#</th>
+                <th style={{padding:"7px 12px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".6px"}}>Worker</th>
                 <th style={{padding:"10px 8px",textAlign:"right",fontSize:10,fontWeight:700,color:"var(--blue)"}}>Handled</th>
                 <th style={{padding:"10px 8px",textAlign:"right",fontSize:10,fontWeight:700,color:"var(--green)"}}>Closed</th>
                 <th style={{padding:"10px 8px",textAlign:"right",fontSize:10,fontWeight:700,color:"#059669"}}>HD Only</th>
                 <th style={{padding:"10px 8px",textAlign:"right",fontSize:10,fontWeight:700,color:"var(--violet)"}}>Engg</th>
                 <th style={{padding:"10px 8px",textAlign:"right",fontSize:10,fontWeight:700,color:"var(--t3)"}}>Open</th>
-                <th style={{padding:"10px 14px",textAlign:"right",fontSize:10,fontWeight:700,color:"var(--t3)"}}>Rate</th>
-                <th style={{padding:"10px 14px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--t3)",minWidth:140}}>Closure Rate</th>
+                <th style={{padding:"7px 12px",textAlign:"right",fontSize:10,fontWeight:700,color:"var(--t3)"}}>Rate</th>
+                <th style={{padding:"7px 12px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--t3)",minWidth:140}}>Closure Rate</th>
                 <th style={{padding:"10px 8px",textAlign:"right",fontSize:10,fontWeight:700,color:"var(--green)"}}>Sanity</th>
               </tr></thead>
               <tbody>{teamPerf.wl.slice(0,25).map(function(wr,i){
                 return(<tr key={wr.name} onClick={function(){setW(wr.name);}} style={{cursor:"pointer",borderBottom:"1px solid var(--border)",transition:"background .15s"}} onMouseOver={function(e){e.currentTarget.style.background="var(--blue-bg)";}} onMouseOut={function(e){e.currentTarget.style.background="";}}>
-                  <td style={{padding:"10px 14px",fontWeight:700,color:"var(--t3)",fontSize:11}}>{i+1}</td>
-                  <td style={{padding:"10px 14px",fontWeight:600}}>{wr.name}</td>
+                  <td style={{padding:"7px 12px",fontWeight:700,color:"var(--t3)",fontSize:11}}>{i+1}</td>
+                  <td style={{padding:"7px 12px",fontWeight:600}}>{wr.name}</td>
                   <td style={{padding:"10px 8px",textAlign:"right",fontWeight:700,color:"var(--blue)",fontFamily:"var(--mono)"}}>{wr.total.toLocaleString()}</td>
                   <td style={{padding:"10px 8px",textAlign:"right",fontWeight:700,color:"var(--green)",fontFamily:"var(--mono)"}}>{wr.closed.toLocaleString()}</td>
                   <td style={{padding:"10px 8px",textAlign:"right",fontWeight:600,color:wr.hdOnly>0?"#059669":"var(--t4)",fontFamily:"var(--mono)"}}>{wr.hdOnly||"·"}</td>
                   <td style={{padding:"10px 8px",textAlign:"right",fontWeight:600,color:wr.engAsst>0?"var(--violet)":"var(--t4)",fontFamily:"var(--mono)"}}>{wr.engAsst||"·"}</td>
                   <td style={{padding:"10px 8px",textAlign:"right",fontWeight:600,color:wr.total-wr.closed>0?"var(--amber)":"var(--t4)",fontFamily:"var(--mono)"}}>{wr.total-wr.closed}</td>
-                  <td style={{padding:"10px 14px",textAlign:"right",fontWeight:800,color:wr.rate>=tAvg.r?"var(--green)":"var(--rose)",fontFamily:"var(--mono)"}}>{wr.rate}%</td>
-                  <td style={{padding:"10px 14px"}}>
+                  <td style={{padding:"7px 12px",textAlign:"right",fontWeight:800,color:wr.rate>=tAvg.r?"var(--green)":"var(--rose)",fontFamily:"var(--mono)"}}>{wr.rate}%</td>
+                  <td style={{padding:"7px 12px"}}>
                     <div style={{display:"flex",alignItems:"center",gap:8}}>
                       <div style={{flex:1,height:6,borderRadius:3,background:"var(--bg)",maxWidth:120}}>
                         <div style={{height:"100%",borderRadius:3,background:wr.rate>=tAvg.r?"var(--green)":"var(--amber)",width:wr.rate+"%",transition:"width .6s"}}/>
@@ -1233,9 +1233,9 @@ function App(){
 
           {/* Breakdowns */}
           <div className="fu fu4" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(300px,1fr))",gap:14}}>
-            <div className="card" style={{padding:"20px 22px"}}><div style={{fontSize:12,fontWeight:700,marginBottom:14,color:"var(--t1)"}}>By Project <span style={{fontWeight:400,color:"var(--t3)",fontSize:10}}>· click to view</span></div>
+            <div className="card" style={{padding:"13px 16px"}}><div style={{fontSize:12,fontWeight:700,marginBottom:9,color:"var(--t1)"}}>By Project <span style={{fontWeight:400,color:"var(--t3)",fontSize:10}}>· click to view</span></div>
               {teamPerf.tp.map(function(x,i){var p=x[0],d=x[1];var pct=d.t?Math.round(d.c/d.t*100):0;
-                return(<div key={i} onClick={function(){perfModal(p+" tickets","🏢","#2563EB",function(t){return t.Project===p;});}} style={{marginBottom:12,cursor:"pointer",padding:"4px 0",borderRadius:4}}>
+                return(<div key={i} onClick={function(){perfModal(p+" tickets","🏢","#2563EB",function(t){return t.Project===p;});}} style={{marginBottom:8,cursor:"pointer",padding:"4px 0",borderRadius:4}}>
                   <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:5}}>
                     <span style={{color:"var(--t2)",maxWidth:180,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p}</span>
                     <span style={{color:"var(--t3)",fontFamily:"var(--mono)",fontSize:10}}>{d.c}/{d.t} · {pct}%</span>
@@ -1246,7 +1246,7 @@ function App(){
                 </div>);
               })}
             </div>
-            <div className="card" style={{padding:"20px 22px"}}><div style={{fontSize:12,fontWeight:700,marginBottom:14,color:"var(--t1)"}}>By Type of Fix <span style={{fontWeight:400,color:"var(--t3)",fontSize:10}}>· click to view</span></div>
+            <div className="card" style={{padding:"13px 16px"}}><div style={{fontSize:12,fontWeight:700,marginBottom:9,color:"var(--t1)"}}>By Type of Fix <span style={{fontWeight:400,color:"var(--t3)",fontSize:10}}>· click to view</span></div>
               {teamPerf.tf.map(function(x,i){var f=x[0],c=x[1];var mx=teamPerf.tf[0]?teamPerf.tf[0][1]:1;
                 return(<div key={i} onClick={function(){perfModal("Type of Fix: "+f,"🔧","#059669",function(t){return t["Type of Fix"]===f;});}} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10,cursor:"pointer",padding:"3px 0",borderRadius:4}}>
                   <span style={{fontSize:10,color:"var(--t2)",minWidth:100,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{f}</span>
@@ -1257,7 +1257,7 @@ function App(){
                 </div>);
               })}
             </div>
-            <div className="card" style={{padding:"20px 22px"}}><div style={{fontSize:12,fontWeight:700,marginBottom:14,color:"var(--t1)"}}>By Root Cause <span style={{fontWeight:400,color:"var(--t3)",fontSize:10}}>· click to view</span></div>
+            <div className="card" style={{padding:"13px 16px"}}><div style={{fontSize:12,fontWeight:700,marginBottom:9,color:"var(--t1)"}}>By Root Cause <span style={{fontWeight:400,color:"var(--t3)",fontSize:10}}>· click to view</span></div>
               {teamPerf.tr.map(function(x,i){var r=x[0],c=x[1];var mx=teamPerf.tr[0]?teamPerf.tr[0][1]:1;
                 return(<div key={i} onClick={function(){perfModal("Root Cause: "+r,"📋","#D97706",function(t){return t["Root Cause"]===r;});}} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10,cursor:"pointer",padding:"3px 0",borderRadius:4}}>
                   <span style={{fontSize:10,color:"var(--t2)",minWidth:110,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r}</span>
@@ -1302,8 +1302,8 @@ function App(){
           </div>
 
           {/* Resolution Classification — Individual */}
-          <div className="fu fu2 card" style={{padding:"22px 24px",marginBottom:16}}>
-            <div style={{fontSize:13,fontWeight:700,marginBottom:14,color:"var(--t1)"}}>Resolution Classification</div>
+          <div className="fu fu2 card" style={{padding:"22px 24px",marginBottom:10}}>
+            <div style={{fontSize:13,fontWeight:700,marginBottom:9,color:"var(--t1)"}}>Resolution Classification</div>
             <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:12}}>
               <div onClick={function(){pmHdOnly();}} style={{textAlign:"center",padding:14,background:"var(--green-bg)",borderRadius:12,border:"1px solid var(--green-border)",cursor:"pointer"}}>
                 <div style={{fontSize:28,fontWeight:900,color:"var(--green)",letterSpacing:"-1px"}}>{perf.hdOnly}</div>
@@ -1337,9 +1337,9 @@ function App(){
           </div>
 
           {/* Incident Clarification Analysis — Individual */}
-          <div className="fu fu2 card" style={{padding:"22px 24px",marginBottom:16}}>
+          <div className="fu fu2 card" style={{padding:"22px 24px",marginBottom:10}}>
             <div style={{fontSize:13,fontWeight:700,marginBottom:4,color:"var(--t1)"}}>Incident Clarification Analysis</div>
-            <div style={{fontSize:11,color:"var(--t3)",marginBottom:14}}>Incidents with Root Cause = "Client Clarification" — HD vs Engineering resolution</div>
+            <div style={{fontSize:11,color:"var(--t3)",marginBottom:9}}>Incidents with Root Cause = "Client Clarification" — HD vs Engineering resolution</div>
             <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:12}}>
               <div onClick={function(){pmIncidents();}} style={{textAlign:"center",padding:14,background:"var(--bg)",borderRadius:10,border:"1px solid var(--border)",cursor:"pointer"}}>
                 <div style={{fontSize:24,fontWeight:900,color:"var(--t1)"}}>{incClarData.incidents}</div>
@@ -1368,8 +1368,8 @@ function App(){
           </div>
 
           {perf.months.length>0&&(
-            <div className="fu fu2 card" style={{padding:"22px 24px",marginBottom:16}}>
-              <div style={{fontSize:13,fontWeight:700,marginBottom:16,color:"var(--t1)"}}>Monthly Volume <span style={{fontWeight:400,color:"var(--t3)",fontSize:11}}>· click bars to view tickets</span></div>
+            <div className="fu fu2 card" style={{padding:"22px 24px",marginBottom:10}}>
+              <div style={{fontSize:13,fontWeight:700,marginBottom:10,color:"var(--t1)"}}>Monthly Volume <span style={{fontWeight:400,color:"var(--t3)",fontSize:11}}>· click bars to view tickets</span></div>
               <div style={{display:"flex",alignItems:"flex-end",gap:8,height:140,padding:"0 4px"}}>
                 {perf.months.map(([m,d],i)=>{const mx=Math.max(...perf.months.map(([,x])=>Math.max(x.cr,x.cl)),1);
                   return(<div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
@@ -1392,9 +1392,9 @@ function App(){
             </div>
           )}
           <div className="fu fu3" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(300px,1fr))",gap:14}}>
-            <div className="card" style={{padding:"20px 22px"}}><div style={{fontSize:12,fontWeight:700,marginBottom:14,color:"var(--t1)"}}>By Project <span style={{fontWeight:400,color:"var(--t3)",fontSize:10}}>· click to view</span></div>
+            <div className="card" style={{padding:"13px 16px"}}><div style={{fontSize:12,fontWeight:700,marginBottom:9,color:"var(--t1)"}}>By Project <span style={{fontWeight:400,color:"var(--t3)",fontSize:10}}>· click to view</span></div>
               {perf.tp.map(([p,d],i)=>{const pct=d.t?Math.round(d.c/d.t*100):0;
-                return(<div key={i} onClick={function(){perfModal(p+" tickets","🏢","#2563EB",function(t){return t.Project===p;});}} style={{marginBottom:12,cursor:"pointer",padding:"4px 0"}}>
+                return(<div key={i} onClick={function(){perfModal(p+" tickets","🏢","#2563EB",function(t){return t.Project===p;});}} style={{marginBottom:8,cursor:"pointer",padding:"4px 0"}}>
                   <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:5}}>
                     <span style={{color:"var(--t2)",maxWidth:180,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p}</span>
                     <span style={{color:"var(--t3)",fontFamily:"var(--mono)",fontSize:10}}>{d.c}/{d.t} · {pct}%</span>
@@ -1404,7 +1404,7 @@ function App(){
                   </div>
                 </div>);})}
             </div>
-            <div className="card" style={{padding:"20px 22px"}}><div style={{fontSize:12,fontWeight:700,marginBottom:14,color:"var(--t1)"}}>By Type of Fix <span style={{fontWeight:400,color:"var(--t3)",fontSize:10}}>· click to view</span></div>
+            <div className="card" style={{padding:"13px 16px"}}><div style={{fontSize:12,fontWeight:700,marginBottom:9,color:"var(--t1)"}}>By Type of Fix <span style={{fontWeight:400,color:"var(--t3)",fontSize:10}}>· click to view</span></div>
               {perf.tf.map(([f,c],i)=>{const mx=perf.tf[0]?.[1]||1;
                 return(<div key={i} onClick={function(){perfModal("Type of Fix: "+f,"🔧","#059669",function(t){return t["Type of Fix"]===f;});}} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10,cursor:"pointer",padding:"3px 0"}}>
                   <span style={{fontSize:10,color:"var(--t2)",minWidth:100,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{f}</span>
@@ -1414,7 +1414,7 @@ function App(){
                   <span style={{fontSize:10,color:"var(--t3)",minWidth:28,textAlign:"right",fontFamily:"var(--mono)"}}>{c}</span>
                 </div>);})}
             </div>
-            <div className="card" style={{padding:"20px 22px"}}><div style={{fontSize:12,fontWeight:700,marginBottom:14,color:"var(--t1)"}}>By Root Cause <span style={{fontWeight:400,color:"var(--t3)",fontSize:10}}>· click to view</span></div>
+            <div className="card" style={{padding:"13px 16px"}}><div style={{fontSize:12,fontWeight:700,marginBottom:9,color:"var(--t1)"}}>By Root Cause <span style={{fontWeight:400,color:"var(--t3)",fontSize:10}}>· click to view</span></div>
               {perf.tr.map(([r,c],i)=>{const mx=perf.tr[0]?.[1]||1;
                 return(<div key={i} onClick={function(){perfModal("Root Cause: "+r,"📋","#D97706",function(t){return t["Root Cause"]===r;});}} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10,cursor:"pointer",padding:"3px 0"}}>
                   <span style={{fontSize:10,color:"var(--t2)",minWidth:110,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r}</span>
@@ -1430,12 +1430,12 @@ function App(){
 
       {/* ═══ DATA GAPS ═══ */}
       {tab==="gaps"&&(<>
-        <div className="fu card" style={{padding:"16px 22px",marginBottom:14,display:"flex",alignItems:"center",gap:16,borderColor:"var(--amber-border)",background:"var(--amber-bg)"}}>
+        <div className="fu card" style={{padding:"11px 18px",marginBottom:9,display:"flex",alignItems:"center",gap:16,borderColor:"var(--amber-border)",background:"var(--amber-bg)"}}>
           <div style={{width:42,height:42,borderRadius:10,background:"#fff",border:"1px solid var(--amber-border)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>⚠️</div>
           <div><div style={{color:"var(--amber)",fontWeight:800,fontSize:15}}>Data Quality Issues</div>
           <div style={{color:"var(--t2)",fontSize:12,marginTop:2}}>{gd.t.length.toLocaleString()} tickets with missing fields{w?` · ${w}`:""}</div></div>
         </div>
-        <div className="fu fu1" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(145px,1fr))",gap:12,marginBottom:14}}>
+        <div className="fu fu1" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(145px,1fr))",gap:12,marginBottom:9}}>
           {GF.map(function(f){var v=gd.s[f]||0;var ac=gf===f;
             return(<div key={f} onClick={function(){filterGap(f);}} className="card" style={{
               padding:"16px 18px",cursor:"pointer",borderColor:ac?"var(--amber)":"var(--border)",background:ac?"var(--amber-bg)":"var(--card)"
@@ -1445,7 +1445,7 @@ function App(){
             </div>);
           })}
         </div>
-        {gf&&(<div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12,padding:"9px 16px",background:"var(--amber-bg)",borderRadius:8,border:"1px solid var(--amber-border)"}}>
+        {gf&&(<div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8,padding:"9px 16px",background:"var(--amber-bg)",borderRadius:8,border:"1px solid var(--amber-border)"}}>
           <span style={{color:"var(--amber)",fontSize:12,fontWeight:600}}>Missing: {gf}</span>
           <span style={{color:"var(--amber)",fontWeight:800}}>→ {dg.length.toLocaleString()}</span>
           <button onClick={function(){setGf(null);}} style={{marginLeft:"auto",background:"var(--amber)",color:"#fff",border:"none",padding:"5px 14px",borderRadius:6,fontSize:10,fontWeight:700}}>✕ Clear</button>
@@ -1454,17 +1454,17 @@ function App(){
           <div style={{overflowX:"auto",maxHeight:520,overflowY:"auto"}}>
             <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
               <thead><tr style={{borderBottom:"2px solid var(--border)",background:"var(--bg)"}}>
-                <th style={{padding:"10px 14px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".6px",position:"sticky",top:0,background:"var(--bg)",zIndex:2}}>Key</th>
-                <th style={{padding:"10px 12px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".6px",position:"sticky",top:0,background:"var(--bg)",zIndex:2}}>Summary</th>
-                <th style={{padding:"10px 12px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".6px",position:"sticky",top:0,background:"var(--bg)",zIndex:2}}>Status</th>
-                <th style={{padding:"10px 12px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".6px",position:"sticky",top:0,background:"var(--bg)",zIndex:2}}>Missing Fields</th>
+                <th style={{padding:"7px 12px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".6px",position:"sticky",top:0,background:"var(--bg)",zIndex:2}}>Key</th>
+                <th style={{padding:"7px 10px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".6px",position:"sticky",top:0,background:"var(--bg)",zIndex:2}}>Summary</th>
+                <th style={{padding:"7px 10px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".6px",position:"sticky",top:0,background:"var(--bg)",zIndex:2}}>Status</th>
+                <th style={{padding:"7px 10px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".6px",position:"sticky",top:0,background:"var(--bg)",zIndex:2}}>Missing Fields</th>
               </tr></thead>
               <tbody>{dg.slice(0,400).map((t,i)=>(
                 <tr key={i} style={{borderBottom:"1px solid var(--border)"}}>
-                  <td style={{padding:"10px 14px",whiteSpace:"nowrap"}}><a href={J+t.Key} target="_blank" rel="noreferrer" style={{fontWeight:700,fontFamily:"var(--mono)",fontSize:12}}>{t.Key}</a></td>
-                  <td style={{padding:"10px 12px",color:"var(--t2)",maxWidth:260,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.Summary}</td>
-                  <td style={{padding:"10px 12px",color:"var(--t3)",fontSize:11}}>{t.Status}</td>
-                  <td style={{padding:"10px 12px"}}><div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{t._g.map(g=>(<span key={g} style={{background:"var(--rose-bg)",color:"var(--rose)",border:"1px solid var(--rose-border)",padding:"2px 8px",borderRadius:20,fontSize:10,fontWeight:600}}>{g}</span>))}</div></td>
+                  <td style={{padding:"7px 12px",whiteSpace:"nowrap"}}><a href={J+t.Key} target="_blank" rel="noreferrer" style={{fontWeight:700,fontFamily:"var(--mono)",fontSize:12}}>{t.Key}</a></td>
+                  <td style={{padding:"7px 10px",color:"var(--t2)",maxWidth:260,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{t.Summary}</td>
+                  <td style={{padding:"7px 10px",color:"var(--t3)",fontSize:11}}>{t.Status}</td>
+                  <td style={{padding:"7px 10px"}}><div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{t._g.map(g=>(<span key={g} style={{background:"var(--rose-bg)",color:"var(--rose)",border:"1px solid var(--rose-border)",padding:"2px 8px",borderRadius:20,fontSize:10,fontWeight:600}}>{g}</span>))}</div></td>
                 </tr>
               ))}</tbody>
             </table>
