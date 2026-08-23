@@ -6,7 +6,7 @@
    Jira export can exceed localStorage's ~5MB limit. The raw file (Blob) is
    stored as-is, so each dashboard parses it with its own existing XLSX code. */
 (function () {
-  var DB = "hd-tracker", STORE = "files", KEY = "current", ROWS_KEY = "edited-rows";
+  var DB = "hd-tracker", STORE = "files", KEY = "current", ROWS_KEY = "edited-rows", SNAP_KEY = "weekly-snapshots";
 
   function open() {
     return new Promise(function (res, rej) {
@@ -85,6 +85,44 @@
         return new Promise(function (res) {
           var t = db.transaction(STORE, "readwrite");
           t.objectStore(STORE).delete(ROWS_KEY);
+          t.oncomplete = function () { res(true); };
+        });
+      }).catch(function () { return false; });
+    },
+
+    /* ── Weekly snapshots (for the Weekly Report) ──
+       A single Jira export only knows today's open state, so the Weekly Report
+       accumulates a small per-week summary each time a fresh export is opened.
+       Stored as ONE object { "2026-34": {...week summary...}, ... } keyed by
+       ISO week. Deliberately NOT cleared by "Change file" / new upload — the
+       whole point is that history survives across weekly uploads. Reset only
+       happens through the Weekly Report's own controls. */
+    saveSnapshots: function (obj) {
+      return open().then(function (db) {
+        return new Promise(function (res, rej) {
+          var t = db.transaction(STORE, "readwrite");
+          t.objectStore(STORE).put({ snaps: obj, savedAt: Date.now() }, SNAP_KEY);
+          t.oncomplete = function () { res(true); };
+          t.onerror = function () { rej(t.error); };
+        });
+      });
+    },
+    // Returns the snapshots object (possibly {}), never null.
+    loadSnapshots: function () {
+      return open().then(function (db) {
+        return new Promise(function (res, rej) {
+          var g = db.transaction(STORE, "readonly").objectStore(STORE).get(SNAP_KEY);
+          g.onsuccess = function () { res(g.result ? g.result.snaps || {} : {}); };
+          g.onerror = function () { rej(g.error); };
+        });
+      }).catch(function () { return {}; });
+    },
+    // Wipe all captured weekly history (explicit user action only).
+    clearSnapshots: function () {
+      return open().then(function (db) {
+        return new Promise(function (res) {
+          var t = db.transaction(STORE, "readwrite");
+          t.objectStore(STORE).delete(SNAP_KEY);
           t.oncomplete = function () { res(true); };
         });
       }).catch(function () { return false; });
