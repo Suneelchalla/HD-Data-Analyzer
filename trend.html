@@ -311,12 +311,13 @@ var RAW_ROWS = [];     // raw rows (original Excel column names) — the editabl
 var BLOB = null;       // original uploaded file, kept for "revert to upload"
 var FILENAME = "";
 /* Edit Data tab working state */
-var ED = { work:[], filters:{}, search:"", sortCol:null, sortDir:"asc", page:0, dirty:false, seq:0 };
+var ED = { work:[], filters:{}, blankFilters:{}, search:"", sortCol:null, sortDir:"asc", page:0, dirty:false, seq:0 };
 
 /* global filter + view state */
 var S = {
   tab:"perf",
   svm:"", cw:"", rc:"", issue:"", proj:"",     // global filters
+  pendAction:"",                               // pending tab: ""=all | svm | client | engg
   from:"", to:"", dlabel:"All time",
   sortCol:"total", sortDir:"desc",
   // trend tab local controls
@@ -455,6 +456,24 @@ function filtered(){
   });
 }
 function isClar(rc){ return String(rc).toLowerCase().indexOf("clarification")>-1; }
+
+/* ── NEXT-ACTION classification (mirrors the Follow-up Tracker) ──
+   For a PENDING ticket, who must act next is read from its Status. The status
+   lists below are identical to followup.html so both dashboards agree:
+     SVM    = Help Desk's own action needed
+     Engg   = sitting with the engineering / dev team
+     Client = waiting on the client (default for anything else) */
+var NA_SVM_STATUS = ["Acknowledged","Assign HD (WFC)","Clarify","Get Confirmation","On-Hold","Open","Re-open Review","Resolved","Resolved With Clarification"];
+var NA_ENGG_STATUS = ["Approval DB Admin","DB Admin Approval","DB Script Request","Development In Progress","Impact Study","POC Release Approval","Project Lead Approval","Release Plan (Production)","Release Plan (UAT or Hot Fix)","Review","Script Release","SVM Hotfix Testing","Team Lead Review & Approval","Technical Analysis","User Request"];
+function nextAction(status){ if(NA_SVM_STATUS.indexOf(status)>-1) return "svm"; if(NA_ENGG_STATUS.indexOf(status)>-1) return "engg"; return "client"; }
+var NA_META = {
+  svm:   {label:"SVM",    css:"var(--hd)",    hex:"#0F766E", icon:"🎯"},
+  client:{label:"Client", css:"var(--amber)", hex:"#B45309", icon:"💬"},
+  engg:  {label:"Engg",   css:"var(--engg)",  hex:"#5B57D8", icon:"🔧"}
+};
+/* Every ticket that isn't Closed, respecting the top filters (SVM / worker /
+   type / project / date). Matches how the Follow-up Tracker defines "open". */
+function pendingPool(){ return filtered().filter(function(t){ return t.status && t.status!=="Closed"; }); }
 
 /* ── rule-based observations (no AI) ── */
 function note(items){
@@ -643,6 +662,7 @@ function renderShell(){
   var issueList=[...new Set(RAW.map(function(t){return t.issue;}).filter(Boolean))].sort();
   var projList=[...new Set(RAW.map(function(t){return t.project;}).filter(Boolean))].sort();
   var exCount=RAW.filter(function(t){return (!t.components||!t.svm||!t.rc) && (!S.proj || t.project===S.proj);}).length;
+  var pendCount=f.filter(function(t){return t.status && t.status!=="Closed";}).length;
 
   var app=el("app");
   function fcell(label,id,allLabel,list,cur){
@@ -661,6 +681,7 @@ function renderShell(){
       '<nav class="tabs">'+
         tabBtn("perf","📊","HD Performance",f.length)+
         tabBtn("trend","📈","Trend Analysis","")+
+        tabBtn("pending","📋","Pending",pendCount)+
         tabBtn("wow","🗓️","Week on Week","")+
         tabBtn("pivots","🧮","Pivots","")+
         tabBtn("exc","⚠️","Exceptions",exCount)+
@@ -828,6 +849,7 @@ function renderMain(){
   var main=el("main");
   if(S.tab==="perf") main.innerHTML=viewPerf();
   else if(S.tab==="trend") main.innerHTML=viewTrend();
+  else if(S.tab==="pending") main.innerHTML=viewPending();
   else if(S.tab==="wow") main.innerHTML=viewWoW();
   else if(S.tab==="pivots") main.innerHTML=viewPivots();
   else if(S.tab==="data"){ main.innerHTML=viewData(); bindData(); return; }
@@ -1125,6 +1147,81 @@ function viewTrend(){
   out+='</div>';
   }
 
+  return out;
+}
+
+/* ═══════════════════════════════ VIEW: PENDING TICKETS ═══════════════════════════════
+   Same shape as Trend Analysis, but for everything that isn't Closed. Grouped by
+   current worker, each card split by whose action is next (SVM / Client / Engg).
+   The "Next action" control filters the whole view to one of those buckets. */
+function naBtn(val,label,cnt){
+  return '<button class="tmode-btn na-btn'+(S.pendAction===val?" on":"")+'" data-na="'+val+'">'+label+' <span style="opacity:.65;font-weight:600">'+cnt+'</span></button>';
+}
+function viewPending(){
+  var pend=pendingPool();
+  var cSvm=pend.filter(function(t){return nextAction(t.status)==="svm";}).length;
+  var cCl =pend.filter(function(t){return nextAction(t.status)==="client";}).length;
+  var cEg =pend.filter(function(t){return nextAction(t.status)==="engg";}).length;
+
+  var na=S.pendAction; // "" | svm | client | engg
+  var scope = na? pend.filter(function(t){return nextAction(t.status)===na;}) : pend;
+
+  // group by current worker
+  var byW={};
+  scope.forEach(function(t){
+    var k=t.currentWorker||"(unassigned)";
+    if(!byW[k]) byW[k]={svm:[],client:[],engg:[],all:[]};
+    byW[k][nextAction(t.status)].push(t);
+    byW[k].all.push(t);
+  });
+  var wKeys=Object.keys(byW).sort(function(a,b){ return byW[b].all.length-byW[a].all.length; });
+
+  var svmName=S.svm||"all SVM staff";
+  var workerNote=S.cw?(" · worker "+S.cw):"";
+  var projNote=S.proj?(" · project "+S.proj):"";
+
+  var out='';
+  out+='<div class="up" style="margin-bottom:9px"><div class="eyebrow">Pending Tickets</div>'+
+    '<h1 style="font-size:16px;font-weight:700;letter-spacing:-.3px;margin-top:2px">What\u2019s still open \u2014 and who acts next?</h1>'+
+    '<div class="sub" style="margin-top:3px">Every ticket <b>except Closed</b>, by <b>current worker</b>, split by whose action is next: <b class="hd">SVM</b> (Help Desk), <b style="color:var(--amber)">Client</b>, or <b class="eg">Engg</b>. Scope: <b>'+esc(svmName)+esc(workerNote)+esc(projNote)+'</b>.</div></div>';
+
+  // next-action filter
+  out+='<div class="card up d1 pad" style="margin-bottom:9px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
+    '<span class="flabel" style="margin-right:4px">Next action</span>'+
+    naBtn("","All",pend.length)+
+    naBtn("svm","\uD83C\uDFAF SVM",cSvm)+
+    naBtn("client","\uD83D\uDCAC Client",cCl)+
+    naBtn("engg","\uD83D\uDD27 Engg",cEg)+
+    '<span class="sub" style="margin-left:auto">SVM, Current Worker, Type &amp; date use the top filters</span>'+
+  '</div>';
+
+  if(!wKeys.length){ out+='<div class="card pad"><div class="empty">No pending tickets in this scope. \uD83C\uDF89</div></div>'; return out; }
+
+  // per-worker cards
+  out+='<div class="grid up d2" style="grid-template-columns:repeat(auto-fit,minmax(330px,1fr));margin-bottom:9px">';
+  wKeys.forEach(function(k){
+    var v=byW[k]; var s=v.svm.length, c=v.client.length, e=v.engg.length, tot=v.all.length;
+    function seg(side,n){ if(!n) return ""; var w=Math.max(pct(n,tot),9);
+      return '<div class="seg" data-wk="'+esc(k)+'" data-na="'+side+'" style="width:'+w+'%;background:'+NA_META[side].css+'">'+NA_META[side].label+' '+n+'</div>'; }
+    var parts=[];
+    if(s) parts.push('<b class="hd">'+s+'</b> awaiting SVM');
+    if(c) parts.push('<b style="color:var(--amber)">'+c+'</b> on client');
+    if(e) parts.push('<b class="eg">'+e+'</b> with engg');
+    out+='<div class="mcard">'+
+      '<div class="mtop"><span class="mmon">'+esc(k)+'</span><span class="mono sub">'+tot+' pending</span></div>'+
+      '<div class="msent">'+parts.join(' \u00b7 ')+'.</div>'+
+      '<div class="track">'+seg("svm",s)+seg("client",c)+seg("engg",e)+'</div>'+
+    '</div>';
+  });
+  out+='</div>';
+
+  var totAll=scope.length, tS=0,tC=0,tE=0;
+  scope.forEach(function(t){ var a=nextAction(t.status); if(a==="svm")tS++; else if(a==="engg")tE++; else tC++; });
+  var top=wKeys[0];
+  out+=note([
+    'Across <b>'+wKeys.length+'</b> worker'+(wKeys.length!==1?'s':'')+', <b>'+totAll.toLocaleString()+'</b> ticket'+(totAll!==1?'s':'')+' pending: <b class="hd">'+tS+' SVM</b> \u00b7 <b style="color:var(--amber)">'+tC+' client</b> \u00b7 <b class="eg">'+tE+' engg</b>.',
+    top?('Most pending: <b>'+esc(top)+'</b> with '+byW[top].all.length+' open ticket'+(byW[top].all.length!==1?'s':'')+'.'):null
+  ]);
   return out;
 }
 
@@ -1727,6 +1824,20 @@ function bindMain(){
     });
   }
 
+  if(S.tab==="pending"){
+    document.querySelectorAll(".na-btn").forEach(function(b){
+      b.onclick=function(){ S.pendAction=b.dataset.na; renderMain(); };
+    });
+    var pend=pendingPool();
+    document.querySelectorAll(".mcard .seg[data-wk][data-na]").forEach(function(s){
+      s.onclick=function(){
+        var k=s.dataset.wk, na=s.dataset.na, m=NA_META[na];
+        var tix=pend.filter(function(t){ return (t.currentWorker||"(unassigned)")===k && nextAction(t.status)===na; });
+        openModal(k+" \u00b7 "+m.label+" next action ("+tix.length+")", m.icon, m.hex, tix);
+      };
+    });
+  }
+
   if(S.tab==="pivots"){
     document.querySelectorAll("[data-piv-nav]").forEach(function(b){ b.onclick=function(){ S.pivot=b.dataset.pivNav; renderMain(); }; });
     // adjustable Issue Type · Root Cause · Status filters
@@ -1825,10 +1936,13 @@ function edCmp(a,b,col,dir){
   if(!isNaN(an)&&!isNaN(bn)&&as.trim()!==""&&bs.trim()!=="") return dir==="asc"?an-bn:bn-an;
   return dir==="asc"?as.localeCompare(bs):bs.localeCompare(as);
 }
+function edIsBlank(v){ var s=edFmt(v).trim().toLowerCase(); return s===""||s==="nan"; }
 function edView(cols){
   var l=ED.work;
   var active=Object.keys(ED.filters).filter(function(k){return ED.filters[k];});
   if(active.length) l=l.filter(function(r){ return active.every(function(k){ return edFmt(r[k]).toLowerCase().indexOf(ED.filters[k].toLowerCase())>-1; }); });
+  var blanks=Object.keys(ED.blankFilters||{}).filter(function(k){return ED.blankFilters[k];});
+  if(blanks.length) l=l.filter(function(r){ return blanks.every(function(k){ return edIsBlank(r[k]); }); });
   if(ED.search){ var q=ED.search.toLowerCase(); l=l.filter(function(r){ return cols.some(function(k){ return edFmt(r[k]).toLowerCase().indexOf(q)>-1; }); }); }
   if(ED.sortCol) l=l.slice().sort(function(a,b){ return edCmp(a,b,ED.sortCol,ED.sortDir); });
   return l;
@@ -1840,7 +1954,7 @@ function viewData(){
   var pageCount=Math.max(1,Math.ceil(view.length/ED_PAGE));
   if(ED.page>pageCount-1) ED.page=pageCount-1; if(ED.page<0) ED.page=0;
   var pageRows=view.slice(ED.page*ED_PAGE, ED.page*ED_PAGE+ED_PAGE);
-  var hasFilter=Object.keys(ED.filters).some(function(k){return ED.filters[k];})||ED.search;
+  var hasFilter=Object.keys(ED.filters).some(function(k){return ED.filters[k];})||ED.search||Object.keys(ED.blankFilters||{}).some(function(k){return ED.blankFilters[k];});
 
   var h='<div style="padding:16px 22px 40px">';
   // toolbar
@@ -1868,7 +1982,15 @@ function viewData(){
   cols.forEach(function(c){ var ar=ED.sortCol===c?(ED.sortDir==="asc"?" ↑":" ↓"):""; h+='<th class="ed-sort" data-col="'+esc(c)+'" style="'+hdr+'" title="Click to sort">'+esc(c)+'<span style="color:var(--hd);font-size:9px">'+ar+'</span></th>'; });
   h+='</tr><tr>';
   h+='<th style="position:sticky;top:31px;left:0;z-index:4;background:var(--paper);border-bottom:1px solid var(--line)"></th>';
-  cols.forEach(function(c){ h+='<th style="position:sticky;top:31px;z-index:3;background:var(--paper);border-bottom:1px solid var(--line);padding:4px 6px"><input class="ed-filter" data-col="'+esc(c)+'" value="'+esc(ED.filters[c]||"")+'" placeholder="filter…" style="width:100%;min-width:100px;border:1px solid var(--line2);border-radius:5px;padding:3px 6px;font-size:11px;color:var(--ink2);background:var(--card);font-family:var(--sans)"/></th>'; });
+  cols.forEach(function(c){
+    var bon=!!(ED.blankFilters&&ED.blankFilters[c]);
+    h+='<th style="position:sticky;top:31px;z-index:3;background:var(--paper);border-bottom:1px solid var(--line);padding:4px 6px">'+
+         '<div style="display:flex;align-items:center;gap:4px">'+
+           '<input class="ed-filter" data-col="'+esc(c)+'" value="'+esc(ED.filters[c]||"")+'" placeholder="'+(bon?'blanks only':'filter\u2026')+'" '+(bon?'disabled ':'')+'style="flex:1;min-width:64px;border:1px solid var(--line2);border-radius:5px;padding:3px 6px;font-size:11px;color:var(--ink2);background:'+(bon?'var(--paper)':'var(--card)')+';font-family:var(--sans)"/>'+
+           '<button class="ed-blank" data-col="'+esc(c)+'" title="'+(bon?'Showing only blank '+esc(c)+' \u2014 click to clear':'Show only rows where '+esc(c)+' is blank')+'" style="flex-shrink:0;border:1px solid '+(bon?'var(--hd)':'var(--line2)')+';background:'+(bon?'var(--hd)':'var(--card)')+';color:'+(bon?'#fff':'var(--muted)')+';border-radius:5px;padding:3px 7px;font-size:11px;font-weight:700;cursor:pointer;line-height:1.3">\u2205</button>'+
+         '</div>'+
+       '</th>';
+  });
   h+='</tr></thead><tbody>';
   if(!pageRows.length) h+='<tr><td colspan="'+(cols.length+1)+'" style="padding:24px;text-align:center;color:var(--faint);font-size:12px">No rows match the current filters.</td></tr>';
   pageRows.forEach(function(r){
@@ -1912,15 +2034,16 @@ function bindData(){
   main.querySelectorAll(".ed-del").forEach(function(b){ b.onclick=function(){ var id=+b.dataset.id; ED.work=ED.work.filter(function(r){return r.__id!==id;}); ED.dirty=true; reData(); }; });
   main.querySelectorAll(".ed-sort").forEach(function(th){ th.onclick=function(){ var c=th.dataset.col; if(ED.sortCol===c){ ED.sortDir=ED.sortDir==="asc"?"desc":"asc"; } else { ED.sortCol=c; ED.sortDir="asc"; } reData(); }; });
   main.querySelectorAll(".ed-filter").forEach(function(inp){ inp.oninput=function(){ var c=inp.dataset.col; if(inp.value) ED.filters[c]=inp.value; else delete ED.filters[c]; ED.page=0; ED._focus={type:"filter",col:c}; reData(); edRestoreFocus(); }; });
+  main.querySelectorAll(".ed-blank").forEach(function(b){ b.onclick=function(){ var c=b.dataset.col; if(!ED.blankFilters) ED.blankFilters={}; if(ED.blankFilters[c]){ delete ED.blankFilters[c]; } else { ED.blankFilters[c]=true; delete ED.filters[c]; } ED.page=0; reData(); }; });
   var s=el("ed-search"); if(s) s.oninput=function(){ ED.search=s.value; ED.page=0; ED._focus={type:"search"}; reData(); edRestoreFocus(); };
   main.querySelectorAll(".ed-pg").forEach(function(b){ b.onclick=function(){ var p=b.dataset.pg; var cols=edCols(); var pc=Math.max(1,Math.ceil(edView(cols).length/ED_PAGE)); if(p==="first")ED.page=0; else if(p==="prev")ED.page=Math.max(0,ED.page-1); else if(p==="next")ED.page=Math.min(pc-1,ED.page+1); else ED.page=pc-1; reData(); }; });
   var add=el("ed-add"); if(add) add.onclick=function(){ var cols=edCols(); var blank={__id:ED.seq++}; cols.forEach(function(c){blank[c]="";}); ED.work.unshift(blank); ED.dirty=true; ED.page=0; reData(); };
-  var cl=el("ed-clear"); if(cl) cl.onclick=function(){ ED.filters={}; ED.search=""; ED.page=0; reData(); };
+  var cl=el("ed-clear"); if(cl) cl.onclick=function(){ ED.filters={}; ED.blankFilters={}; ED.search=""; ED.page=0; reData(); };
   var rv=el("ed-revert"); if(rv) rv.onclick=function(){
     if(!BLOB) return;
     if(!confirm("Discard all in-app edits and reload the originally uploaded file?")) return;
     if(window.HDStore) HDStore.clearRows();
-    readFile(BLOB).then(function(rows){ rebuildFromRows(rows); if(window.HDStore) HDStore.saveRows(rows); ED._init=false; ED.filters={}; ED.search=""; ED.sortCol=null; ED.page=0; ED.dirty=false; reData(); });
+    readFile(BLOB).then(function(rows){ rebuildFromRows(rows); if(window.HDStore) HDStore.saveRows(rows); ED._init=false; ED.filters={}; ED.blankFilters={}; ED.search=""; ED.sortCol=null; ED.page=0; ED.dirty=false; reData(); });
   };
   var ap=el("ed-apply"); if(ap) ap.onclick=function(){
     if(!ED.dirty) return;
@@ -1942,9 +2065,9 @@ function handleUpload(e){
   readFile(file).then(function(rows){
     rebuildFromRows(rows);
     if(window.HDStore){ HDStore.clearRows(); HDStore.saveRows(rows); }
-    ED={ work:[], filters:{}, search:"", sortCol:null, sortDir:"asc", page:0, dirty:false, seq:0 };
+    ED={ work:[], filters:{}, blankFilters:{}, search:"", sortCol:null, sortDir:"asc", page:0, dirty:false, seq:0 };
     // reset view state on new upload
-    S.svm=""; S.cw=""; S.rc=""; S.issue=""; S.proj=""; S.from=""; S.to=""; S.dlabel="All time"; S._excFilter=null;
+    S.svm=""; S.cw=""; S.rc=""; S.issue=""; S.proj=""; S.from=""; S.to=""; S.dlabel="All time"; S._excFilter=null; S.pendAction="";
     S.tab="perf"; S.tRc="__CLAR__"; S.tStatus="Closed"; S.pivot="hdworker"; S.pIssue=""; S.pRc=""; S.pStatus=""; S._pivFor=null; S.weekA=""; S.weekB=""; S.sortCol="total"; S.sortDir="desc";
     render();
     // footer
