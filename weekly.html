@@ -43,6 +43,16 @@ select{appearance:none;background:var(--paper);border:1px solid var(--line);bord
 .btn.primary:hover{background:#26364f}
 .btn.danger:hover{border-color:var(--client2);color:var(--client)}
 .spacer{flex:1}
+/* column picker */
+.colpick{position:relative}
+.colpick>summary{list-style:none;cursor:pointer;user-select:none}
+.colpick>summary::-webkit-details-marker{display:none}
+.colpick>summary::marker{content:""}
+.colmenu{position:absolute;top:40px;left:0;z-index:30;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:var(--sh2);padding:8px;min-width:190px;display:flex;flex-direction:column;gap:3px}
+.colmenu-h{font-size:9.5px;font-weight:800;color:var(--faint);text-transform:uppercase;letter-spacing:.6px;padding:2px 6px 5px}
+.colmenu label{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink);padding:5px 6px;border-radius:6px;cursor:pointer}
+.colmenu label:hover{background:var(--paper)}
+.colmenu input{accent-color:var(--hd)}
 
 /* ── report sheet ── */
 .sheet{background:#fff;border:1px solid var(--line);border-radius:var(--r2);box-shadow:var(--sh);overflow:hidden}
@@ -75,7 +85,7 @@ select{appearance:none;background:var(--paper);border:1px solid var(--line);bord
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .chartcard{border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;background:#fff;min-width:0}
 .chartcard .ct{font-size:11.5px;font-weight:700;color:var(--ink2);margin-bottom:8px}
-.chartcard svg{width:100%;height:auto;display:block;overflow:visible}
+.chartcard svg{width:100%;height:auto;display:block;overflow:visible;max-height:210px}
 .legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px}
 .legend .li{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted);font-weight:600}
 .legend .sw{width:9px;height:9px;border-radius:2px}
@@ -150,13 +160,24 @@ select{appearance:none;background:var(--paper);border:1px solid var(--line);bord
 
 /* ── PRINT ── */
 @media print{
-  @page{ size:A4 landscape; margin:10mm; }
+  @page{ size:A4 landscape; margin:9mm; }
   body{background:#fff}
   .noprint{display:none!important}
   .wrap{max-width:none;padding:0}
   .sheet{border:none;box-shadow:none;border-radius:0}
-  .chartcard,.kpi,.matrix{break-inside:avoid}
-  .sectitle{break-after:avoid}
+  /* smaller charts so they don't sprawl / leave blank pages */
+  .chartcard svg{max-height:130px}
+  .chartcard{padding:8px 11px;break-inside:avoid}
+  .grid2,.grid3{gap:9px;break-inside:avoid}       /* keep a chart row together, but small enough to fit */
+  .kpi,.matrix,.exec,.callout{break-inside:avoid}
+  .sectitle{break-after:avoid;margin:9px 0 6px;padding:5px 11px}
+  .caption{margin:-3px 0 7px}
+  .insight{padding:6px 10px;margin-top:6px}
+  .exec{padding:11px 13px;margin-bottom:10px}
+  .kpi{padding:9px 12px}
+  .kpi .val{font-size:21px}
+  .rhead{padding:14px 20px}
+  .rbody{padding:14px 16px}
   *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
 @media (max-width:820px){ .grid3,.grid2{grid-template-columns:1fr} }
@@ -226,6 +247,9 @@ function stageOf(status){ return STAGE_MAP[status] || "Other"; }
 var PRIO_ORDER = ["Critical","High","Medium","Low","Show Stopper"];
 var PRIO_COLOR = {"Critical":"var(--p-crit)","High":"var(--p-high)","Medium":"var(--p-med)","Low":"var(--p-low)","Show Stopper":"var(--p-stop)"};
 var WEEKS_BACK = 6;
+/* Pending-list columns: default 7 (fit an A4 landscape page); user can add/remove. */
+var DEFAULT_COLS = ["key","summary","status","stage","priority","component","age"];
+var MODAL_COLS   = ["key","summary","status","stage","priority","component","worker","next","age"];
 
 /* ═══════════════════════ HELPERS ═══════════════════════ */
 function el(id){ return document.getElementById(id); }
@@ -280,7 +304,7 @@ var RAW=[];          // all normalized tickets (all clients)
 var RAW_ROWS=[];
 var FILENAME="";
 var DATA_ASOF=null;  // max created/resolved date
-var S={ client:"", na:"", status:"" };
+var S={ client:"", na:"", status:"", cols:DEFAULT_COLS.slice(), colsOpen:false };
 
 /* ═══════════════════════ PARSE ═══════════════════════ */
 function readFile(file){
@@ -317,7 +341,8 @@ function normalize(rows){
       created:toDate(pick(row,"created")),
       resolved:toDate(pick(row,"resolved")),
       na:String(pick(row,"next action")||"").trim(),
-      currentWorker:String(pick(row,"current worker")||"").trim()
+      currentWorker:String(pick(row,"current worker")||"").trim(),
+      svmInCharge:String(pick(row,"svm in charge")||"").trim()
     };
   }).filter(function(t){return t.key;});
 }
@@ -460,33 +485,36 @@ function trunc(s,n){ s=String(s||""); return s.length>n? s.slice(0,n-1)+"…" : 
 function ageDays(t){ return t.created? Math.max(0,Math.floor((Date.now()-t.created)/86400000)) : ""; }
 var CUR_WK = wkKey(new Date());
 
-/* Shared ticket table (used by the bottom lists AND the drill-down modal).
-   showNA=true adds a Next-Action badge column. Sorted oldest-first by default. */
-function ticketTable(tix,showNA){
+/* Selectable columns for the pending ticket lists. Order here = display order. */
+var COLS=[
+  {k:"key",      label:"Key",            th:'<th>Key</th>',           cell:function(t){return '<td class="key"><a href="'+JIRA+encodeURIComponent(t.key)+'" target="_blank" rel="noreferrer">'+esc(t.key)+'</a></td>';}},
+  {k:"summary",  label:"Summary",        th:'<th>Summary</th>',       cell:function(t){return '<td class="sum" title="'+esc(t.summary)+'">'+esc(trunc(t.summary,80))+'</td>';}},
+  {k:"status",   label:"Status",         th:'<th>Status</th>',        cell:function(t){return '<td><span class="pill">'+esc(t.status||"—")+'</span></td>';}},
+  {k:"stage",    label:"Stage",          th:'<th>Stage</th>',         cell:function(t){return '<td>'+esc(shortStage(t.stage))+'</td>';}},
+  {k:"priority", label:"Priority",       th:'<th>Priority</th>',      cell:function(t){return '<td>'+esc(t.priority||"—")+'</td>';}},
+  {k:"component",label:"Component",      th:'<th>Component</th>',     cell:function(t){return '<td>'+esc(t.componentsRaw||"—")+'</td>';}},
+  {k:"worker",   label:"Current Worker", th:'<th>Current Worker</th>',cell:function(t){return '<td>'+esc(t.currentWorker||"—")+'</td>';}},
+  {k:"svm",      label:"SVM In Charge",  th:'<th>SVM In Charge</th>', cell:function(t){return '<td>'+esc(t.svmInCharge||t.currentWorker||"—")+'</td>';}},
+  {k:"next",     label:"Next Action",    th:'<th>Next</th>',          cell:function(t){var na=naKey(t);return '<td>'+(na==="svm"?'<span class="badge-na svm">SVM</span>':na==="client"?'<span class="badge-na client">Client</span>':'<span class="pill">—</span>')+'</td>';}},
+  {k:"created",  label:"Created",        th:'<th>Created</th>',       cell:function(t){return '<td style="white-space:nowrap">'+fdate(t.created)+'</td>';}},
+  {k:"age",      label:"Age (days)",     th:'<th>Age (d)</th>',       cell:function(t){return '<td class="num">'+ageDays(t)+'</td>';}}
+];
+/* Shared ticket table. colKeys = array of column keys to show (in COLS order).
+   Sorted oldest-first by default. */
+function ticketTable(tix,colKeys){
   if(!tix.length) return '<div class="empty">No tickets.</div>';
+  var cols=COLS.filter(function(c){ return colKeys && colKeys.indexOf(c.k)>-1; });
+  if(!cols.length) cols=COLS.filter(function(c){ return DEFAULT_COLS.indexOf(c.k)>-1; });
   var list=tix.slice().sort(function(a,b){ return (ageDays(b)||0)-(ageDays(a)||0); });
-  var head='<tr><th>Key</th><th>Summary</th><th>Status</th><th>Stage</th><th>Priority</th><th>Component</th><th>Current Worker</th>'+(showNA?'<th>Next</th>':'')+'<th>Age (d)</th></tr>';
-  var body=list.map(function(t){
-    var na=naKey(t);
-    return '<tr>'+
-      '<td class="key"><a href="'+JIRA+encodeURIComponent(t.key)+'" target="_blank" rel="noreferrer">'+esc(t.key)+'</a></td>'+
-      '<td class="sum" title="'+esc(t.summary)+'">'+esc(trunc(t.summary,80))+'</td>'+
-      '<td><span class="pill">'+esc(t.status||"—")+'</span></td>'+
-      '<td>'+esc(shortStage(t.stage))+'</td>'+
-      '<td>'+esc(t.priority||"—")+'</td>'+
-      '<td>'+esc(t.componentsRaw||"—")+'</td>'+
-      '<td>'+esc(t.currentWorker||"—")+'</td>'+
-      (showNA?'<td>'+(na==="svm"?'<span class="badge-na svm">SVM</span>':na==="client"?'<span class="badge-na client">Client</span>':'<span class="pill">—</span>')+'</td>':'')+
-      '<td class="num">'+ageDays(t)+'</td>'+
-    '</tr>';
-  }).join("");
+  var head='<tr>'+cols.map(function(c){return c.th;}).join("")+'</tr>';
+  var body=list.map(function(t){ return '<tr>'+cols.map(function(c){return c.cell(t);}).join("")+'</tr>'; }).join("");
   return '<div class="ttable-wrap"><table class="ttable"><thead>'+head+'</thead><tbody>'+body+'</tbody></table></div>';
 }
 function openModal(title,tix){
   closeModal();
   var ov=document.createElement("div"); ov.className="ovl noprint"; ov.id="ovl";
   ov.innerHTML='<div class="modal"><div class="mhead"><span class="mt">'+esc(title)+' · '+tix.length+' ticket'+(tix.length!==1?'s':'')+'</span><button id="mclose" title="Close (Esc)">✕</button></div>'+
-    '<div class="mbody">'+ticketTable(tix,true)+'</div></div>';
+    '<div class="mbody">'+ticketTable(tix,MODAL_COLS)+'</div></div>';
   ov.addEventListener("click",function(e){ if(e.target===ov) closeModal(); });
   document.body.appendChild(ov);
   var b=el("mclose"); if(b) b.onclick=closeModal;
@@ -573,6 +601,12 @@ function render(){
       '<span class="flabel">Status</span>'+
       '<select id="stsel"><option value="">All statuses</option>'+statusList.map(function(s){return '<option value="'+esc(s)+'" '+(S.status===s?"selected":"")+'>'+esc(s)+'</option>';}).join("")+'</select>'+
       ((S.na||S.status)?'<button class="btn" id="clrsel">✕ Clear</button>':'')+
+      '<details class="colpick" '+(S.colsOpen?'open':'')+'>'+
+        '<summary class="btn">🧩 Columns ('+S.cols.length+')</summary>'+
+        '<div class="colmenu"><div class="colmenu-h">Pending-list columns</div>'+
+          COLS.map(function(c){ var on=S.cols.indexOf(c.k)>-1; return '<label><input type="checkbox" class="colchk" data-k="'+c.k+'" '+(on?'checked':'')+'> '+esc(c.label)+'</label>'; }).join("")+
+        '</div>'+
+      '</details>'+
       '<span class="spacer"></span>'+
       '<button class="btn primary" id="printbtn">🖨️ Print / Save PDF</button>'+
       '<button class="btn" id="backbtn">← Launcher</button>'+
@@ -667,12 +701,12 @@ function render(){
 
         /* ── Pending ticket lists (printed in the PDF) ── */
         '<div class="sectitle">Pending Tickets — with SVM <span class="sub">'+svmPending.length+' open · our action</span></div>'+
-        caption('Open tickets where the next action is on the SVM Help Desk side. Oldest first.')+
-        ticketTable(svmPending,false)+
+        caption('Open tickets where the next action is on the SVM Help Desk side. Oldest first. <b class="noprint">Use “🧩 Columns” up top to choose what shows.</b>')+
+        ticketTable(svmPending,S.cols)+
 
         '<div class="sectitle">Pending Tickets — with Client <span class="sub">'+clientPending.length+' open · awaiting your team</span></div>'+
         caption('Open tickets waiting on the client. Oldest first.')+
-        ticketTable(clientPending,false)+
+        ticketTable(clientPending,S.cols)+
 
         '<div class="foot"><b>'+esc(FILENAME||"—")+'</b> · '+RAW.length.toLocaleString()+' tickets loaded · '+ct.length.toLocaleString()+' for '+esc(S.client)+' · HD Weekly Report · files stay on your device</div>'+
       '</div>'+
@@ -701,6 +735,13 @@ function bind(){
   el("nasel").onchange=function(e){ S.na=e.target.value; render(); };
   el("stsel").onchange=function(e){ S.status=e.target.value; render(); };
   var clr=el("clrsel"); if(clr) clr.onclick=function(){ S.na=""; S.status=""; render(); };
+  var dp=document.querySelector(".colpick"); if(dp) dp.addEventListener("toggle",function(){ S.colsOpen=dp.open; });
+  document.querySelectorAll(".colchk").forEach(function(chk){ chk.onchange=function(){
+    var k=chk.dataset.k;
+    if(chk.checked){ if(S.cols.indexOf(k)<0) S.cols.push(k); }
+    else { S.cols=S.cols.filter(function(x){return x!==k;}); }
+    S.colsOpen=true; render();
+  }; });
   el("printbtn").onclick=function(){ window.print(); };
   el("backbtn").onclick=function(){ window.location.href="index.html"; };
   bindDrill();
