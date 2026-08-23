@@ -280,7 +280,7 @@ var RAW=[];          // all normalized tickets (all clients)
 var RAW_ROWS=[];
 var FILENAME="";
 var DATA_ASOF=null;  // max created/resolved date
-var S={ client:"" };
+var S={ client:"", na:"", status:"" };
 
 /* ═══════════════════════ PARSE ═══════════════════════ */
 function readFile(file){
@@ -330,7 +330,14 @@ function computeAsOf(){
 }
 
 /* ═══════════════════════ DERIVE (selected client) ═══════════════════════ */
-function clientTickets(){ return RAW.filter(function(t){ return (t.client||"(no project)")===S.client; }); }
+function clientTickets(){
+  return RAW.filter(function(t){
+    if((t.client||"(no project)")!==S.client) return false;
+    if(S.na && naKey(t)!==S.na) return false;
+    if(S.status && t.status!==S.status) return false;
+    return true;
+  });
+}
 
 function kpis(ct){
   var open=ct.filter(isOpen);
@@ -501,6 +508,11 @@ function clientList(){
 function render(){
   var clients=clientList();
   if(!S.client && clients.length) S.client=clients[0].name;
+  // option lists for the Next-action / Status filters (scoped to the selected client)
+  var clientAll=RAW.filter(function(t){ return (t.client||"(no project)")===S.client; });
+  var statusList=Object.keys(clientAll.reduce(function(a,t){ if(t.status)a[t.status]=1; return a; },{})).sort();
+  var naHasUnset=clientAll.some(function(t){ return naKey(t)==="unset"; });
+  if(S.status && statusList.indexOf(S.status)<0) S.status="";   // drop stale status when switching client
   var ct=clientTickets();
   var K=kpis(ct);
   var weeks=lastWeeks(WEEKS_BACK);
@@ -551,6 +563,16 @@ function render(){
     '<div class="controls noprint">'+
       '<span class="flabel">Client</span>'+
       '<select id="csel">'+clients.map(function(c){return '<option value="'+esc(c.name)+'" '+(c.name===S.client?"selected":"")+'>'+esc(c.name)+' ('+c.n+')</option>';}).join("")+'</select>'+
+      '<span class="flabel">Next action</span>'+
+      '<select id="nasel">'+
+        '<option value="" '+(S.na===""?"selected":"")+'>All</option>'+
+        '<option value="svm" '+(S.na==="svm"?"selected":"")+'>SVM</option>'+
+        '<option value="client" '+(S.na==="client"?"selected":"")+'>Client</option>'+
+        (naHasUnset?'<option value="unset" '+(S.na==="unset"?"selected":"")+'>Unset</option>':'')+
+      '</select>'+
+      '<span class="flabel">Status</span>'+
+      '<select id="stsel"><option value="">All statuses</option>'+statusList.map(function(s){return '<option value="'+esc(s)+'" '+(S.status===s?"selected":"")+'>'+esc(s)+'</option>';}).join("")+'</select>'+
+      ((S.na||S.status)?'<button class="btn" id="clrsel">✕ Clear</button>':'')+
       '<span class="spacer"></span>'+
       '<button class="btn primary" id="printbtn">🖨️ Print / Save PDF</button>'+
       '<button class="btn" id="backbtn">← Launcher</button>'+
@@ -563,6 +585,7 @@ function render(){
           '<div class="kicker">Weekly Report</div>'+
           '<h1>'+esc(S.client)+'</h1>'+
           '<div class="meta">Generated '+fdt(new Date())+' &nbsp;·&nbsp; data as of '+fdate(DATA_ASOF)+' &nbsp;·&nbsp; '+esc(FILENAME||"—")+'</div>'+
+          ((S.na||S.status)?'<div class="meta" style="color:var(--client);font-weight:600">Filtered: '+[ (S.na?"Next action = "+(S.na==="svm"?"SVM":S.na==="client"?"Client":"Unset"):""), (S.status?"Status = "+esc(S.status):"") ].filter(Boolean).join(" · ")+'</div>':'')+
         '</div>'+
         '<div class="asof"><div class="box">Reporting window<br><b>'+wkLabel(weeks[0])+' → '+wkLabel(weeks[weeks.length-1])+'</b></div></div>'+
       '</div>'+
@@ -674,7 +697,10 @@ function currentStageHTML(rows){
 
 /* ═══════════════════════ EVENTS ═══════════════════════ */
 function bind(){
-  el("csel").onchange=function(e){ S.client=e.target.value; render(); };
+  el("csel").onchange=function(e){ S.client=e.target.value; S.status=""; render(); };
+  el("nasel").onchange=function(e){ S.na=e.target.value; render(); };
+  el("stsel").onchange=function(e){ S.status=e.target.value; render(); };
+  var clr=el("clrsel"); if(clr) clr.onclick=function(){ S.na=""; S.status=""; render(); };
   el("printbtn").onclick=function(){ window.print(); };
   el("backbtn").onclick=function(){ window.location.href="index.html"; };
   bindDrill();
