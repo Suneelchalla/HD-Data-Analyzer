@@ -428,6 +428,7 @@ function normalize(rows){
       project:String(pick(row,"project")||"").trim(),
       priority:String(pick(row,"priority")||"").trim(),
       currentWorker:String(pick(row,"current worker")||"").trim(),
+      nextActionRaw:String(pick(row,"next action")||"").trim(),
       typeOfFix:String(pick(row,"type of fix")||"").trim(),
       screenName:String(pick(row,"screen name")||"").trim(),
       menuHead:String(pick(row,"menu head")||"").trim(),
@@ -457,19 +458,21 @@ function filtered(){
 }
 function isClar(rc){ return String(rc).toLowerCase().indexOf("clarification")>-1; }
 
-/* ── NEXT-ACTION classification (mirrors the Follow-up Tracker) ──
-   For a PENDING ticket, who must act next is read from its Status. The status
-   lists below are identical to followup.html so both dashboards agree:
-     SVM    = Help Desk's own action needed
-     Engg   = sitting with the engineering / dev team
-     Client = waiting on the client (default for anything else) */
-var NA_SVM_STATUS = ["Acknowledged","Assign HD (WFC)","Clarify","Get Confirmation","On-Hold","Open","Re-open Review","Resolved","Resolved With Clarification"];
-var NA_ENGG_STATUS = ["Approval DB Admin","DB Admin Approval","DB Script Request","Development In Progress","Impact Study","POC Release Approval","Project Lead Approval","Release Plan (Production)","Release Plan (UAT or Hot Fix)","Review","Script Release","SVM Hotfix Testing","Team Lead Review & Approval","Technical Analysis","User Request"];
-function nextAction(status){ if(NA_SVM_STATUS.indexOf(status)>-1) return "svm"; if(NA_ENGG_STATUS.indexOf(status)>-1) return "engg"; return "client"; }
+/* ── NEXT-ACTION (read from the Jira "Next Action" column) ──
+   The export carries an explicit Next Action per ticket — "SVM" (Help Desk to
+   act) or "CLIENT" (waiting on the client). It's a pending-only field: closed
+   tickets leave it blank. Anything blank/other lands in an "Unset" bucket that
+   only surfaces when non-empty. */
+function naKey(t){
+  var v=String(t&&t.nextActionRaw||"").trim().toUpperCase();
+  if(v==="SVM") return "svm";
+  if(v==="CLIENT") return "client";
+  return "unset";
+}
 var NA_META = {
   svm:   {label:"SVM",    css:"var(--hd)",    hex:"#0F766E", icon:"🎯"},
   client:{label:"Client", css:"var(--amber)", hex:"#B45309", icon:"💬"},
-  engg:  {label:"Engg",   css:"var(--engg)",  hex:"#5B57D8", icon:"🔧"}
+  unset: {label:"Unset",  css:"var(--faint)", hex:"#9AA7B8", icon:"❔"}
 };
 /* Every ticket that isn't Closed, respecting the top filters (SVM / worker /
    type / project / date). Matches how the Follow-up Tracker defines "open". */
@@ -1152,26 +1155,26 @@ function viewTrend(){
 
 /* ═══════════════════════════════ VIEW: PENDING TICKETS ═══════════════════════════════
    Same shape as Trend Analysis, but for everything that isn't Closed. Grouped by
-   current worker, each card split by whose action is next (SVM / Client / Engg).
+   current worker, each card split by the ticket's Next Action (SVM / Client).
    The "Next action" control filters the whole view to one of those buckets. */
 function naBtn(val,label,cnt){
   return '<button class="tmode-btn na-btn'+(S.pendAction===val?" on":"")+'" data-na="'+val+'">'+label+' <span style="opacity:.65;font-weight:600">'+cnt+'</span></button>';
 }
 function viewPending(){
   var pend=pendingPool();
-  var cSvm=pend.filter(function(t){return nextAction(t.status)==="svm";}).length;
-  var cCl =pend.filter(function(t){return nextAction(t.status)==="client";}).length;
-  var cEg =pend.filter(function(t){return nextAction(t.status)==="engg";}).length;
+  var cSvm=pend.filter(function(t){return naKey(t)==="svm";}).length;
+  var cCl =pend.filter(function(t){return naKey(t)==="client";}).length;
+  var cUn =pend.filter(function(t){return naKey(t)==="unset";}).length;
 
-  var na=S.pendAction; // "" | svm | client | engg
-  var scope = na? pend.filter(function(t){return nextAction(t.status)===na;}) : pend;
+  var na=S.pendAction; // "" | svm | client | unset
+  var scope = na? pend.filter(function(t){return naKey(t)===na;}) : pend;
 
   // group by current worker
   var byW={};
   scope.forEach(function(t){
     var k=t.currentWorker||"(unassigned)";
-    if(!byW[k]) byW[k]={svm:[],client:[],engg:[],all:[]};
-    byW[k][nextAction(t.status)].push(t);
+    if(!byW[k]) byW[k]={svm:[],client:[],unset:[],all:[]};
+    byW[k][naKey(t)].push(t);
     byW[k].all.push(t);
   });
   var wKeys=Object.keys(byW).sort(function(a,b){ return byW[b].all.length-byW[a].all.length; });
@@ -1183,15 +1186,15 @@ function viewPending(){
   var out='';
   out+='<div class="up" style="margin-bottom:9px"><div class="eyebrow">Pending Tickets</div>'+
     '<h1 style="font-size:16px;font-weight:700;letter-spacing:-.3px;margin-top:2px">What\u2019s still open \u2014 and who acts next?</h1>'+
-    '<div class="sub" style="margin-top:3px">Every ticket <b>except Closed</b>, by <b>current worker</b>, split by whose action is next: <b class="hd">SVM</b> (Help Desk), <b style="color:var(--amber)">Client</b>, or <b class="eg">Engg</b>. Scope: <b>'+esc(svmName)+esc(workerNote)+esc(projNote)+'</b>.</div></div>';
+    '<div class="sub" style="margin-top:3px">Every ticket <b>except Closed</b>, by <b>current worker</b>, split by the <b>Next Action</b> on each ticket: <b class="hd">SVM</b> (Help Desk) or <b style="color:var(--amber)">Client</b>'+(cUn?', with anything unset shown separately':'')+'. Scope: <b>'+esc(svmName)+esc(workerNote)+esc(projNote)+'</b>.</div></div>';
 
-  // next-action filter
+  // next-action filter (Unset only offered when present)
   out+='<div class="card up d1 pad" style="margin-bottom:9px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">'+
     '<span class="flabel" style="margin-right:4px">Next action</span>'+
     naBtn("","All",pend.length)+
     naBtn("svm","\uD83C\uDFAF SVM",cSvm)+
     naBtn("client","\uD83D\uDCAC Client",cCl)+
-    naBtn("engg","\uD83D\uDD27 Engg",cEg)+
+    (cUn?naBtn("unset","\u2754 Unset",cUn):"")+
     '<span class="sub" style="margin-left:auto">SVM, Current Worker, Type &amp; date use the top filters</span>'+
   '</div>';
 
@@ -1200,26 +1203,26 @@ function viewPending(){
   // per-worker cards
   out+='<div class="grid up d2" style="grid-template-columns:repeat(auto-fit,minmax(330px,1fr));margin-bottom:9px">';
   wKeys.forEach(function(k){
-    var v=byW[k]; var s=v.svm.length, c=v.client.length, e=v.engg.length, tot=v.all.length;
+    var v=byW[k]; var s=v.svm.length, c=v.client.length, u=v.unset.length, tot=v.all.length;
     function seg(side,n){ if(!n) return ""; var w=Math.max(pct(n,tot),9);
       return '<div class="seg" data-wk="'+esc(k)+'" data-na="'+side+'" style="width:'+w+'%;background:'+NA_META[side].css+'">'+NA_META[side].label+' '+n+'</div>'; }
     var parts=[];
     if(s) parts.push('<b class="hd">'+s+'</b> awaiting SVM');
     if(c) parts.push('<b style="color:var(--amber)">'+c+'</b> on client');
-    if(e) parts.push('<b class="eg">'+e+'</b> with engg');
+    if(u) parts.push('<b style="color:var(--muted)">'+u+'</b> unset');
     out+='<div class="mcard">'+
       '<div class="mtop"><span class="mmon">'+esc(k)+'</span><span class="mono sub">'+tot+' pending</span></div>'+
       '<div class="msent">'+parts.join(' \u00b7 ')+'.</div>'+
-      '<div class="track">'+seg("svm",s)+seg("client",c)+seg("engg",e)+'</div>'+
+      '<div class="track">'+seg("svm",s)+seg("client",c)+seg("unset",u)+'</div>'+
     '</div>';
   });
   out+='</div>';
 
-  var totAll=scope.length, tS=0,tC=0,tE=0;
-  scope.forEach(function(t){ var a=nextAction(t.status); if(a==="svm")tS++; else if(a==="engg")tE++; else tC++; });
+  var totAll=scope.length, tS=0,tC=0,tU=0;
+  scope.forEach(function(t){ var a=naKey(t); if(a==="svm")tS++; else if(a==="unset")tU++; else tC++; });
   var top=wKeys[0];
   out+=note([
-    'Across <b>'+wKeys.length+'</b> worker'+(wKeys.length!==1?'s':'')+', <b>'+totAll.toLocaleString()+'</b> ticket'+(totAll!==1?'s':'')+' pending: <b class="hd">'+tS+' SVM</b> \u00b7 <b style="color:var(--amber)">'+tC+' client</b> \u00b7 <b class="eg">'+tE+' engg</b>.',
+    'Across <b>'+wKeys.length+'</b> worker'+(wKeys.length!==1?'s':'')+', <b>'+totAll.toLocaleString()+'</b> ticket'+(totAll!==1?'s':'')+' pending: <b class="hd">'+tS+' SVM</b> \u00b7 <b style="color:var(--amber)">'+tC+' client</b>'+(tU?' \u00b7 <b style="color:var(--muted)">'+tU+' unset</b>':'')+'.',
     top?('Most pending: <b>'+esc(top)+'</b> with '+byW[top].all.length+' open ticket'+(byW[top].all.length!==1?'s':'')+'.'):null
   ]);
   return out;
@@ -1832,7 +1835,7 @@ function bindMain(){
     document.querySelectorAll(".mcard .seg[data-wk][data-na]").forEach(function(s){
       s.onclick=function(){
         var k=s.dataset.wk, na=s.dataset.na, m=NA_META[na];
-        var tix=pend.filter(function(t){ return (t.currentWorker||"(unassigned)")===k && nextAction(t.status)===na; });
+        var tix=pend.filter(function(t){ return (t.currentWorker||"(unassigned)")===k && naKey(t)===na; });
         openModal(k+" \u00b7 "+m.label+" next action ("+tix.length+")", m.icon, m.hex, tix);
       };
     });
