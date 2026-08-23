@@ -281,7 +281,7 @@ h1 .two{background:linear-gradient(100deg,var(--blue) 0%,#3A86C9 45%,var(--teal)
                 <span class="num" id="fcount">0</span> tickets loaded
                 <span class="sep">·</span> feeding all three
                 <span class="sep" id="fsep" style="display:none">·</span>
-                <span id="fdaterange" style="display:none">resolved <span class="rng" id="fmindate">—</span> → <span class="rng" id="fmaxdate">—</span></span>
+                <span id="fdaterange" style="display:none">created <span class="rng" id="fcmin">—</span> → <span class="rng" id="fcmax">—</span> <span class="sep">·</span> resolved <span class="rng" id="frmin">—</span> → <span class="rng" id="frmax">—</span></span>
               </div>
             </div>
             <button class="ghost" id="changeBtn">Change file</button>
@@ -406,16 +406,18 @@ function countTickets(file){
             || wb.SheetNames.find(function(s){return s.toLowerCase().indexOf("issue")>-1;})
             || wb.SheetNames[1] || wb.SheetNames[0];
         var rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{defval:""});
-        var minD=null,maxD=null;
+        var cMin=null,cMax=null,rMin=null,rMax=null;
+        function upd(v,isC){ if(!v)return; var dt=v instanceof Date?v:new Date(v); if(isNaN(dt))return;
+          if(isC){ if(!cMin||dt<cMin)cMin=dt; if(!cMax||dt>cMax)cMax=dt; }
+          else   { if(!rMin||dt<rMin)rMin=dt; if(!rMax||dt>rMax)rMax=dt; } }
         rows.forEach(function(row){
-          var d=row["Resolved"]||row["resolved"]||row["Created"]||row["created"]; if(!d)return;
-          var dt=d instanceof Date?d:new Date(d); if(isNaN(dt))return;
-          if(!minD||dt<minD)minD=dt; if(!maxD||dt>maxD)maxD=dt;
+          upd(row["Created"]||row["created"], true);
+          upd(row["Resolved"]||row["resolved"], false);
         });
-        res({count:rows.length,minDate:minD,maxDate:maxD});
-      }catch(err){ res({count:null,minDate:null,maxDate:null}); }
+        res({count:rows.length,cMin:cMin,cMax:cMax,rMin:rMin,rMax:rMax});
+      }catch(err){ res({count:null}); }
     };
-    r.onerror=function(){ res({count:null,minDate:null,maxDate:null}); };
+    r.onerror=function(){ res({count:null}); };
     r.readAsArrayBuffer(file);
   });
 }
@@ -430,9 +432,9 @@ function showLoaded(name,info){
   el("fname").textContent=name;
   el("fcount").textContent=(count==null?"—":(typeof count==="number"?count.toLocaleString():count));
   var dr=el("fdaterange");
-  if(dr&&info&&info.minDate&&info.maxDate){
-    el("fmindate").textContent=fmtDate(info.minDate);
-    el("fmaxdate").textContent=fmtDate(info.maxDate);
+  if(dr&&info&&(info.cMin||info.rMin)){
+    el("fcmin").textContent=fmtDate(info.cMin); el("fcmax").textContent=fmtDate(info.cMax);
+    el("frmin").textContent=fmtDate(info.rMin); el("frmax").textContent=fmtDate(info.rMax);
     dr.style.display="inline"; el("fsep").style.display="inline";
   }
   var sp=el("status"); sp.classList.add("live");
