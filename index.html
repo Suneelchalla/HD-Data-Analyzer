@@ -101,6 +101,7 @@ h1 .two{background:linear-gradient(100deg,var(--blue) 0%,#3A86C9 45%,var(--teal)
 .stage.live .flow{opacity:1;animation:march 1.1s linear infinite}
 .flow.fu{stroke:var(--blue);filter:drop-shadow(0 0 4px var(--blue-glow))}
 .flow.tr{stroke:var(--teal);filter:drop-shadow(0 0 4px var(--teal-glow))}
+.flow.wr{stroke:var(--amber);filter:drop-shadow(0 0 4px rgba(180,83,9,.35))}
 @keyframes march{to{stroke-dashoffset:-42}}
 
 .source{position:relative;z-index:2;background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--sh);overflow:hidden}
@@ -130,7 +131,7 @@ h1 .two{background:linear-gradient(100deg,var(--blue) 0%,#3A86C9 45%,var(--teal)
 
 .fork{height:52px}
 
-.cards{display:grid;grid-template-columns:1fr 1fr;gap:16px;position:relative;z-index:2}
+.cards{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;position:relative;z-index:2}
 .card{position:relative;display:block;border-radius:18px;padding:18px 18px 16px;overflow:hidden;background:var(--card);border:1px solid var(--line);box-shadow:var(--sh);transition:transform .2s,box-shadow .25s,border-color .2s,opacity .35s,filter .35s}
 .card::after{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:var(--line);transition:background .35s,box-shadow .35s}
 .card .top{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px}
@@ -155,6 +156,10 @@ h1 .two{background:linear-gradient(100deg,var(--blue) 0%,#3A86C9 45%,var(--teal)
 .cards:not(.locked) .card.tr::after{background:var(--teal);box-shadow:0 0 14px var(--teal-glow)}
 .cards:not(.locked) .card.tr .badge{background:var(--teal-soft);border-color:var(--teal-line)}
 .cards:not(.locked) .card.tr .go{color:var(--teal)}
+.cards:not(.locked) .card.wr{border-color:#F5D9A8}
+.cards:not(.locked) .card.wr::after{background:var(--amber);box-shadow:0 0 14px rgba(180,83,9,.3)}
+.cards:not(.locked) .card.wr .badge{background:#FEF3E2;border-color:#F5D9A8}
+.cards:not(.locked) .card.wr .go{color:var(--amber)}
 .cards:not(.locked) .card:hover{transform:translateY(-4px);box-shadow:var(--sh2)}
 .cards:not(.locked) .card:hover .go .ar{transform:translateX(4px)}
 
@@ -232,8 +237,8 @@ h1 .two{background:linear-gradient(100deg,var(--blue) 0%,#3A86C9 45%,var(--teal)
     <!-- left hero -->
     <div class="rise d1">
       <div class="eyebrow">SVM Help Desk · analytics</div>
-      <h1>One export.<br><span class="two">Two lenses.</span></h1>
-      <p class="lead">Drop a single Jira export and it powers both dashboards at once — the <b class="b">Follow-up Tracker</b> for daily triage and the <b class="t">HD Trend Tracker</b> for the bigger picture. Right-click a card to open it in its own tab.</p>
+      <h1>One export.<br><span class="two">Three lenses.</span></h1>
+      <p class="lead">Drop a single Jira export and it powers every dashboard at once — the <b class="b">Follow-up Tracker</b> for daily triage, the <b class="t">HD Trend Tracker</b> for the bigger picture, and the <b style="color:var(--amber);font-weight:600">Weekly Report</b> for client-ready summaries. Right-click a card to open it in its own tab.</p>
     </div>
 
     <!-- right stage -->
@@ -241,8 +246,10 @@ h1 .two{background:linear-gradient(100deg,var(--blue) 0%,#3A86C9 45%,var(--teal)
       <svg id="wires" preserveAspectRatio="none">
         <path class="track" id="trackFU"></path>
         <path class="track" id="trackTR"></path>
+        <path class="track" id="trackWR"></path>
         <path class="flow fu" id="flowFU"></path>
         <path class="flow tr" id="flowTR"></path>
+        <path class="flow wr" id="flowWR"></path>
       </svg>
 
       <div class="source" id="sourceNode">
@@ -272,7 +279,7 @@ h1 .two{background:linear-gradient(100deg,var(--blue) 0%,#3A86C9 45%,var(--teal)
               <div class="fname" id="fname">—</div>
               <div class="fmeta">
                 <span class="num" id="fcount">0</span> tickets loaded
-                <span class="sep">·</span> feeding both
+                <span class="sep">·</span> feeding all three
                 <span class="sep" id="fsep" style="display:none">·</span>
                 <span id="fdaterange" style="display:none">resolved <span class="rng" id="fmindate">—</span> → <span class="rng" id="fmaxdate">—</span></span>
               </div>
@@ -296,7 +303,14 @@ h1 .two{background:linear-gradient(100deg,var(--blue) 0%,#3A86C9 45%,var(--teal)
           <div class="top"><div class="badge">📈</div><span class="go">Open <span class="ar">→</span></span></div>
           <h2>HD Trend Tracker</h2>
           <p>The bigger picture: HD resolved alone vs. escalated to engineering, month by month and week by week, with pivots.</p>
-          <div class="feat"><span>HD vs Engg</span><span>Trends</span><span>Week on week</span><span>Pivots</span><span>Exceptions</span></div>
+          <div class="feat"><span>HD vs Engg</span><span>Trends</span><span>Week on week</span><span>Pivots</span><span>Pending</span></div>
+          <div class="lock">◌ Waiting for source file</div>
+        </a>
+        <a class="card wr" id="cardWR" href="weekly.html">
+          <div class="top"><div class="badge">🗓️</div><span class="go">Open <span class="ar">→</span></span></div>
+          <h2>Weekly Report</h2>
+          <p>Client-ready weekly incident report: per-client KPIs, inflow, resolved, SVM vs client, activity stages — print or save as PDF.</p>
+          <div class="feat"><span>Per client</span><span>SVM vs Client</span><span>Stages</span><span>Print / PDF</span><span>Weekly</span></div>
           <div class="lock">◌ Waiting for source file</div>
         </a>
       </div>
@@ -365,17 +379,18 @@ function buildBackdrop(){
 
 /* ── connective wires ── */
 function drawWires(){
-  var stage=el("stage"),src=el("sourceNode"),fu=el("cardFU"),tr=el("cardTR"),svg=el("wires");
+  var stage=el("stage"),src=el("sourceNode"),fu=el("cardFU"),tr=el("cardTR"),wr=el("cardWR"),svg=el("wires");
   if(!stage||!src||!fu||!tr) return;
   var sr=stage.getBoundingClientRect();
   svg.setAttribute("viewBox","0 0 "+sr.width+" "+sr.height);
-  var s=src.getBoundingClientRect(),a=fu.getBoundingClientRect(),b=tr.getBoundingClientRect();
+  var s=src.getBoundingClientRect();
   var sx=(s.left+s.width/2)-sr.left, sy=s.bottom-sr.top;
   function pathTo(r){ var cx=(r.left+r.width/2)-sr.left, cy=r.top-sr.top, m=(sy+cy)/2;
     return "M "+sx+" "+sy+" C "+sx+" "+m+", "+cx+" "+m+", "+cx+" "+cy; }
-  var pFU=pathTo(a),pTR=pathTo(b);
+  var pFU=pathTo(fu.getBoundingClientRect()),pTR=pathTo(tr.getBoundingClientRect());
   el("trackFU").setAttribute("d",pFU); el("flowFU").setAttribute("d",pFU);
   el("trackTR").setAttribute("d",pTR); el("flowTR").setAttribute("d",pTR);
+  if(wr){ var pWR=pathTo(wr.getBoundingClientRect()); el("trackWR").setAttribute("d",pWR); el("flowWR").setAttribute("d",pWR); }
 }
 function relayout(){ buildBackdrop(); drawWires(); }
 window.addEventListener("resize", relayout);
