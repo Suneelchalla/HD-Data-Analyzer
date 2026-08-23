@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HD Weekly Report</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23B45309'/%3E%3Crect x='7' y='13' width='4' height='10' rx='1.5' fill='white'/%3E%3Crect x='14' y='9' width='4' height='14' rx='1.5' fill='white'/%3E%3Crect x='21' y='16' width='4' height='7' rx='1.5' fill='white'/%3E%3C/svg%3E">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="hd-store.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EEF1F4; --paper:#F6F8FA; --card:#FFFFFF;
+  --ink:#111A2B; --ink2:#3E4C63; --muted:#6B7A90; --faint:#9AA7B8; --line:#E3E8EE; --line2:#D2DAE3;
+  --hd:#0F766E; --hd2:#14B8A6; --hd-bg:#F0FBF9; --hd-soft:#D6F3EE;
+  --client:#B45309; --client2:#D97706; --client-bg:#FEF7EC; --client-soft:#FCE7C3;
+  --svm:#0F766E;
+  --accent:#B45309;
+  --p-crit:#9333EA; --p-high:#F0A6C0; --p-med:#F5C518; --p-low:#059669; --p-stop:#3949AB;
+  --r:12px; --r2:16px;
+  --disp:'Space Grotesk',sans-serif; --sans:'Inter',-apple-system,sans-serif; --mono:'JetBrains Mono',monospace;
+  --sh:0 1px 2px rgba(16,24,40,.05),0 1px 3px rgba(16,24,40,.04);
+  --sh2:0 6px 18px rgba(16,24,40,.09),0 2px 6px rgba(16,24,40,.05);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{font-size:14px}
+body{background:var(--bg);font-family:var(--sans);color:var(--ink);-webkit-font-smoothing:antialiased;min-height:100vh}
+h1,h2,h3,.disp{font-family:var(--disp)}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+button{cursor:pointer;font-family:inherit;transition:all .16s;border:none}
+button:active{transform:translateY(1px)}
+select,input[type=file]{font-family:var(--sans)}
+select{appearance:none;background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:8px 30px 8px 12px;font-size:12px;font-weight:600;color:var(--ink);cursor:pointer;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='11' height='11' viewBox='0 0 24 24' fill='none' stroke='%236B7A90' stroke-width='2.5'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center}
+.wrap{max-width:1180px;margin:0 auto;padding:16px 22px 60px}
+
+/* ── controls (screen only) ── */
+.controls{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:11px 14px;box-shadow:var(--sh)}
+.controls .flabel{font-size:9.5px;font-weight:700;color:var(--faint);text-transform:uppercase;letter-spacing:.7px}
+.btn{background:var(--paper);border:1px solid var(--line2);color:var(--ink2);padding:8px 13px;border-radius:9px;font-size:12px;font-weight:600;display:inline-flex;align-items:center;gap:6px}
+.btn:hover{border-color:var(--muted);color:var(--ink)}
+.btn.primary{background:var(--ink);color:#fff;border-color:var(--ink)}
+.btn.primary:hover{background:#26364f}
+.btn.danger:hover{border-color:var(--client2);color:var(--client)}
+.spacer{flex:1}
+
+/* ── report sheet ── */
+.sheet{background:#fff;border:1px solid var(--line);border-radius:var(--r2);box-shadow:var(--sh);overflow:hidden}
+.rhead{display:flex;align-items:flex-start;gap:16px;padding:20px 26px;background:linear-gradient(180deg,#F4FAFF,#EAF4FB);border-bottom:1px solid var(--line)}
+.rhead .logo{display:flex;gap:4px;align-items:flex-end;height:34px;flex-shrink:0;margin-top:3px}
+.rhead .logo i{display:block;width:9px;border-radius:2px}
+.rhead .who{flex:1;min-width:0}
+.rhead .kicker{font-size:11px;font-weight:700;color:var(--client);text-transform:uppercase;letter-spacing:2px}
+.rhead h1{font-size:30px;font-weight:700;letter-spacing:-.6px;line-height:1.05;margin-top:2px}
+.rhead .meta{font-size:11.5px;color:var(--muted);margin-top:5px;font-family:var(--mono)}
+.rhead .asof{text-align:right;flex-shrink:0}
+.rhead .asof .box{border:1px solid var(--line2);border-radius:9px;padding:7px 12px;background:#fff;font-size:10.5px;color:var(--ink2);font-family:var(--mono)}
+.rhead .asof .box b{color:var(--ink)}
+
+.rbody{padding:18px 22px 24px}
+.sectitle{font-size:12px;font-weight:800;color:var(--ink);letter-spacing:.2px;background:#DCEBF7;border-radius:7px;padding:7px 12px;margin:16px 0 11px;display:flex;align-items:center;justify-content:space-between}
+.sectitle:first-child{margin-top:0}
+.sectitle .sub{font-size:10px;font-weight:600;color:var(--muted);letter-spacing:.2px}
+
+/* KPI tiles */
+.kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:11px}
+.kpi{border:1px solid var(--line);border-radius:var(--r);padding:13px 15px;background:var(--paper);text-align:center}
+.kpi .lab{font-size:9.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.7px}
+.kpi .val{font-size:26px;font-weight:800;letter-spacing:-1px;margin-top:5px;line-height:1}
+.kpi .val.sm{font-size:19px}
+.kpi.hl{background:var(--client-bg);border-color:var(--client-soft)}
+.kpi.hl2{background:var(--hd-bg);border-color:var(--hd-soft)}
+
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.chartcard{border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;background:#fff;min-width:0}
+.chartcard .ct{font-size:11.5px;font-weight:700;color:var(--ink2);margin-bottom:8px}
+.chartcard svg{width:100%;height:auto;display:block;overflow:visible}
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px}
+.legend .li{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--muted);font-weight:600}
+.legend .sw{width:9px;height:9px;border-radius:2px}
+
+/* matrix */
+.matrix{width:100%;border-collapse:collapse;font-size:11px}
+.matrix th,.matrix td{border:1px solid var(--line);padding:5px 8px;text-align:center;white-space:nowrap}
+.matrix thead th{background:var(--paper);font-weight:800;color:var(--ink2);font-size:10px;text-transform:uppercase;letter-spacing:.3px}
+.matrix td.stage{text-align:left;font-weight:700;color:var(--ink)}
+.matrix td.cl{color:var(--client);font-weight:700;font-family:var(--mono)}
+.matrix td.sv{color:var(--hd);font-weight:700;font-family:var(--mono)}
+.matrix td.zero{color:var(--faint)}
+
+.hbar-row{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.hbar-row .lb{width:120px;font-size:10.5px;color:var(--ink2);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0}
+.hbar-row .bar{height:16px;border-radius:4px;background:var(--hd);min-width:2px}
+.hbar-row .n{font-size:10.5px;font-weight:700;color:var(--ink);font-family:var(--mono)}
+
+.banner{display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:10px;font-size:11.5px;margin-bottom:12px}
+.banner.info{background:var(--hd-bg);border:1px solid var(--hd-soft);color:var(--hd)}
+.banner.warn{background:var(--client-bg);border:1px solid var(--client-soft);color:var(--client)}
+.empty{padding:26px;text-align:center;color:var(--faint);font-size:12px}
+.foot{margin-top:18px;padding-top:12px;border-top:1px solid var(--line);font-size:10.5px;color:var(--faint);font-family:var(--mono);display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+
+.loading{height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px}
+
+/* ── PRINT ── */
+@media print{
+  @page{ size:A4 landscape; margin:10mm; }
+  body{background:#fff}
+  .noprint{display:none!important}
+  .wrap{max-width:none;padding:0}
+  .sheet{border:none;box-shadow:none;border-radius:0}
+  .chartcard,.kpi,.matrix{break-inside:avoid}
+  .sectitle{break-after:avoid}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+@media (max-width:820px){ .kpis{grid-template-columns:repeat(2,1fr)} .grid3,.grid2{grid-template-columns:1fr} }
+</style>
+</head>
+<body>
+<div id="app"><div class="loading"><div style="font-size:15px;font-weight:700">Loading Weekly Report…</div><div style="font-size:12px;color:var(--muted)">Nothing loading? <a href="index.html" style="color:var(--client);font-weight:600">Go to upload</a>.</div></div></div>
+<input type="file" id="histfile" accept=".json" style="display:none">
+
+<script>
+/* ═══════════════════════ CONFIG ═══════════════════════ */
+var JIRA = "https://svmhelpdesk.atlassian.net/browse/";
+
+/* Status → Activity Stage. Derived from your export's Status values (there is no
+   Activity Stage column). REVIEW & TWEAK this to match how the team thinks of
+   the pipeline — it drives the Activity-Stage matrix and the Stage funnels. */
+var STAGE_MAP = {
+  // Stage 1 — Analysis & Study
+  "Analysis & Study":"Stage 1 - Analysis & Study",
+  "Technical Analysis":"Stage 1 - Analysis & Study",
+  "Doubt Clarification":"Stage 1 - Analysis & Study",
+  "User Request":"Stage 1 - Analysis & Study",
+  "Sys/user configuration":"Stage 1 - Analysis & Study",
+  // Stage 2 — Fix in Progress
+  "Development In Progress":"Stage 2 - Fix in Progress",
+  "Testing In Progress":"Stage 2 - Fix in Progress",
+  "SVM Hotfix Testing":"Stage 2 - Fix in Progress",
+  "Approval DB Admin":"Stage 2 - Fix in Progress",
+  "DB Admin Approval":"Stage 2 - Fix in Progress",
+  "Team Lead Review & Approval":"Stage 2 - Fix in Progress",
+  "Clarification (Dev)":"Stage 2 - Fix in Progress",
+  "Release In Progress":"Stage 2 - Fix in Progress",
+  // Stage 3 — Under Delivery
+  "DB Script Delivered":"Stage 3 - Under Delivery",
+  "Delivered":"Stage 3 - Under Delivery",
+  "Release Move to Production":"Stage 3 - Under Delivery",
+  "Release Plan (UAT or Hot Fix)":"Stage 3 - Under Delivery",
+  "Release Plan (Production)":"Stage 3 - Under Delivery",
+  "POC Release Approval":"Stage 3 - Under Delivery",
+  "Assign to SVM Deployment Team":"Stage 3 - Under Delivery",
+  "Published":"Stage 3 - Under Delivery",
+  "Client Deployment (PROD)":"Stage 3 - Under Delivery",
+  // Stage 4 — Client Action
+  "Waiting for customer":"Stage 4 - Client Action",
+  "Confirmation":"Stage 4 - Client Action",
+  "CLIENT Approval (DB Script)":"Stage 4 - Client Action",
+  "CLIENT RELEASE APPROVAL":"Stage 4 - Client Action",
+  "Client Release Approval (PROD)":"Stage 4 - Client Action",
+  "Client Hotfix Testing":"Stage 4 - Client Action",
+  "Client Rejected (DB Script)":"Stage 4 - Client Action",
+  "Get Confirmation":"Stage 4 - Client Action",
+  // Stage 5 — Ticket Closure
+  "Closed":"Stage 5 - Ticket Closure",
+  "Resolved":"Stage 5 - Ticket Closure",
+  "Resolved With Clarification":"Stage 5 - Ticket Closure",
+  "Completed":"Stage 5 - Ticket Closure",
+  "Invoice Yet to Raise":"Stage 5 - Ticket Closure"
+};
+var STAGE_ORDER = ["Stage 1 - Analysis & Study","Stage 2 - Fix in Progress","Stage 3 - Under Delivery","Stage 4 - Client Action","Other"];
+var STAGE_ALL   = STAGE_ORDER.concat(["Stage 5 - Ticket Closure"]);
+function stageOf(status){ return STAGE_MAP[status] || "Other"; }
+
+var PRIO_ORDER = ["Critical","High","Medium","Low","Show Stopper"];
+var PRIO_COLOR = {"Critical":"var(--p-crit)","High":"var(--p-high)","Medium":"var(--p-med)","Low":"var(--p-low)","Show Stopper":"var(--p-stop)"};
+var WEEKS_BACK = 6;
+
+/* ═══════════════════════ HELPERS ═══════════════════════ */
+function el(id){ return document.getElementById(id); }
+function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function blank(v){ return v===null||v===undefined||String(v).trim()===""||String(v).trim().toLowerCase()==="nan"; }
+function toDate(v){ if(v instanceof Date) return isNaN(v)?null:v; if(blank(v)) return null; var d=new Date(v); return isNaN(d)?null:d; }
+function pct(n,d){ return d>0? Math.round(n/d*100):0; }
+function pad2(n){ return String(n).padStart(2,"0"); }
+function fdate(d){ return d? d.toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"}) : "—"; }
+function fdt(d){ return d? d.toLocaleString("en-GB",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}) : "—"; }
+function naKey(t){ var v=String(t&&t.na||"").trim().toUpperCase(); return v==="SVM"?"svm":v==="CLIENT"?"client":"unset"; }
+
+/* ISO week */
+function isoWeek(d){
+  var date=new Date(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate()));
+  var day=date.getUTCDay()||7; date.setUTCDate(date.getUTCDate()+4-day);
+  var ys=new Date(Date.UTC(date.getUTCFullYear(),0,1));
+  var wk=Math.ceil((((date-ys)/86400000)+1)/7);
+  return {year:date.getUTCFullYear(), week:wk};
+}
+function wkKey(d){ if(!d) return null; var w=isoWeek(d); return w.year+"-"+pad2(w.week); }
+function wkLabel(key){ return key? "W"+key.slice(5) : "—"; }
+function lastWeeks(n){
+  var out=[], now=new Date();
+  for(var i=n-1;i>=0;i--){ var d=new Date(now.getTime()-i*7*86400000); out.push(wkKey(d)); }
+  // dedup preserving order
+  var seen={},res=[]; out.forEach(function(k){ if(!seen[k]){seen[k]=1;res.push(k);} }); return res;
+}
+
+/* ═══════════════════════ STATE ═══════════════════════ */
+var RAW=[];          // all normalized tickets (all clients)
+var RAW_ROWS=[];
+var SNAPS={};        // { "2026-34": {week,capturedAt,fp,clients:{...}} }
+var FILENAME="";
+var DATA_ASOF=null;  // max created/resolved date
+var S={ client:"" };
+
+/* ═══════════════════════ PARSE ═══════════════════════ */
+function readFile(file){
+  return new Promise(function(res,rej){
+    var r=new FileReader();
+    r.onload=function(e){
+      try{
+        var wb=XLSX.read(e.target.result,{type:"array",cellDates:true});
+        var sn=wb.SheetNames.find(function(s){return s.toLowerCase().indexOf("jira issues")>-1;})
+          || wb.SheetNames.find(function(s){return s.toLowerCase().indexOf("issue")>-1;})
+          || wb.SheetNames[1] || wb.SheetNames[0];
+        res(XLSX.utils.sheet_to_json(wb.Sheets[sn],{defval:""}));
+      }catch(err){ rej(err); }
+    };
+    r.onerror=rej; r.readAsArrayBuffer(file);
+  });
+}
+function normalize(rows){
+  if(!rows.length) return [];
+  var keymap={}; Object.keys(rows[0]).forEach(function(k){ keymap[k.trim().toLowerCase()]=k; });
+  function pick(row){ for(var i=1;i<arguments.length;i++){ var kk=keymap[arguments[i]]; if(kk!==undefined) return row[kk]; } return ""; }
+  return rows.map(function(row){
+    var comp=String(pick(row,"components")||"").trim();
+    var status=String(pick(row,"status")||"").trim();
+    return {
+      key:String(pick(row,"key")||"").trim(),
+      summary:String(pick(row,"summary")||""),
+      client:String(pick(row,"project")||"").trim(),        // "client" = Project
+      priority:String(pick(row,"priority")||"").trim(),
+      componentsRaw:comp,
+      components: blank(comp)? [] : comp.split(";").map(function(x){return x.trim();}).filter(Boolean),
+      status:status,
+      stage:stageOf(status),
+      created:toDate(pick(row,"created")),
+      resolved:toDate(pick(row,"resolved")),
+      na:String(pick(row,"next action")||"").trim(),
+      currentWorker:String(pick(row,"current worker")||"").trim()
+    };
+  }).filter(function(t){return t.key;});
+}
+function isOpen(t){ return t.status && t.status.toLowerCase()!=="closed"; }
+
+/* ═══════════════════════ SNAPSHOT ═══════════════════════ */
+function dataFingerprint(tickets){
+  var mx=0; tickets.forEach(function(t){ [t.created,t.resolved].forEach(function(d){ if(d){var m=d.getTime(); if(m>mx)mx=m;} }); });
+  DATA_ASOF = mx? new Date(mx):null;
+  return tickets.length+"|"+mx;
+}
+function buildSnapshot(tickets){
+  var clients={};
+  tickets.forEach(function(t){
+    var c=t.client||"(no project)";
+    if(!clients[c]) clients[c]={ open:0, svmOpen:0, clientOpen:0, closedTotal:0, byStage:{}, byComponentSvm:{} };
+    var C=clients[c];
+    if(t.status && t.status.toLowerCase()==="closed"){ C.closedTotal++; return; }
+    // open ticket
+    C.open++;
+    var na=naKey(t);
+    if(na==="svm") C.svmOpen++; else if(na==="client") C.clientOpen++;
+    var st=t.stage;
+    if(!C.byStage[st]) C.byStage[st]={client:0,svm:0,unset:0};
+    C.byStage[st][na]++;
+    if(na==="svm"){ (t.components.length?t.components:["(none)"]).forEach(function(cm){ C.byComponentSvm[cm]=(C.byComponentSvm[cm]||0)+1; }); }
+  });
+  return { week:wkKey(new Date()), capturedAt:new Date().toISOString(), fp:dataFingerprint(tickets), clients:clients };
+}
+/* Capture guard: only record when the data actually changed since the last
+   capture, so re-opening stale data in a new calendar week doesn't fabricate
+   a duplicate week. */
+function maybeCapture(){
+  var fp=dataFingerprint(RAW);
+  var keys=Object.keys(SNAPS);
+  var already=keys.some(function(k){ return SNAPS[k] && SNAPS[k].fp===fp; });
+  if(already) return Promise.resolve(false);         // this exact export already snapshotted
+  var snap=buildSnapshot(RAW);
+  SNAPS[snap.week]=snap;                              // last upload of the week wins
+  return (window.HDStore? HDStore.saveSnapshots(SNAPS):Promise.resolve()).then(function(){return true;});
+}
+
+/* ═══════════════════════ DERIVE (selected client) ═══════════════════════ */
+function clientTickets(){ return RAW.filter(function(t){ return (t.client||"(no project)")===S.client; }); }
+
+function kpis(ct){
+  var open=ct.filter(isOpen);
+  var svm=open.filter(function(t){return naKey(t)==="svm";}).length;
+  var cli=open.filter(function(t){return naKey(t)==="client";}).length;
+  var base=svm+cli;
+  return { total:ct.length, open:open.length, closed:ct.length-open.length,
+           svm:svm, client:cli, svmPct:pct(svm,base), clientPct:base?100-pct(svm,base):0 };
+}
+function inflowByWeek(ct,weeks){
+  var m={}; weeks.forEach(function(w){ m[w]={}; PRIO_ORDER.forEach(function(p){m[w][p]=0;}); });
+  ct.forEach(function(t){ var k=wkKey(t.created); if(k&&m[k]!==undefined){ var p=PRIO_ORDER.indexOf(t.priority)>-1?t.priority:"Medium"; m[k][p]++; } });
+  return m;
+}
+function resolvedByWeek(ct,weeks){ var m={}; weeks.forEach(function(w){m[w]=0;}); ct.forEach(function(t){ var k=wkKey(t.resolved); if(k&&m[k]!==undefined)m[k]++; }); return m; }
+function avgResDaysByWeek(ct,weeks){
+  var acc={}; weeks.forEach(function(w){acc[w]={s:0,n:0};});
+  ct.forEach(function(t){ if(t.resolved&&t.created){ var k=wkKey(t.resolved); if(acc[k]!==undefined){ var d=(t.resolved-t.created)/86400000; if(d>=0&&d<3650){acc[k].s+=d;acc[k].n++;} } } });
+  var m={}; weeks.forEach(function(w){ m[w]= acc[w].n? Math.round(acc[w].s/acc[w].n*10)/10 : null; }); return m;
+}
+function componentOpenSvm(ct){
+  var m={};
+  ct.filter(function(t){return isOpen(t)&&naKey(t)==="svm";}).forEach(function(t){
+    (t.components.length?t.components:["(none)"]).forEach(function(cm){ m[cm]=(m[cm]||0)+1; });
+  });
+  return Object.keys(m).map(function(k){return {label:k,val:m[k]};}).sort(function(a,b){return b.val-a.val;});
+}
+/* snapshot series for selected client */
+function snapWeeksAvailable(){ return Object.keys(SNAPS).sort(); }
+function svmOpenWoW(weeks){ return weeks.map(function(w){ var s=SNAPS[w]; var c=s&&s.clients[S.client]; return c? c.svmOpen : null; }); }
+function stageMatrix(weeks){
+  // rows = STAGE_ORDER, per week {client,svm}
+  var have=weeks.filter(function(w){ return SNAPS[w]&&SNAPS[w].clients[S.client]; });
+  return { weeks:have, rows:STAGE_ORDER.map(function(st){
+    return { stage:st, cells:have.map(function(w){ var bs=SNAPS[w].clients[S.client].byStage[st]||{client:0,svm:0}; return {client:bs.client||0,svm:bs.svm||0}; }) };
+  })};
+}
+function stageFunnel(weeks,stage){
+  return weeks.map(function(w){ var s=SNAPS[w]; if(!s||!s.clients[S.client]) return null;
+    if(stage==="Stage 5 - Ticket Closure") return s.clients[S.client].closedTotal||0;
+    var bs=s.clients[S.client].byStage[stage]; return bs? (bs.client||0)+(bs.svm||0)+(bs.unset||0) : 0; });
+}
+
+/* ═══════════════════════ CHART BUILDERS (SVG) ═══════════════════════ */
+function stackedBars(weeks,byWeek,cats,colors){
+  var W=Math.max(weeks.length*70,300), H=190, padL=30, padB=26, padT=16, bw=Math.min(38, (W-padL)/weeks.length*0.6);
+  var tot=weeks.map(function(w){ return cats.reduce(function(a,c){return a+(byWeek[w][c]||0);},0); });
+  var mx=Math.max.apply(null,tot.concat([1]));
+  var ih=H-padT-padB, iw=W-padL;
+  var g=""; var out="";
+  weeks.forEach(function(w,i){
+    var x=padL+(iw*(i+0.5)/weeks.length)-bw/2, y=padT+ih, t=tot[i];
+    cats.forEach(function(c){ var v=byWeek[w][c]||0; if(!v)return; var h=v/mx*ih; y-=h;
+      out+='<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+h.toFixed(1)+'" fill="'+colors[c]+'"/>';
+      if(h>13) out+='<text x="'+(x+bw/2).toFixed(1)+'" y="'+(y+h/2+3).toFixed(1)+'" font-size="9" fill="#fff" text-anchor="middle" font-weight="700" font-family="var(--mono)">'+v+'</text>';
+    });
+    out+='<text x="'+(x+bw/2).toFixed(1)+'" y="'+(padT+ih-t/mx*ih-4).toFixed(1)+'" font-size="10" fill="var(--ink)" text-anchor="middle" font-weight="800" font-family="var(--mono)">'+t+'</text>';
+    out+='<text x="'+(x+bw/2).toFixed(1)+'" y="'+(H-8)+'" font-size="9.5" fill="var(--muted)" text-anchor="middle" font-weight="600">'+wkLabel(w)+'</text>';
+  });
+  return '<svg viewBox="0 0 '+W+' '+H+'">'+g+out+'</svg>';
+}
+function simpleBars(weeks,vals,colorArr){
+  var W=Math.max(weeks.length*64,300), H=180, padL=26, padB=26, padT=18, bw=Math.min(40,(W-padL)/weeks.length*0.6);
+  var nums=vals.map(function(v){return v==null?0:v;}); var mx=Math.max.apply(null,nums.concat([1]));
+  var ih=H-padT-padB, iw=W-padL, out="";
+  weeks.forEach(function(w,i){
+    var x=padL+(iw*(i+0.5)/weeks.length)-bw/2, v=vals[i];
+    var color=colorArr[i%colorArr.length];
+    if(v==null){ out+='<text x="'+(x+bw/2).toFixed(1)+'" y="'+(padT+ih-6)+'" font-size="9" fill="var(--faint)" text-anchor="middle">—</text>'; }
+    else { var h=v/mx*ih, y=padT+ih-h;
+      out+='<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+bw.toFixed(1)+'" height="'+h.toFixed(1)+'" rx="3" fill="'+color+'"/>';
+      out+='<text x="'+(x+bw/2).toFixed(1)+'" y="'+(y-4).toFixed(1)+'" font-size="10" fill="var(--ink)" text-anchor="middle" font-weight="800" font-family="var(--mono)">'+v+'</text>';
+    }
+    out+='<text x="'+(x+bw/2).toFixed(1)+'" y="'+(H-8)+'" font-size="9.5" fill="var(--muted)" text-anchor="middle" font-weight="600">'+wkLabel(w)+'</text>';
+  });
+  return '<svg viewBox="0 0 '+W+' '+H+'">'+out+'</svg>';
+}
+function lineChartMini(weeks,vals,color){
+  var W=Math.max(weeks.length*64,300), H=170, padL=30, padB=24, padT=20, iw=W-padL-10, ih=H-padT-padB;
+  var pts=[]; var nums=vals.filter(function(v){return v!=null;});
+  var mx=Math.max.apply(null,nums.concat([1])), mn=Math.min.apply(null,nums.concat([0]));
+  if(mx===mn)mx=mn+1;
+  function x(i){ return padL + iw*(weeks.length===1?0.5:i/(weeks.length-1)); }
+  function y(v){ return padT + ih*(1-(v-mn)/(mx-mn)); }
+  var poly=[], dots="", labels="";
+  weeks.forEach(function(w,i){ var v=vals[i]; if(v==null)return; var px=x(i),py=y(v); poly.push(px.toFixed(1)+","+py.toFixed(1));
+    dots+='<circle cx="'+px.toFixed(1)+'" cy="'+py.toFixed(1)+'" r="3.5" fill="#fff" stroke="'+color+'" stroke-width="2"/>';
+    labels+='<text x="'+px.toFixed(1)+'" y="'+(py-8).toFixed(1)+'" font-size="9.5" fill="'+color+'" text-anchor="middle" font-weight="700" font-family="var(--mono)">'+v+'</text>';
+  });
+  var xlab=""; weeks.forEach(function(w,i){ xlab+='<text x="'+x(i).toFixed(1)+'" y="'+(H-7)+'" font-size="9" fill="var(--muted)" text-anchor="middle" font-weight="600">'+wkLabel(w)+'</text>'; });
+  return '<svg viewBox="0 0 '+W+' '+H+'">'+
+    '<polyline points="'+poly.join(" ")+'" fill="none" stroke="'+color+'" stroke-width="2.2" stroke-linejoin="round"/>'+dots+labels+xlab+'</svg>';
+}
+function hbars(items,color){
+  if(!items.length) return '<div class="empty">No open SVM tickets for this client.</div>';
+  var mx=items[0].val||1;
+  return items.slice(0,14).map(function(it){ var w=Math.max(it.val/mx*100,3);
+    return '<div class="hbar-row"><span class="lb" title="'+esc(it.label)+'">'+esc(it.label)+'</span>'+
+      '<div class="bar" style="width:'+w+'%;background:'+color+'"></div><span class="n">'+it.val+'</span></div>';
+  }).join("");
+}
+
+/* ═══════════════════════ RENDER ═══════════════════════ */
+function clientList(){
+  var m={}; RAW.forEach(function(t){ var c=t.client||"(no project)"; m[c]=(m[c]||0)+1; });
+  return Object.keys(m).map(function(k){return {name:k,n:m[k]};}).sort(function(a,b){return b.n-a.n;});
+}
+function render(){
+  var clients=clientList();
+  if(!S.client && clients.length) S.client=clients[0].name;
+  var ct=clientTickets();
+  var K=kpis(ct);
+  var weeks=lastWeeks(WEEKS_BACK);
+  var inflow=inflowByWeek(ct,weeks), resolved=resolvedByWeek(ct,weeks), resDays=avgResDaysByWeek(ct,weeks);
+  var comps=componentOpenSvm(ct);
+  var snapKeys=snapWeeksAvailable();
+  var snapWeeks=weeks.filter(function(w){return SNAPS[w];});   // captured weeks within window
+  var barPalette=["#5B57D8","#B45309","#0F766E","#9333EA","#DB2777","#0891B2","#65A30D"];
+
+  var histNote = snapKeys.length>=WEEKS_BACK
+    ? '<div class="banner info noprint">📈 Weekly history: <b>&nbsp;'+snapKeys.length+' weeks captured</b>. Snapshot-based charts below are complete.</div>'
+    : '<div class="banner warn noprint">🗓️ Weekly history is still building — <b>&nbsp;'+snapKeys.length+' of '+WEEKS_BACK+' week(s) captured</b>. The SVM-open, activity-stage and stage-funnel charts fill in each week you open a fresh export. (Inflow &amp; resolved trends are exact from this export.)</div>';
+
+  var app=el("app");
+  app.innerHTML=''+
+  /* controls */
+  '<div class="wrap">'+
+    '<div class="controls noprint">'+
+      '<span class="flabel">Client</span>'+
+      '<select id="csel">'+clients.map(function(c){return '<option value="'+esc(c.name)+'" '+(c.name===S.client?"selected":"")+'>'+esc(c.name)+' ('+c.n+')</option>';}).join("")+'</select>'+
+      '<span class="spacer"></span>'+
+      '<button class="btn primary" id="printbtn">🖨️ Print / Save PDF</button>'+
+      '<button class="btn" id="expbtn">⬇ Export history</button>'+
+      '<button class="btn" id="impbtn">⬆ Import history</button>'+
+      '<button class="btn danger" id="rstbtn">↺ Reset history</button>'+
+      '<button class="btn" id="backbtn">← Launcher</button>'+
+    '</div>'+
+    histNote+
+    /* the printable sheet */
+    '<div class="sheet" id="sheet">'+
+      '<div class="rhead">'+
+        '<div class="logo"><i style="height:16px;background:var(--hd)"></i><i style="height:30px;background:var(--hd2)"></i><i style="height:13px;background:var(--client2)"></i><i style="height:24px;background:var(--client)"></i></div>'+
+        '<div class="who">'+
+          '<div class="kicker">Weekly Incident Report</div>'+
+          '<h1>'+esc(S.client)+'</h1>'+
+          '<div class="meta">Generated '+fdt(new Date())+' &nbsp;·&nbsp; data as of '+fdate(DATA_ASOF)+' &nbsp;·&nbsp; '+esc(FILENAME||"—")+'</div>'+
+        '</div>'+
+        '<div class="asof"><div class="box">Reporting window<br><b>'+wkLabel(weeks[0])+' → '+wkLabel(weeks[weeks.length-1])+'</b></div></div>'+
+      '</div>'+
+      '<div class="rbody">'+
+
+        /* KPIs */
+        '<div class="kpis">'+
+          '<div class="kpi hl"><div class="lab">Open Tickets</div><div class="val" style="color:var(--client)">'+K.open+'</div></div>'+
+          '<div class="kpi hl2"><div class="lab">SVM — Action</div><div class="val" style="color:var(--hd)">'+K.svm+'</div></div>'+
+          '<div class="kpi"><div class="lab">Client — Waiting</div><div class="val" style="color:var(--client2)">'+K.client+'</div></div>'+
+          '<div class="kpi"><div class="lab">SVM % · Client %</div><div class="val sm"><span style="color:var(--hd)">'+K.svmPct+'%</span> · <span style="color:var(--client2)">'+K.clientPct+'%</span></div></div>'+
+          '<div class="kpi"><div class="lab">Total · Closed</div><div class="val sm">'+K.total+' · '+K.closed+'</div></div>'+
+        '</div>'+
+
+        /* Row 1: inflow / resolved / svm-open WoW */
+        '<div class="sectitle">Weekly Trends — Last '+WEEKS_BACK+' Weeks</div>'+
+        '<div class="grid3">'+
+          '<div class="chartcard"><div class="ct">Ticket Inflow by Priority <span style="color:var(--faint);font-weight:500">· created</span></div>'+
+            stackedBars(weeks,inflow,PRIO_ORDER,PRIO_COLOR)+
+            '<div class="legend">'+PRIO_ORDER.map(function(p){return '<span class="li"><span class="sw" style="background:'+PRIO_COLOR[p]+'"></span>'+p+'</span>';}).join("")+'</div>'+
+          '</div>'+
+          '<div class="chartcard"><div class="ct">Resolved Tickets <span style="color:var(--faint);font-weight:500">· by resolved week</span></div>'+
+            simpleBars(weeks,weeks.map(function(w){return resolved[w];}),["#0F766E"])+
+          '</div>'+
+          '<div class="chartcard"><div class="ct">SVM Open — Week on Week <span style="color:var(--faint);font-weight:500">· from snapshots</span></div>'+
+            (snapWeeks.length? simpleBars(weeks,svmOpenWoW(weeks),["#5B57D8"]) : '<div class="empty">Builds as you upload weekly.<br>This week: <b>'+K.svm+'</b> on SVM.</div>')+
+          '</div>'+
+        '</div>'+
+
+        /* Row 2: component / resolution days */
+        '<div class="sectitle">Open Work &amp; Turnaround</div>'+
+        '<div class="grid2">'+
+          '<div class="chartcard"><div class="ct">Component-Wise Open Ticket Count (SVM)</div>'+ hbars(comps,"var(--hd)") +'</div>'+
+          '<div class="chartcard"><div class="ct">Average Resolution Days <span style="color:var(--faint);font-weight:500">· Resolved − Created</span></div>'+
+            lineChartMini(weeks,weeks.map(function(w){return resDays[w];}),"var(--client)")+
+          '</div>'+
+        '</div>'+
+
+        /* Activity stage matrix */
+        '<div class="sectitle">Issue Count by Activity Stage — Weekly Trend (Client vs SVM) <span class="sub">from snapshots</span></div>'+
+        stageMatrixHTML(snapWeeks)+
+
+        /* Stage funnels */
+        '<div class="sectitle">Stage Funnels — Last '+WEEKS_BACK+' Weeks <span class="sub">from snapshots</span></div>'+
+        (snapWeeks.length? '<div class="grid3">'+STAGE_ALL.filter(function(s){return s!=="Other";}).map(function(st){
+            return '<div class="chartcard"><div class="ct">'+esc(st)+'</div>'+lineChartMini(snapWeeks,stageFunnel(snapWeeks,st),"#5B57D8")+'</div>';
+          }).join("")+'</div>'
+          : '<div class="chartcard"><div class="empty">Stage funnels appear once at least one weekly snapshot is captured.</div></div>')+
+
+        '<div class="foot"><b>'+esc(FILENAME||"—")+'</b> · '+RAW.length.toLocaleString()+' tickets loaded · '+ct.length.toLocaleString()+' for '+esc(S.client)+' · HD Weekly Report · files stay on your device</div>'+
+      '</div>'+
+    '</div>'+
+  '</div>';
+
+  bind();
+}
+function stageMatrixHTML(snapWeeks){
+  if(!snapWeeks.length) return '<div class="chartcard"><div class="empty">The activity-stage matrix needs weekly snapshots. It will populate as you open a fresh export each week.</div></div>';
+  var M=stageMatrix(snapWeeks);
+  var h='<div style="overflow-x:auto"><table class="matrix"><thead><tr><th rowspan="2" style="text-align:left">Activity Stage</th>';
+  M.weeks.forEach(function(w){ h+='<th colspan="2">'+esc(w)+'</th>'; });
+  h+='</tr><tr>';
+  M.weeks.forEach(function(){ h+='<th>Client</th><th>SVM</th>'; });
+  h+='</tr></thead><tbody>';
+  M.rows.forEach(function(r){
+    var any=r.cells.some(function(c){return c.client||c.svm;});
+    if(!any && r.stage==="Other") return;
+    h+='<tr><td class="stage">'+esc(r.stage)+'</td>';
+    r.cells.forEach(function(c){
+      h+='<td class="'+(c.client?"cl":"zero")+'">'+(c.client||"·")+'</td><td class="'+(c.svm?"sv":"zero")+'">'+(c.svm||"·")+'</td>';
+    });
+    h+='</tr>';
+  });
+  h+='</tbody></table></div>';
+  return h;
+}
+
+/* ═══════════════════════ EVENTS ═══════════════════════ */
+function bind(){
+  el("csel").onchange=function(e){ S.client=e.target.value; render(); };
+  el("printbtn").onclick=function(){ window.print(); };
+  el("backbtn").onclick=function(){ window.location.href="index.html"; };
+  el("expbtn").onclick=exportHistory;
+  el("impbtn").onclick=function(){ el("histfile").click(); };
+  el("rstbtn").onclick=function(){
+    if(!confirm("Delete all captured weekly history? The current export stays; you'll rebuild history from future uploads.")) return;
+    SNAPS={}; if(window.HDStore) HDStore.clearSnapshots().then(function(){ maybeCapture().then(render); });
+  };
+}
+function exportHistory(){
+  var payload={ type:"hd-weekly-snapshots", version:1, exportedAt:new Date().toISOString(), snapshots:SNAPS };
+  var blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
+  var url=URL.createObjectURL(blob), a=document.createElement("a");
+  a.href=url; a.download="hd-weekly-history-"+wkKey(new Date())+".json"; a.click(); URL.revokeObjectURL(url);
+}
+el("histfile").onchange=function(e){
+  var f=e.target.files&&e.target.files[0]; if(!f) return;
+  var r=new FileReader();
+  r.onload=function(ev){
+    try{
+      var d=JSON.parse(ev.target.result);
+      var incoming=d&&d.snapshots?d.snapshots:(d&&d.type?{}:d);
+      if(!incoming||typeof incoming!=="object") throw new Error("Unrecognised file");
+      var added=0;
+      Object.keys(incoming).forEach(function(k){ if(incoming[k]&&incoming[k].clients){ if(!SNAPS[k]) added++; SNAPS[k]=incoming[k]; } });
+      (window.HDStore?HDStore.saveSnapshots(SNAPS):Promise.resolve()).then(function(){ alert("Imported "+Object.keys(incoming).length+" week(s) ("+added+" new). History merged."); render(); });
+    }catch(err){ alert("Could not import: "+err.message); }
+  };
+  r.readAsText(f); e.target.value="";
+};
+
+/* ═══════════════════════ BOOT ═══════════════════════ */
+function boot(){
+  if(!window.HDStore){ el("app").innerHTML='<div class="loading"><div style="font-size:15px;font-weight:700">Storage unavailable</div><div style="font-size:12px;color:var(--muted)">Open this from the launcher. <a href="index.html">Go to upload</a>.</div></div>'; return; }
+  Promise.all([HDStore.loadFile(), HDStore.loadRows(), HDStore.loadSnapshots()]).then(function(r){
+    var rec=r[0], edited=r[1]; SNAPS=r[2]||{};
+    if(!rec){ window.location.replace("index.html"); return; }
+    FILENAME=rec.name;
+    function go(rows){ RAW_ROWS=rows; RAW=normalize(rows); maybeCapture().then(render); }
+    if(edited && edited.length){ go(edited); }
+    else { readFile(rec.blob).then(go).catch(function(err){ alert("Could not read stored file: "+err.message); window.location.replace("index.html"); }); }
+  });
+}
+boot();
+</script>
+</body>
+</html>
