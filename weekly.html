@@ -195,20 +195,20 @@ var STAGE_MAP = {
   "Client Deployment (PROD)":"Stage 3 - Under Delivery",
   "CLIENT RELEASE APPROVAL":"Stage 3 - Under Delivery",
   "CLIENT Approval (DB Script)":"Stage 3 - Under Delivery",
-  // ── Stage 4 — Client Action ──
-  "Waiting for customer":"Stage 4 - Client Action",
-  "Resolved With Clarification":"Stage 4 - Client Action",
-  "Resolved":"Stage 4 - Client Action",
-  "Release Move to Production":"Stage 4 - Client Action",
-  "Release In Progress":"Stage 4 - Client Action",
-  "Delivered":"Stage 4 - Client Action",
+  // ── Stage 4 — Awaiting Confirmation (delivered/resolved, awaiting confirmation or closure) ──
+  "Waiting for customer":"Stage 4 - Awaiting Confirmation",
+  "Resolved With Clarification":"Stage 4 - Awaiting Confirmation",
+  "Resolved":"Stage 4 - Awaiting Confirmation",
+  "Release Move to Production":"Stage 4 - Awaiting Confirmation",
+  "Release In Progress":"Stage 4 - Awaiting Confirmation",
+  "Delivered":"Stage 4 - Awaiting Confirmation",
   // ── Script Release (own bucket in the SEDGE table) ──
   "Script Release":"Script Release",
 
   /* ── EXCEPTIONS: present in the export but NOT in the SEDGE table.
         Placed by best fit — move any of these if you'd group them differently. */
   "Closed":"Stage 5 - Ticket Closure",                 // terminal
-  "Confirmation":"Stage 4 - Client Action",            // 126 tickets — awaiting client confirmation
+  "Confirmation":"Stage 4 - Awaiting Confirmation",            // 126 tickets — awaiting client confirmation
   "Completed":"Stage 5 - Ticket Closure",              // terminal
   "Invoice Yet to Raise":"Stage 5 - Ticket Closure",   // post-resolution admin
   "User Request":"Stage 1 - Analysis & Study",         // new request being assessed
@@ -217,7 +217,7 @@ var STAGE_MAP = {
   "Assign to SVM Deployment Team":"Stage 3 - Under Delivery",
   "Published":"Stage 3 - Under Delivery"
 };
-var STAGE_ORDER = ["Stage 1 - Analysis & Study","Stage 2 - Fix in Progress","Stage 3 - Under Delivery","Stage 4 - Client Action","Script Release","Other"];
+var STAGE_ORDER = ["Stage 1 - Analysis & Study","Stage 2 - Fix in Progress","Stage 3 - Under Delivery","Stage 4 - Awaiting Confirmation","Script Release","Other"];
 var STAGE_ALL   = STAGE_ORDER.concat(["Stage 5 - Ticket Closure"]);
 function stageOf(status){ return STAGE_MAP[status] || "Other"; }
 
@@ -234,7 +234,27 @@ function pct(n,d){ return d>0? Math.round(n/d*100):0; }
 function pad2(n){ return String(n).padStart(2,"0"); }
 function fdate(d){ return d? d.toLocaleDateString("en-GB",{day:"2-digit",month:"short",year:"numeric"}) : "—"; }
 function fdt(d){ return d? d.toLocaleString("en-GB",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}) : "—"; }
-function naKey(t){ var v=String(t&&t.na||"").trim().toUpperCase(); return v==="SVM"?"svm":v==="CLIENT"?"client":"unset"; }
+/* Owner (SVM vs Client) is decided by STATUS — the Jira "Next Action" column
+   isn't reliably updated, so we don't trust it. Confirmed with the team.
+   Anything not listed falls back to the Next Action column, then "unset". */
+var STATUS_OWNER = {
+  // ── Client — waiting on the client ──
+  "Waiting for customer":"client","Resolved With Clarification":"client","Confirmation":"client",
+  "DB Script Delivered":"client","Delivered":"client","Resolved":"client","Completed":"client",
+  "CLIENT Approval (DB Script)":"client","CLIENT RELEASE APPROVAL":"client","Client Release Approval (PROD)":"client",
+  "Client Hotfix Testing":"client","Client Deployment (PROD)":"client","Release Move to Production":"client",
+  "Doubt Clarification":"client","Clarification (Dev)":"client","Published":"client",
+  // ── SVM — action on our side ──
+  "Technical Analysis":"svm","Analysis & Study":"svm","User Request":"svm","Team Lead Review & Approval":"svm",
+  "Development In Progress":"svm","Approval DB Admin":"svm","DB Admin Approval":"svm","Sys/user configuration":"svm",
+  "SVM Hotfix Testing":"svm","Testing In Progress":"svm","Assign to SVM Deployment Team":"svm",
+  "Release Plan (UAT or Hot Fix)":"svm","DB Script Request":"svm","Impact Study":"svm","Release Kit Prep.":"svm",
+  "Invoice Yet to Raise":"svm","POC Release Approval":"svm","Release In Progress":"svm"
+};
+function naKey(t){
+  if(t && STATUS_OWNER[t.status]) return STATUS_OWNER[t.status];
+  var v=String(t&&t.na||"").trim().toUpperCase(); return v==="SVM"?"svm":v==="CLIENT"?"client":"unset";
+}
 
 /* ISO week */
 function isoWeek(d){
@@ -618,7 +638,7 @@ function render(){
         '<div class="sectitle">Open Tickets by Activity Stage <span class="sub">Client vs SVM · this export</span></div>'+
         caption('Where the open tickets sit in the delivery pipeline right now, and whose action is next. <b>Click a number to list those tickets.</b>')+
         currentStageHTML(stageRows)+
-        insight('Each row counts open tickets at that stage, split by who acts next — <b style="color:var(--client2)">Client</b> (your team) vs <b style="color:var(--hd)">SVM</b> (ours).'+(topStage&&stageCount[topStage]?' The biggest bucket is <b>'+esc(shortStage(topStage))+'</b> with <b>'+stageCount[topStage]+'</b> open.':'')+' A build-up in "Client Action" means tickets are waiting on your side.')+
+        insight('Each row is a pipeline phase (from Status); the <b style="color:var(--client2)">Client</b> / <b style="color:var(--hd)">SVM</b> split is who must act next (from the Next Action field), so the same phase can have some of each.'+(topStage&&stageCount[topStage]?' The biggest phase is <b>'+esc(shortStage(topStage))+'</b> with <b>'+stageCount[topStage]+'</b> open.':'')+' A high <b style="color:var(--client2)">Client</b> column means those tickets are waiting on your team.')+
 
         /* ── Pending ticket lists (printed in the PDF) ── */
         '<div class="sectitle">Pending Tickets — with SVM <span class="sub">'+svmPending.length+' open · our action</span></div>'+
