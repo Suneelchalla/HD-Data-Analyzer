@@ -162,7 +162,6 @@ select{appearance:none;background:var(--paper);border:1px solid var(--line);bord
 </head>
 <body>
 <div id="app"><div class="loading"><div style="font-size:15px;font-weight:700">Loading Weekly Report…</div><div style="font-size:12px;color:var(--muted)">Nothing loading? <a href="index.html" style="color:var(--client);font-weight:600">Go to upload</a>.</div></div></div>
-<input type="file" id="histfile" accept=".json" style="display:none">
 
 <script>
 /* ═══════════════════════ CONFIG ═══════════════════════ */
@@ -219,7 +218,6 @@ var STAGE_MAP = {
   "Published":"Stage 3 - Under Delivery"
 };
 var STAGE_ORDER = ["Stage 1 - Analysis & Study","Stage 2 - Fix in Progress","Stage 3 - Under Delivery","Stage 4 - Client Action","Script Release","Other"];
-var FUNNEL_STAGES = ["Stage 1 - Analysis & Study","Stage 2 - Fix in Progress","Stage 3 - Under Delivery","Stage 4 - Client Action","Stage 5 - Ticket Closure"];
 var STAGE_ALL   = STAGE_ORDER.concat(["Stage 5 - Ticket Closure"]);
 function stageOf(status){ return STAGE_MAP[status] || "Other"; }
 
@@ -258,7 +256,6 @@ function lastWeeks(n){
 /* ═══════════════════════ STATE ═══════════════════════ */
 var RAW=[];          // all normalized tickets (all clients)
 var RAW_ROWS=[];
-var SNAPS={};        // { "2026-34": {week,capturedAt,fp,clients:{...}} }
 var FILENAME="";
 var DATA_ASOF=null;  // max created/resolved date
 var S={ client:"" };
@@ -304,41 +301,10 @@ function normalize(rows){
 }
 function isOpen(t){ return t.status && t.status.toLowerCase()!=="closed"; }
 
-/* ═══════════════════════ SNAPSHOT ═══════════════════════ */
-function dataFingerprint(tickets){
-  var mx=0; tickets.forEach(function(t){ [t.created,t.resolved].forEach(function(d){ if(d){var m=d.getTime(); if(m>mx)mx=m;} }); });
+/* ═══════════════════════ AS-OF DATE ═══════════════════════ */
+function computeAsOf(){
+  var mx=0; RAW.forEach(function(t){ [t.created,t.resolved].forEach(function(d){ if(d){var m=d.getTime(); if(m>mx)mx=m;} }); });
   DATA_ASOF = mx? new Date(mx):null;
-  return tickets.length+"|"+mx;
-}
-function buildSnapshot(tickets){
-  var clients={};
-  tickets.forEach(function(t){
-    var c=t.client||"(no project)";
-    if(!clients[c]) clients[c]={ open:0, svmOpen:0, clientOpen:0, closedTotal:0, byStage:{}, byComponentSvm:{} };
-    var C=clients[c];
-    if(t.status && t.status.toLowerCase()==="closed"){ C.closedTotal++; return; }
-    // open ticket
-    C.open++;
-    var na=naKey(t);
-    if(na==="svm") C.svmOpen++; else if(na==="client") C.clientOpen++;
-    var st=t.stage;
-    if(!C.byStage[st]) C.byStage[st]={client:0,svm:0,unset:0};
-    C.byStage[st][na]++;
-    if(na==="svm"){ (t.components.length?t.components:["(none)"]).forEach(function(cm){ C.byComponentSvm[cm]=(C.byComponentSvm[cm]||0)+1; }); }
-  });
-  return { week:wkKey(new Date()), capturedAt:new Date().toISOString(), fp:dataFingerprint(tickets), clients:clients };
-}
-/* Capture guard: only record when the data actually changed since the last
-   capture, so re-opening stale data in a new calendar week doesn't fabricate
-   a duplicate week. */
-function maybeCapture(){
-  var fp=dataFingerprint(RAW);
-  var keys=Object.keys(SNAPS);
-  var already=keys.some(function(k){ return SNAPS[k] && SNAPS[k].fp===fp; });
-  if(already) return Promise.resolve(false);         // this exact export already snapshotted
-  var snap=buildSnapshot(RAW);
-  SNAPS[snap.week]=snap;                              // last upload of the week wins
-  return (window.HDStore? HDStore.saveSnapshots(SNAPS):Promise.resolve()).then(function(){return true;});
 }
 
 /* ═══════════════════════ DERIVE (selected client) ═══════════════════════ */
@@ -370,20 +336,13 @@ function componentOpenSvm(ct){
   });
   return Object.keys(m).map(function(k){return {label:k,val:m[k]};}).sort(function(a,b){return b.val-a.val;});
 }
-/* snapshot series for selected client */
-function snapWeeksAvailable(){ return Object.keys(SNAPS).sort(); }
-function svmOpenWoW(weeks){ return weeks.map(function(w){ var s=SNAPS[w]; var c=s&&s.clients[S.client]; return c? c.svmOpen : null; }); }
-function stageMatrix(weeks){
-  // rows = STAGE_ORDER, per week {client,svm}
-  var have=weeks.filter(function(w){ return SNAPS[w]&&SNAPS[w].clients[S.client]; });
-  return { weeks:have, rows:STAGE_ORDER.map(function(st){
-    return { stage:st, cells:have.map(function(w){ var bs=SNAPS[w].clients[S.client].byStage[st]||{client:0,svm:0}; return {client:bs.client||0,svm:bs.svm||0}; }) };
-  })};
-}
-function stageFunnel(weeks,stage){
-  return weeks.map(function(w){ var s=SNAPS[w]; if(!s||!s.clients[S.client]) return null;
-    if(stage==="Stage 5 - Ticket Closure") return s.clients[S.client].closedTotal||0;
-    var bs=s.clients[S.client].byStage[stage]; return bs? (bs.client||0)+(bs.svm||0)+(bs.unset||0) : 0; });
+/* Current open tickets grouped by stage × next-action (this export only). */
+function currentStages(openList){
+  var m={}; STAGE_ORDER.forEach(function(s){ m[s]={client:0,svm:0,total:0}; });
+  openList.forEach(function(t){ var s=t.stage; if(!m[s]) m[s]={client:0,svm:0,total:0};
+    var na=naKey(t); if(na==="svm")m[s].svm++; else m[s].client++; m[s].total++; });
+  return STAGE_ORDER.map(function(s){ return {stage:s, client:m[s].client, svm:m[s].svm, total:m[s].total}; })
+                    .filter(function(r){ return r.total>0; });
 }
 
 /* ═══════════════════════ CHART BUILDERS (SVG) ═══════════════════════ */
@@ -505,9 +464,6 @@ function openModal(title,tix){
 }
 function closeModal(){ var o=el("ovl"); if(o) o.remove(); }
 document.addEventListener("keydown",function(e){ if(e.key==="Escape") closeModal(); });
-function snapCountModal(w,label,n){ // for historical points where only counts exist
-  openModalNote(label+" — "+wkLabel(w),"This is a captured weekly count: <b>"+n+"</b> ticket"+(n!==1?"s":"")+". Ticket-level detail is only kept for the current export, so the list can't be shown for past weeks.");
-}
 function openModalNote(title,html){
   closeModal();
   var ov=document.createElement("div"); ov.className="ovl noprint"; ov.id="ovl";
@@ -528,8 +484,6 @@ function render(){
   var weeks=lastWeeks(WEEKS_BACK);
   var inflow=inflowByWeek(ct,weeks), resolved=resolvedByWeek(ct,weeks), resDays=avgResDaysByWeek(ct,weeks);
   var comps=componentOpenSvm(ct);
-  var snapKeys=snapWeeksAvailable();
-  var snapWeeks=weeks.filter(function(w){return SNAPS[w];});   // captured weeks within window
 
   /* ── figures for the plain-language insights ── */
   var lastWk=weeks[weeks.length-1];
@@ -559,15 +513,7 @@ function render(){
   var stageCount={}; STAGE_ALL.forEach(function(s){stageCount[s]=0;});
   openList.forEach(function(t){ stageCount[t.stage]=(stageCount[t.stage]||0)+1; });
   var topStage=STAGE_ORDER.filter(function(s){return s!=="Other";}).sort(function(a,b){return (stageCount[b]||0)-(stageCount[a]||0);})[0];
-  var svmTrendTxt = (snapWeeks.length>=2)
-    ? (function(){ var a=SNAPS[snapWeeks[0]].clients[S.client], b=SNAPS[snapWeeks[snapWeeks.length-1]].clients[S.client];
-        if(!a||!b) return 'The queue on SVM is being tracked week to week.';
-        return 'The SVM queue moved from <b>'+a.svmOpen+'</b> ('+wkLabel(snapWeeks[0])+') to <b>'+b.svmOpen+'</b> ('+wkLabel(snapWeeks[snapWeeks.length-1])+')'+chg(b.svmOpen,a.svmOpen,false)+'.'; })()
-    : 'There are <b>'+K.svm+'</b> tickets on SVM right now. This line grows into a trend as a fresh export is opened each week.';
-
-  var histNote = snapKeys.length>=WEEKS_BACK
-    ? '<div class="banner info noprint">📈 Weekly history: <b>&nbsp;'+snapKeys.length+' weeks captured</b>. Snapshot-based charts below are complete.</div>'
-    : '<div class="banner warn noprint">🗓️ Weekly history is still building — <b>&nbsp;'+snapKeys.length+' of '+WEEKS_BACK+' week(s) captured</b>. The SVM-open and activity-stage charts fill in each week you open a fresh export. (Inflow &amp; resolved trends are always exact from the current export.)</div>';
+  var stageRows=currentStages(openList);
 
   /* ── executive summary ── */
   var exText='<b>'+esc(S.client)+'</b> currently has <b>'+K.open+' open ticket'+(K.open!==1?'s':'')+'</b> — '
@@ -585,12 +531,8 @@ function render(){
       '<select id="csel">'+clients.map(function(c){return '<option value="'+esc(c.name)+'" '+(c.name===S.client?"selected":"")+'>'+esc(c.name)+' ('+c.n+')</option>';}).join("")+'</select>'+
       '<span class="spacer"></span>'+
       '<button class="btn primary" id="printbtn">🖨️ Print / Save PDF</button>'+
-      '<button class="btn" id="expbtn">⬇ Export history</button>'+
-      '<button class="btn" id="impbtn">⬆ Import history</button>'+
-      '<button class="btn danger" id="rstbtn">↺ Reset history</button>'+
       '<button class="btn" id="backbtn">← Launcher</button>'+
     '</div>'+
-    histNote+
     /* the printable sheet */
     '<div class="sheet" id="sheet">'+
       '<div class="rhead">'+
@@ -647,8 +589,8 @@ function render(){
 
         '<div class="sectitle">Weekly Trends — Last '+WEEKS_BACK+' Weeks</div>'+
         caption('How work came in and went out over the past '+WEEKS_BACK+' weeks. Weeks are ISO week numbers (e.g. W34). <b>Click any bar to list the tickets behind it.</b>')+
-        '<div class="grid3">'+
-          '<div class="chartcard"><div class="ct">Ticket Inflow by Priority <span style="color:var(--faint);font-weight:500">· new tickets created</span></div>'+
+        '<div class="grid2">'+
+          '<div class="chartcard"><div class="ct">New Tickets by Priority <span style="color:var(--faint);font-weight:500">· created each week</span></div>'+
             stackedBars(weeks,inflow,PRIO_ORDER,PRIO_COLOR)+
             '<div class="legend">'+PRIO_ORDER.map(function(p){return '<span class="li"><span class="sw" style="background:'+PRIO_COLOR[p]+'"></span>'+p+'</span>';}).join("")+'</div>'+
             insight('<b>'+infLast+'</b> new ticket'+(infLast!==1?'s':'')+' in '+wkLabel(lastWk)+chg(infLast,infPrev,false)+'; mostly <b>'+domP+'</b> priority ('+domPn+'). Tall bars flag weeks that needed more capacity.')+
@@ -656,10 +598,6 @@ function render(){
           '<div class="chartcard"><div class="ct">Resolved Tickets <span style="color:var(--faint);font-weight:500">· closed each week</span></div>'+
             simpleBars(weeks,weeks.map(function(w){return resolved[w];}),["#0F766E"],"resolved")+
             insight('<b>'+resLast+'</b> resolved in '+wkLabel(lastWk)+chg(resLast,resPrev,true)+' — averaging about <b>'+resAvg+'/week</b>. Compare against inflow: resolving fewer than arrive grows the backlog.')+
-          '</div>'+
-          '<div class="chartcard"><div class="ct">SVM Open — Week on Week <span style="color:var(--faint);font-weight:500">· our live queue</span></div>'+
-            (snapWeeks.length? simpleBars(weeks,svmOpenWoW(weeks),["#5B57D8"],"svmopen") : '<div class="empty">Builds as you upload weekly.<br>This week: <b>'+K.svm+'</b> on SVM.</div>')+
-            insight(svmTrendTxt)+
           '</div>'+
         '</div>'+
 
@@ -676,11 +614,11 @@ function render(){
           '</div>'+
         '</div>'+
 
-        /* Activity stage matrix */
-        '<div class="sectitle">Issue Count by Activity Stage — Weekly Trend (Client vs SVM) <span class="sub">from snapshots</span></div>'+
-        caption('Where open tickets sit in the delivery pipeline each week, and whether the next move is yours (Client) or ours (SVM). Stages run 1 → 4 from first analysis to awaiting client action.')+
-        stageMatrixHTML(snapWeeks)+
-        insight('Each cell counts open tickets at that stage, split by who acts next — <b style="color:var(--client2)">Client</b> (your team) vs <b style="color:var(--hd)">SVM</b> (ours).'+(topStage&&stageCount[topStage]?' Right now the biggest bucket is <b>'+esc(shortStage(topStage))+'</b> with <b>'+stageCount[topStage]+'</b> open.':'')+' A build-up in "Client Action" means tickets are waiting on your side.')+
+        /* Current activity-stage breakdown (this export only) */
+        '<div class="sectitle">Open Tickets by Activity Stage <span class="sub">Client vs SVM · this export</span></div>'+
+        caption('Where the open tickets sit in the delivery pipeline right now, and whose action is next. <b>Click a number to list those tickets.</b>')+
+        currentStageHTML(stageRows)+
+        insight('Each row counts open tickets at that stage, split by who acts next — <b style="color:var(--client2)">Client</b> (your team) vs <b style="color:var(--hd)">SVM</b> (ours).'+(topStage&&stageCount[topStage]?' The biggest bucket is <b>'+esc(shortStage(topStage))+'</b> with <b>'+stageCount[topStage]+'</b> open.':'')+' A build-up in "Client Action" means tickets are waiting on your side.')+
 
         /* ── Pending ticket lists (printed in the PDF) ── */
         '<div class="sectitle">Pending Tickets — with SVM <span class="sub">'+svmPending.length+' open · our action</span></div>'+
@@ -698,24 +636,15 @@ function render(){
 
   bind();
 }
-function stageMatrixHTML(snapWeeks){
-  if(!snapWeeks.length) return '<div class="chartcard"><div class="empty">The activity-stage matrix needs weekly snapshots. It will populate as you open a fresh export each week.</div></div>';
-  var M=stageMatrix(snapWeeks);
-  var h='<div style="overflow-x:auto"><table class="matrix"><thead><tr><th rowspan="2" style="text-align:left">Activity Stage</th>';
-  M.weeks.forEach(function(w){ h+='<th colspan="2">'+esc(w)+'</th>'; });
-  h+='</tr><tr>';
-  M.weeks.forEach(function(){ h+='<th>Client</th><th>SVM</th>'; });
-  h+='</tr></thead><tbody>';
-  M.rows.forEach(function(r){
-    var any=r.cells.some(function(c){return c.client||c.svm;});
-    if(!any && r.stage==="Other") return;
-    h+='<tr><td class="stage">'+esc(r.stage)+'</td>';
-    r.cells.forEach(function(c,ci){
-      var w=M.weeks[ci];
-      h+='<td class="mcell '+(c.client?"cl":"zero")+'" data-wk="'+w+'" data-stage="'+esc(r.stage)+'" data-na="client" style="cursor:pointer">'+(c.client||"·")+'</td>'+
-         '<td class="mcell '+(c.svm?"sv":"zero")+'" data-wk="'+w+'" data-stage="'+esc(r.stage)+'" data-na="svm" style="cursor:pointer">'+(c.svm||"·")+'</td>';
-    });
-    h+='</tr>';
+function currentStageHTML(rows){
+  if(!rows.length) return '<div class="chartcard"><div class="empty">No open tickets for this client.</div></div>';
+  var h='<div class="ttable-wrap"><table class="matrix"><thead><tr>'+
+    '<th style="text-align:left">Activity Stage</th><th>Client</th><th>SVM</th><th>Total</th></tr></thead><tbody>';
+  rows.forEach(function(r){
+    h+='<tr><td class="stage">'+esc(r.stage)+'</td>'+
+       '<td class="scell '+(r.client?"cl":"zero")+'" data-stage="'+esc(r.stage)+'" data-na="client" style="cursor:pointer">'+(r.client||"·")+'</td>'+
+       '<td class="scell '+(r.svm?"sv":"zero")+'" data-stage="'+esc(r.stage)+'" data-na="svm" style="cursor:pointer">'+(r.svm||"·")+'</td>'+
+       '<td class="mono" style="font-weight:700">'+r.total+'</td></tr>';
   });
   h+='</tbody></table></div>';
   return h;
@@ -726,12 +655,6 @@ function bind(){
   el("csel").onchange=function(e){ S.client=e.target.value; render(); };
   el("printbtn").onclick=function(){ window.print(); };
   el("backbtn").onclick=function(){ window.location.href="index.html"; };
-  el("expbtn").onclick=exportHistory;
-  el("impbtn").onclick=function(){ el("histfile").click(); };
-  el("rstbtn").onclick=function(){
-    if(!confirm("Delete all captured weekly history? The current export stays; you'll rebuild history from future uploads.")) return;
-    SNAPS={}; if(window.HDStore) HDStore.clearSnapshots().then(function(){ maybeCapture().then(render); });
-  };
   bindDrill();
 }
 /* Click-to-see-tickets on every chart element (screen only; opens a modal). */
@@ -754,14 +677,10 @@ function bindDrill(){
     openModal("New in "+wkLabel(w)+" · "+cat+" priority", tix);
   }; });
 
-  // Simple bars: resolved / svm-open
+  // Resolved bars
   q(".wbar").forEach(function(n){ n.onclick=function(){
-    var w=n.dataset.wk, kind=n.dataset.kind;
-    if(kind==="resolved"){ openModal("Resolved in "+wkLabel(w)+" — "+S.client, ct.filter(function(t){return wkKey(t.resolved)===w;})); }
-    else if(kind==="svmopen"){
-      if(w===CUR_WK){ openModal("SVM open ("+wkLabel(w)+") — "+S.client, openL.filter(function(t){return naKey(t)==="svm";})); }
-      else { var c=SNAPS[w]&&SNAPS[w].clients[S.client]; snapCountModal(w,"SVM open", c?c.svmOpen:0); }
-    }
+    var w=n.dataset.wk;
+    openModal("Resolved in "+wkLabel(w)+" — "+S.client, ct.filter(function(t){return wkKey(t.resolved)===w;}));
   }; });
 
   // Resolution-days points (resolved that week)
@@ -776,16 +695,11 @@ function bindDrill(){
     openModal("Open SVM · "+comp+" — "+S.client, tix);
   }; });
 
-  // Activity-stage matrix cells
-  q(".mcell").forEach(function(n){ n.onclick=function(){
-    var w=n.dataset.wk, st=n.dataset.stage, na=n.dataset.na;
-    if(w===CUR_WK){
-      var tix=openL.filter(function(t){ return t.stage===st && naKey(t)===na; });
-      openModal(shortStage(st)+" · "+(na==="svm"?"SVM":"Client")+" ("+wkLabel(w)+")", tix);
-    } else {
-      var c=SNAPS[w]&&SNAPS[w].clients[S.client]; var bs=c&&c.byStage[st]; var cnt=bs?(bs[na]||0):0;
-      snapCountModal(w, shortStage(st)+" · "+(na==="svm"?"SVM":"Client"), cnt);
-    }
+  // Activity-stage cells (current export)
+  q(".scell").forEach(function(n){ n.onclick=function(){
+    var st=n.dataset.stage, na=n.dataset.na;
+    var tix=openL.filter(function(t){ return t.stage===st && naKey(t)===na; });
+    openModal(shortStage(st)+" · "+(na==="svm"?"SVM":"Client")+" — "+S.client, tix);
   }; });
 
   // Open by Priority segments
@@ -805,36 +719,15 @@ function bindDrill(){
   var cc=document.querySelector(".clientcallout");
   if(cc) cc.onclick=function(){ openModal("Pending with Client — "+S.client, openL.filter(function(t){return naKey(t)==="client";})); };
 }
-function exportHistory(){
-  var payload={ type:"hd-weekly-snapshots", version:1, exportedAt:new Date().toISOString(), snapshots:SNAPS };
-  var blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json"});
-  var url=URL.createObjectURL(blob), a=document.createElement("a");
-  a.href=url; a.download="hd-weekly-history-"+wkKey(new Date())+".json"; a.click(); URL.revokeObjectURL(url);
-}
-el("histfile").onchange=function(e){
-  var f=e.target.files&&e.target.files[0]; if(!f) return;
-  var r=new FileReader();
-  r.onload=function(ev){
-    try{
-      var d=JSON.parse(ev.target.result);
-      var incoming=d&&d.snapshots?d.snapshots:(d&&d.type?{}:d);
-      if(!incoming||typeof incoming!=="object") throw new Error("Unrecognised file");
-      var added=0;
-      Object.keys(incoming).forEach(function(k){ if(incoming[k]&&incoming[k].clients){ if(!SNAPS[k]) added++; SNAPS[k]=incoming[k]; } });
-      (window.HDStore?HDStore.saveSnapshots(SNAPS):Promise.resolve()).then(function(){ alert("Imported "+Object.keys(incoming).length+" week(s) ("+added+" new). History merged."); render(); });
-    }catch(err){ alert("Could not import: "+err.message); }
-  };
-  r.readAsText(f); e.target.value="";
-};
 
 /* ═══════════════════════ BOOT ═══════════════════════ */
 function boot(){
   if(!window.HDStore){ el("app").innerHTML='<div class="loading"><div style="font-size:15px;font-weight:700">Storage unavailable</div><div style="font-size:12px;color:var(--muted)">Open this from the launcher. <a href="index.html">Go to upload</a>.</div></div>'; return; }
-  Promise.all([HDStore.loadFile(), HDStore.loadRows(), HDStore.loadSnapshots()]).then(function(r){
-    var rec=r[0], edited=r[1]; SNAPS=r[2]||{};
+  Promise.all([HDStore.loadFile(), HDStore.loadRows()]).then(function(r){
+    var rec=r[0], edited=r[1];
     if(!rec){ window.location.replace("index.html"); return; }
     FILENAME=rec.name;
-    function go(rows){ RAW_ROWS=rows; RAW=normalize(rows); maybeCapture().then(render); }
+    function go(rows){ RAW_ROWS=rows; RAW=normalize(rows); computeAsOf(); render(); }
     if(edited && edited.length){ go(edited); }
     else { readFile(rec.blob).then(go).catch(function(err){ alert("Could not read stored file: "+err.message); window.location.replace("index.html"); }); }
   });
