@@ -109,11 +109,31 @@ input[type="date"]:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,9
 const{useState,useMemo,useCallback,useRef,useEffect}=React;
 const J="https://svmhelpdesk.atlassian.net/browse/";
 
-/* ═══ STATUS CLASSIFICATION ═══ */
-const HD_S=["Acknowledged","Assign HD (WFC)","Clarify","Get Confirmation","On-Hold","Open","Re-open Review","Resolved","Resolved With Clarification"];
-const CLIENT_S=["Clarification (Dev)","CLIENT Approval (DB Script)","Client Hotfix Testing","Client Rejected (DB Script)","CLIENT RELEASE APPROVAL","Client Release Approval (PROD)","Completed","Confirmation","DB Script Delivered","Delivered","Doubt Clarification","Published","Release Move to Production","Waiting for customer"];
-const ENGG_S=["Approval DB Admin","DB Admin Approval","DB Script Request","Development In Progress","Impact Study","POC Release Approval","Project Lead Approval","Release Plan (Production)","Release Plan (UAT or Hot Fix)","Review","Script Release","SVM Hotfix Testing","Team Lead Review & Approval","Technical Analysis","User Request"];
-const classify=s=>HD_S.includes(s)?"hd":ENGG_S.includes(s)?"engg":"client";
+/* ═══ STATUS CLASSIFICATION (aligned with the confirmed Status→owner map used
+   by the Weekly Report & Trend Tracker). CLIENT = waiting on the client; the
+   rest (our side) splits into ENGG = with engineering/dev, HD = desk-level.
+   Client is checked first so a resolved/awaiting-confirmation ticket counts as
+   client, matching the other dashboards. Unknown statuses default to HD. */
+const HD_S=["Acknowledged","Assign HD (WFC)","Clarify","On-Hold","Open","Re-open Review","Analysis & Study","Sys/user configuration","Invoice Yet to Raise"];
+const CLIENT_S=["Waiting for customer","Resolved With Clarification","Resolved","Confirmation","Get Confirmation","Completed","DB Script Delivered","Delivered","Release Move to Production","Doubt Clarification","Clarification (Dev)","Published","CLIENT Approval (DB Script)","CLIENT RELEASE APPROVAL","Client Release Approval (PROD)","Client Hotfix Testing","Client Deployment (PROD)","Client Rejected (DB Script)"];
+const ENGG_S=["Technical Analysis","Development In Progress","Approval DB Admin","DB Admin Approval","DB Script Request","Impact Study","POC Release Approval","Project Lead Approval","Release Plan (Production)","Release Plan (UAT or Hot Fix)","Review","Script Release","SVM Hotfix Testing","Team Lead Review & Approval","Testing In Progress","Assign to SVM Deployment Team","Release In Progress","Release Kit Prep.","User Request"];
+const classify=s=>CLIENT_S.includes(s)?"client":ENGG_S.includes(s)?"engg":HD_S.includes(s)?"hd":"hd";
+/* Priority ordering + a plain next-step hint per status, for the Action Queue. */
+const PRIO_ORD={"Show Stopper":0,"Critical":1,"High":2,"Medium":3,"Low":4};
+const prioRank=p=>(PRIO_ORD[p]!==undefined?PRIO_ORD[p]:5);
+const NEXT_STEP={
+  "Resolved":"Confirm & close","Resolved With Clarification":"Confirm & close","Completed":"Confirm & close",
+  "Acknowledged":"Start work","Open":"Pick up & triage","Assign HD (WFC)":"Follow up for confirmation",
+  "Clarify":"Get clarification","Get Confirmation":"Chase confirmation","On-Hold":"Review hold reason",
+  "Re-open Review":"Review reopened ticket","Analysis & Study":"Analyse & scope","Sys/user configuration":"Configure & verify",
+  "Invoice Yet to Raise":"Raise the invoice","User Request":"Review request",
+  "Waiting for customer":"Awaiting client — chase if stale","Confirmation":"Awaiting client confirmation",
+  "Doubt Clarification":"Awaiting client clarification","Delivered":"Awaiting client verification",
+  "DB Script Delivered":"Awaiting client run","Release Move to Production":"Awaiting client go-live",
+  "Technical Analysis":"With engineering — follow up","Development In Progress":"With dev — follow up",
+  "Testing In Progress":"In testing — follow up","DB Admin Approval":"Awaiting DBA approval","Approval DB Admin":"Awaiting DBA approval"
+};
+const nextStep=(s,cat)=>NEXT_STEP[s]||(cat==="client"?"Awaiting client — chase if stale":cat==="engg"?"With engineering — follow up":"Review & act");
 
 const CL={hd:"HD Action Required",client:"Client Follow-up",engg:"Engineering Follow-up"};
 const CS={
@@ -786,7 +806,7 @@ function App(){
         <div style={{flex:1}}/>
 
         <nav style={{display:"flex",background:"var(--bg)",borderRadius:10,padding:3,gap:2,border:"1px solid var(--border)"}}>
-          {[["followup","📌 Follow-ups",op.length],["performance","📊 Performance",dateFiltered?dateFiltered.length:0],["gaps","⚠️ Data Gaps",gd.t.length],["data","✏️ Edit Data",raw?raw.length:0]].map(function(x){var id=x[0],lb=x[1],cnt=x[2];return(
+          {[["followup","📌 Follow-ups",op.length],["gaps","⚠️ Data Gaps",gd.t.length],["data","✏️ Edit Data",raw?raw.length:0]].map(function(x){var id=x[0],lb=x[1],cnt=x[2];return(
             <button key={id} onClick={function(){setTab(id);clr();}} style={{background:tab===id?"var(--blue)":"transparent",color:tab===id?"#fff":"var(--t3)",border:"none",padding:"7px 16px",borderRadius:8,fontSize:11,fontWeight:700,display:"flex",alignItems:"center",gap:5}}>
               {lb} <span style={{background:tab===id?"rgba(255,255,255,.2)":"rgba(0,0,0,.06)",padding:"1px 6px",borderRadius:10,fontSize:10,fontWeight:800}}>{cnt}</span>
             </button>
@@ -871,26 +891,56 @@ function App(){
           </div>
         )}
 
-        {/* KPIs */}
-        <div className="fu fu2" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(145px,1fr))",gap:12,marginBottom:10}}>
-          <KPI icon="📝" label="Total Created" value={totalCreated.toLocaleString()} color="#6366F1" bgColor="#EEF2FF" sub="In selected range"/>
-          <KPI icon="✅" label="Total Closed" value={totalClosed.toLocaleString()} color="var(--green)" bgColor="var(--green-bg)" sub="In selected range"/>
-          <KPI icon="📂" label="Still Open" value={st.n} color="var(--blue)" bgColor="var(--blue-bg)" onClick={function(){openAllModal();}} active={false}/>
+        {/* Fires + Stale-client callouts */}
+        {(function(){
+          var all=[].concat(st.hd,st.cl,st.eng);
+          var fires=all.filter(function(t){var p=t.Priority;return (p==="Show Stopper"||p==="Critical")&&ds(t.Updated||t.Created)>14;});
+          var stale=st.cl.filter(function(t){return ds(t.Updated||t.Created)>14;});
+          if(!fires.length&&!stale.length)return null;
+          return(<div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(280px,1fr))",gap:10,marginBottom:9}}>
+            {fires.length>0&&<div onClick={function(){setModal({title:"Fires — high priority & ageing",icon:"🔥",color:"#E11D48",tickets:fires});}} className="card" style={{padding:"11px 16px",display:"flex",alignItems:"center",gap:12,cursor:"pointer",borderColor:"var(--rose-border)",background:"var(--rose-bg)"}}>
+              <span style={{fontSize:20}}>🔥</span><div><div style={{color:"var(--rose)",fontWeight:800,fontSize:13.5}}>{fires.length} fire{fires.length!==1?"s":""} — high priority &amp; ageing</div><div style={{color:"var(--t2)",fontSize:11.5,marginTop:1}}>Show Stopper / Critical open over 14 days — tackle first.</div></div></div>}
+            {stale.length>0&&<div onClick={function(){setModal({title:"Stale client follow-ups (over 14 days)",icon:"💬",color:"#D97706",tickets:stale});}} className="card" style={{padding:"11px 16px",display:"flex",alignItems:"center",gap:12,cursor:"pointer",borderColor:"var(--amber-border)",background:"var(--amber-bg)"}}>
+              <span style={{fontSize:20}}>💬</span><div><div style={{color:"var(--amber)",fontWeight:800,fontSize:13.5}}>{stale.length} client follow-up{stale.length!==1?"s":""} going stale</div><div style={{color:"var(--t2)",fontSize:11.5,marginTop:1}}>Waiting on the client over 14 days — worth a nudge.</div></div></div>}
+          </div>);
+        })()}
+
+        {/* KPIs — 4 triage-focused */}
+        <div className="fu fu2" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12,marginBottom:10}}>
           <KPI icon="🎯" label="HD Action" value={st.hd.length} color="var(--cyan)" bgColor="var(--cyan-bg)" sub="Your action needed"
             onClick={function(){openCatModal("hd");}}/>
           <KPI icon="💬" label="Client F/U" value={st.cl.length} color="var(--amber)" bgColor="var(--amber-bg)" sub="Chase if stale"
             onClick={function(){openCatModal("client");}}/>
           <KPI icon="🔧" label="Engg F/U" value={st.eng.length} color="var(--violet)" bgColor="var(--violet-bg)" sub="Follow up with dev"
             onClick={function(){openCatModal("engg");}}/>
-          <KPI icon="🔴" label="Danger 90+" value={st.dng} color="var(--rose)" bgColor="var(--rose-bg)" sub="Critical backlog"
+          <KPI icon="🔴" label="Danger 90+" value={st.dng} color="var(--rose)" bgColor="var(--rose-bg)" sub="Stale — decide or close"
             onClick={function(){openDangerModal();}}/>
-          <KPI icon="⚡" label="SLA Breach" value={slaData.all.length} color="#BE123C" bgColor="#FFF1F2" sub={"Out of "+slaData.total+" total"}
-            onClick={function(){openSLAModal();}}/>
-          <KPI icon="📊" label="Avg Age" value={st.avg+"d"} color="var(--t3)"/>
         </div>
 
-        {/* Priority Distribution + SLA summary row */}
-        <div className="fu fu3" style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:12,marginBottom:9}}>
+        {/* My Action Queue — the daily driver */}
+        {(function(){
+          var q=st.hd.slice().sort(function(a,b){var pr=prioRank(a.Priority)-prioRank(b.Priority);if(pr)return pr;return ds(b.Updated||b.Created)-ds(a.Updated||a.Created);});
+          return(<div className="card" style={{padding:"13px 16px",marginBottom:9}}>
+            <div style={{fontSize:13,fontWeight:700,marginBottom:2,color:"var(--t1)"}}>🎯 {w?"Your":"HD"} Action Queue <span style={{fontWeight:400,color:"var(--t3)",fontSize:11}}>· {q.length} need action · sorted by priority &amp; age</span></div>
+            {q.length===0?<div style={{color:"var(--t3)",fontSize:12,padding:"10px 0"}}>Nothing needs action right now. 🎉</div>:
+            <div style={{marginTop:8}}>
+              {q.slice(0,12).map(function(t,i){var age=ds(t.Updated||t.Created);var pc=PRIORITY_COLORS[t.Priority]||"var(--t3)";
+                return(<div key={t.Key} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 0",borderTop:i?"1px solid var(--border)":"none"}}>
+                  <span style={{width:7,height:7,borderRadius:7,background:pc,flexShrink:0}}/>
+                  <a href={J+t.Key} target="_blank" rel="noreferrer" style={{fontFamily:"var(--mono)",fontWeight:700,fontSize:12,flexShrink:0,minWidth:96}}>{t.Key}</a>
+                  <span style={{flex:1,fontSize:12,color:"var(--t2)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap",minWidth:0}} title={t.Summary}>{t.Summary}</span>
+                  <span style={{fontSize:10,fontWeight:700,color:pc,flexShrink:0}}>{t.Priority||"—"}</span>
+                  <span style={{fontSize:11,color:"var(--cyan)",fontWeight:600,flexShrink:0,background:"var(--cyan-bg)",border:"1px solid var(--cyan-border)",padding:"1px 8px",borderRadius:12,whiteSpace:"nowrap"}}>{nextStep(t.Status,"hd")}</span>
+                  <span style={{fontSize:11,color:age>90?"var(--rose)":age>30?"var(--amber)":"var(--t3)",fontFamily:"var(--mono)",flexShrink:0,minWidth:38,textAlign:"right"}}>{age}d</span>
+                </div>);
+              })}
+              {q.length>12&&<div onClick={function(){openCatModal("hd");}} style={{fontSize:11,color:"var(--blue)",fontWeight:600,cursor:"pointer",marginTop:8,textAlign:"center"}}>View all {q.length} →</div>}
+            </div>}
+          </div>);
+        })()}
+
+        {/* Priority Distribution */}
+        <div className="fu fu3" style={{marginBottom:9}}>
           {/* Priority */}
           <div className="card" style={{padding:"13px 16px"}}>
             <div style={{fontSize:13,fontWeight:700,marginBottom:8,color:"var(--t1)"}}>Priority Distribution <span style={{fontWeight:400,color:"var(--t3)",fontSize:11}}>· click to view</span></div>
@@ -904,32 +954,6 @@ function App(){
                 </div>);
               })}
             </div>
-          </div>
-          {/* SLA Summary — computed on ALL tickets in range */}
-          <div className="card" style={{padding:"13px 16px"}}>
-            <div style={{fontSize:13,fontWeight:700,marginBottom:8,color:"var(--t1)"}}>SLA Performance <span style={{fontWeight:400,color:"var(--t3)",fontSize:11}}>· all {slaData.total} tickets</span></div>
-            <div style={{display:"flex",gap:14,alignItems:"center",marginBottom:9}}>
-              <Ring pct={slaData.total>0?Math.round((slaData.total-slaData.all.length)/slaData.total*100):100} sz={70} sw={5} color={slaData.all.length>0?"#D97706":"#059669"} track="#E2E8F0">
-                <div style={{fontSize:15,fontWeight:900,color:slaData.all.length>0?"var(--amber)":"var(--green)"}}>{slaData.total>0?Math.round((slaData.total-slaData.all.length)/slaData.total*100):100}%</div>
-              </Ring>
-              <div>
-                <div style={{fontSize:12,color:"var(--t2)"}}><b style={{color:"var(--green)"}}>{slaData.total-slaData.all.length}</b> within SLA</div>
-                <div style={{fontSize:12,color:"var(--t2)",marginTop:3}}><b style={{color:"var(--rose)"}}>{slaData.all.length}</b> breached</div>
-              </div>
-            </div>
-            <div style={{display:"flex",gap:10}}>
-              <div onClick={function(){openSLAFRModal();}} style={{flex:1,padding:"8px 10px",background:"var(--rose-bg)",borderRadius:8,border:"1px solid var(--rose-border)",cursor:"pointer",textAlign:"center"}}>
-                <div style={{fontSize:16,fontWeight:800,color:"var(--rose)"}}>{slaData.fr.length}</div>
-                <div style={{fontSize:9,color:"var(--t3)",marginTop:2,fontWeight:600}}>1st Response breach</div>
-                <div style={{fontSize:9,color:"var(--t3)"}}>{slaData.frRate}% met of {slaData.frTotal}</div>
-              </div>
-              <div onClick={function(){openSLAResModal();}} style={{flex:1,padding:"8px 10px",background:"var(--amber-bg)",borderRadius:8,border:"1px solid var(--amber-border)",cursor:"pointer",textAlign:"center"}}>
-                <div style={{fontSize:16,fontWeight:800,color:"var(--amber)"}}>{slaData.res.length}</div>
-                <div style={{fontSize:9,color:"var(--t3)",marginTop:2,fontWeight:600}}>Resolution breach</div>
-                <div style={{fontSize:9,color:"var(--t3)"}}>{slaData.resRate}% met of {slaData.resTotal}</div>
-              </div>
-            </div>
-            <div style={{fontSize:9,color:"var(--t3)",marginTop:8,textAlign:"center"}}>SLA: Critical 1h/24h · High 4h/48h · Medium 8h/72h · Low 24h/120h</div>
           </div>
         </div>
 
@@ -1061,372 +1085,6 @@ function App(){
         )}
       </>)}
 
-      {/* ═══ PERFORMANCE ═══ */}
-      {tab==="performance"&&(<>
-        {!w&&teamPerf?(<>
-          {/* ═══ TEAM CONSOLIDATED VIEW ═══ */}
-          <div className="fu" style={{marginBottom:20}}>
-            <h2 style={{fontSize:22,fontWeight:800,letterSpacing:"-.3px"}}>Team Performance</h2>
-            <p style={{color:"var(--t2)",fontSize:13,marginTop:4}}>Consolidated view across all workers · Select a worker above for individual drill-down</p>
-          </div>
-
-          <div className="fu fu1" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(230px,1fr))",gap:14,marginBottom:20}}>
-            <div className="card" style={{padding:24,display:"flex",alignItems:"center",gap:20}}>
-              <Ring pct={teamPerf.rate} sz={82} sw={6} color="#059669" track="#E2E8F0">
-                <div style={{fontSize:20,fontWeight:900,color:"var(--green)"}}>{teamPerf.rate}%</div>
-              </Ring>
-              <div><div style={{fontSize:10,color:"var(--t3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".5px"}}>Team Closure Rate</div>
-              <div style={{fontSize:13,color:"var(--t2)",marginTop:6}}>{teamPerf.cl.toLocaleString()} of {teamPerf.all.toLocaleString()}</div></div>
-            </div>
-            <div className="card" onClick={function(){pmAll();}} style={{padding:24,cursor:"pointer"}}>
-              <div style={{fontSize:10,color:"var(--t3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".5px"}}>Total Handled</div>
-              <div style={{fontSize:38,fontWeight:900,letterSpacing:"-1.5px",marginTop:6,color:"var(--t1)"}}>{teamPerf.all.toLocaleString()}</div>
-              <div style={{display:"flex",gap:14,marginTop:12}}>{Object.entries(teamPerf.bt).map(function(e){return(<div key={e[0]} style={{fontSize:11,color:"var(--t2)"}}><b>{e[1]}</b> {e[0]}{e[1]!==1?"s":""}</div>);})}</div>
-            </div>
-            <div className="card" onClick={function(){pmClosed();}} style={{padding:24,cursor:"pointer"}}>
-              <div style={{fontSize:10,color:"var(--t3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".5px"}}>Closed</div>
-              <div style={{fontSize:38,fontWeight:900,color:"var(--green)",letterSpacing:"-1.5px",marginTop:6}}>{teamPerf.cl.toLocaleString()}</div>
-              <div style={{fontSize:12,color:"var(--t2)",marginTop:12}}><b onClick={function(e){e.stopPropagation();pmOpen();}} style={{color:"var(--amber)",cursor:"pointer",textDecoration:"underline"}}>{teamPerf.op.toLocaleString()}</b> open · <b style={{color:"var(--green)"}}>{teamPerf.san}</b> sanity tested</div>
-            </div>
-            <div className="card" style={{padding:24}}>
-              <div style={{fontSize:10,color:"var(--t3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".5px"}}>Avg Resolution</div>
-              <div style={{fontSize:38,fontWeight:900,color:"var(--blue)",letterSpacing:"-1.5px",marginTop:6}}>{teamPerf.avgR}<span style={{fontSize:16,fontWeight:500}}>d</span></div>
-              <div style={{fontSize:12,color:"var(--t2)",marginTop:12}}>From creation to resolution</div>
-            </div>
-          </div>
-
-          {/* Resolution Classification */}
-          <div className="fu fu2 card" style={{padding:"22px 24px",marginBottom:10}}>
-            <div style={{fontSize:13,fontWeight:700,marginBottom:9,color:"var(--t1)"}}>Resolution Classification</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:16}}>
-              <div onClick={function(){pmHdOnly();}} style={{textAlign:"center",padding:16,background:"var(--green-bg)",borderRadius:12,border:"1px solid var(--green-border)",cursor:"pointer",transition:"box-shadow .2s"}}>                <div style={{fontSize:32,fontWeight:900,color:"var(--green)",letterSpacing:"-1px"}}>{teamPerf.hdOnly.toLocaleString()}</div>
-                <div style={{fontSize:11,fontWeight:700,color:"var(--green)",marginTop:4}}>Closed by HD</div>
-                <div style={{fontSize:10,color:"var(--t3)",marginTop:2}}>Without engineering help</div>
-                <div style={{fontSize:10,color:"var(--t2)",marginTop:6,fontWeight:600}}>{teamPerf.cl>0?Math.round(teamPerf.hdOnly/teamPerf.cl*100):0}% of closed</div>
-              </div>
-              <div onClick={function(){pmEngAsst();}} style={{textAlign:"center",padding:16,background:"var(--violet-bg)",borderRadius:12,border:"1px solid var(--violet-border)",cursor:"pointer"}}>
-                <div style={{fontSize:32,fontWeight:900,color:"var(--violet)",letterSpacing:"-1px"}}>{teamPerf.engAsst.toLocaleString()}</div>
-                <div style={{fontSize:11,fontWeight:700,color:"var(--violet)",marginTop:4}}>Assigned to Engg</div>
-                <div style={{fontSize:10,color:"var(--t3)",marginTop:2}}>Had LRPS linked ticket</div>
-                <div style={{fontSize:10,color:"var(--t2)",marginTop:6,fontWeight:600}}>{teamPerf.cl>0?Math.round(teamPerf.engAsst/teamPerf.cl*100):0}% of closed</div>
-              </div>
-              <div onClick={function(){pmClosed();}} style={{textAlign:"center",padding:16,background:"var(--blue-bg)",borderRadius:12,border:"1px solid #BFDBFE",cursor:"pointer"}}>
-                <div style={{fontSize:32,fontWeight:900,color:"var(--blue)",letterSpacing:"-1px"}}>{teamPerf.cl.toLocaleString()}</div>
-                <div style={{fontSize:11,fontWeight:700,color:"var(--blue)",marginTop:4}}>Total Closed</div>
-                <div style={{fontSize:10,color:"var(--t3)",marginTop:2}}>All resolutions</div>
-                <div style={{marginTop:8,height:8,borderRadius:4,background:"var(--bg)",display:"flex",overflow:"hidden"}}>
-                  <div style={{width:(teamPerf.cl>0?teamPerf.hdOnly/teamPerf.cl*100:0)+"%",background:"var(--green)",transition:"width .6s"}}/>
-                  <div style={{width:(teamPerf.cl>0?teamPerf.engAsst/teamPerf.cl*100:0)+"%",background:"var(--violet)",transition:"width .6s"}}/>
-                </div>
-                <div style={{display:"flex",justifyContent:"center",gap:12,marginTop:6}}>
-                  <span style={{fontSize:9,color:"var(--green)",fontWeight:600}}>● HD Only</span>
-                  <span style={{fontSize:9,color:"var(--violet)",fontWeight:600}}>● Engg Assisted</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Incident + Clarification Breakdown */}
-          <div className="fu fu2 card" style={{padding:"22px 24px",marginBottom:10}}>
-            <div style={{fontSize:13,fontWeight:700,marginBottom:4,color:"var(--t1)"}}>Incident Clarification Analysis</div>
-            <div style={{fontSize:11,color:"var(--t3)",marginBottom:9}}>Incidents with Root Cause = "Client Clarification" — how many resolved by HD alone vs. with engineering</div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:12}}>
-              <div onClick={function(){pmIncidents();}} style={{textAlign:"center",padding:14,background:"var(--bg)",borderRadius:10,border:"1px solid var(--border)",cursor:"pointer"}}>
-                <div style={{fontSize:24,fontWeight:900,color:"var(--t1)"}}>{incClarData.incidents}</div>
-                <div style={{fontSize:10,fontWeight:600,color:"var(--t2)",marginTop:4}}>Total Incidents</div>
-              </div>
-              <div onClick={function(){pmIncClar();}} style={{textAlign:"center",padding:14,background:"var(--cyan-bg)",borderRadius:10,border:"1px solid var(--cyan-border)",cursor:"pointer"}}>
-                <div style={{fontSize:24,fontWeight:900,color:"var(--cyan)"}}>{incClarData.incClar}</div>
-                <div style={{fontSize:10,fontWeight:600,color:"var(--cyan)",marginTop:4}}>Clarification Type</div>
-                <div style={{fontSize:9,color:"var(--t3)",marginTop:2}}>{incClarData.incClarClosed} closed</div>
-              </div>
-              <div onClick={function(){pmIncClarHd();}} style={{textAlign:"center",padding:14,background:"var(--green-bg)",borderRadius:10,border:"1px solid var(--green-border)",cursor:"pointer"}}>
-                <div style={{fontSize:24,fontWeight:900,color:"var(--green)"}}>{incClarData.hdOnly}</div>
-                <div style={{fontSize:10,fontWeight:600,color:"var(--green)",marginTop:4}}>HD Closed</div>
-                <div style={{fontSize:9,color:"var(--t3)",marginTop:2}}>No LRPS needed</div>
-              </div>
-              <div onClick={function(){pmIncClarEng();}} style={{textAlign:"center",padding:14,background:"var(--violet-bg)",borderRadius:10,border:"1px solid var(--violet-border)",cursor:"pointer"}}>
-                <div style={{fontSize:24,fontWeight:900,color:"var(--violet)"}}>{incClarData.engAsst}</div>
-                <div style={{fontSize:10,fontWeight:600,color:"var(--violet)",marginTop:4}}>Engg Assisted</div>
-                <div style={{fontSize:9,color:"var(--t3)",marginTop:2}}>Had LRPS ticket</div>
-              </div>
-            </div>
-            {incClarData.incClarClosed>0&&<div style={{marginTop:12}}>
-              <div style={{height:8,borderRadius:4,background:"var(--bg)",display:"flex",overflow:"hidden"}}>
-                <div style={{width:(incClarData.hdOnly/incClarData.incClarClosed*100)+"%",background:"var(--green)",transition:"width .6s"}}/>
-                <div style={{width:(incClarData.engAsst/incClarData.incClarClosed*100)+"%",background:"var(--violet)",transition:"width .6s"}}/>
-              </div>
-              <div style={{display:"flex",justifyContent:"center",gap:16,marginTop:6}}>
-                <span style={{fontSize:10,color:"var(--green)",fontWeight:600}}>● HD Only {Math.round(incClarData.hdOnly/incClarData.incClarClosed*100)}%</span>
-                <span style={{fontSize:10,color:"var(--violet)",fontWeight:600}}>● Engg {Math.round(incClarData.engAsst/incClarData.incClarClosed*100)}%</span>
-              </div>
-            </div>}
-          </div>
-
-          {/* Monthly trend */}
-          {teamPerf.months.length>0&&(
-            <div className="fu fu2 card" style={{padding:"22px 24px",marginBottom:10}}>
-              <div style={{fontSize:13,fontWeight:700,marginBottom:10,color:"var(--t1)"}}>Monthly Volume <span style={{fontWeight:400,color:"var(--t3)",fontSize:11}}>· click bars to view tickets</span></div>
-              <div style={{display:"flex",alignItems:"flex-end",gap:8,height:140,padding:"0 4px"}}>
-                {teamPerf.months.map(function(x,i){var m=x[0],d=x[1];var mx=Math.max.apply(null,teamPerf.months.map(function(z){return Math.max(z[1].cr,z[1].cl);}));mx=mx||1;
-                  return(<div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
-                    <div style={{display:"flex",gap:3,alignItems:"flex-end",width:"100%",height:110}}>
-                      <div onClick={function(){perfModal("Created in "+m,"📝","#2563EB",function(t){return fm(t.Created)===m;});}} style={{flex:1,background:"var(--blue-light)",borderRadius:"4px 4px 0 0",height:Math.max(d.cr/mx*100,8)+"%",border:"1px solid #BFDBFE",transition:"height .6s",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",minHeight:22}}>
-                        <span style={{fontSize:9,fontWeight:700,color:"var(--blue)"}}>{d.cr}</span>
-                      </div>
-                      <div onClick={function(){perfModal("Closed in "+m,"✅","#059669",function(t){return t.Status==="Closed"&&fm(t.Resolved)===m;});}} style={{flex:1,background:"var(--green-bg)",borderRadius:"4px 4px 0 0",height:Math.max(d.cl/mx*100,8)+"%",border:"1px solid var(--green-border)",transition:"height .6s",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",minHeight:22}}>
-                        <span style={{fontSize:9,fontWeight:700,color:"var(--green)"}}>{d.cl}</span>
-                      </div>
-                    </div>
-                    <div style={{fontSize:9,color:"var(--t3)",whiteSpace:"nowrap",fontWeight:600,marginTop:2}}>{m}</div>
-                  </div>);
-                })}
-              </div>
-              <div style={{display:"flex",gap:20,marginTop:12}}>
-                <div style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--t2)"}}><div style={{width:12,height:12,borderRadius:3,background:"var(--blue-light)",border:"1px solid #BFDBFE"}}/>Created</div>
-                <div style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--t2)"}}><div style={{width:12,height:12,borderRadius:3,background:"var(--green-bg)",border:"1px solid var(--green-border)"}}/>Closed</div>
-              </div>
-            </div>
-          )}
-
-          {/* Worker Leaderboard */}
-          <div className="fu fu3 card" style={{overflow:"hidden",marginBottom:10}}>
-            <div style={{padding:"11px 18px",borderBottom:"1px solid var(--border)",fontWeight:700,fontSize:13,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
-              <span>Worker Leaderboard</span>
-              <span style={{fontSize:11,color:"var(--t3)",fontWeight:400}}>Click a row to see individual performance</span>
-            </div>
-            <div style={{overflowX:"auto"}}><table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
-              <thead><tr style={{borderBottom:"2px solid var(--border)",background:"var(--bg)"}}>
-                <th style={{padding:"7px 12px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".6px"}}>#</th>
-                <th style={{padding:"7px 12px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".6px"}}>Worker</th>
-                <th style={{padding:"10px 8px",textAlign:"right",fontSize:10,fontWeight:700,color:"var(--blue)"}}>Handled</th>
-                <th style={{padding:"10px 8px",textAlign:"right",fontSize:10,fontWeight:700,color:"var(--green)"}}>Closed</th>
-                <th style={{padding:"10px 8px",textAlign:"right",fontSize:10,fontWeight:700,color:"#059669"}}>HD Only</th>
-                <th style={{padding:"10px 8px",textAlign:"right",fontSize:10,fontWeight:700,color:"var(--violet)"}}>Engg</th>
-                <th style={{padding:"10px 8px",textAlign:"right",fontSize:10,fontWeight:700,color:"var(--t3)"}}>Open</th>
-                <th style={{padding:"7px 12px",textAlign:"right",fontSize:10,fontWeight:700,color:"var(--t3)"}}>Rate</th>
-                <th style={{padding:"7px 12px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--t3)",minWidth:140}}>Closure Rate</th>
-                <th style={{padding:"10px 8px",textAlign:"right",fontSize:10,fontWeight:700,color:"var(--green)"}}>Sanity</th>
-              </tr></thead>
-              <tbody>{teamPerf.wl.slice(0,25).map(function(wr,i){
-                return(<tr key={wr.name} onClick={function(){setW(wr.name);}} style={{cursor:"pointer",borderBottom:"1px solid var(--border)",transition:"background .15s"}} onMouseOver={function(e){e.currentTarget.style.background="var(--blue-bg)";}} onMouseOut={function(e){e.currentTarget.style.background="";}}>
-                  <td style={{padding:"7px 12px",fontWeight:700,color:"var(--t3)",fontSize:11}}>{i+1}</td>
-                  <td style={{padding:"7px 12px",fontWeight:600}}>{wr.name}</td>
-                  <td style={{padding:"10px 8px",textAlign:"right",fontWeight:700,color:"var(--blue)",fontFamily:"var(--mono)"}}>{wr.total.toLocaleString()}</td>
-                  <td style={{padding:"10px 8px",textAlign:"right",fontWeight:700,color:"var(--green)",fontFamily:"var(--mono)"}}>{wr.closed.toLocaleString()}</td>
-                  <td style={{padding:"10px 8px",textAlign:"right",fontWeight:600,color:wr.hdOnly>0?"#059669":"var(--t4)",fontFamily:"var(--mono)"}}>{wr.hdOnly||"·"}</td>
-                  <td style={{padding:"10px 8px",textAlign:"right",fontWeight:600,color:wr.engAsst>0?"var(--violet)":"var(--t4)",fontFamily:"var(--mono)"}}>{wr.engAsst||"·"}</td>
-                  <td style={{padding:"10px 8px",textAlign:"right",fontWeight:600,color:wr.total-wr.closed>0?"var(--amber)":"var(--t4)",fontFamily:"var(--mono)"}}>{wr.total-wr.closed}</td>
-                  <td style={{padding:"7px 12px",textAlign:"right",fontWeight:800,color:wr.rate>=tAvg.r?"var(--green)":"var(--rose)",fontFamily:"var(--mono)"}}>{wr.rate}%</td>
-                  <td style={{padding:"7px 12px"}}>
-                    <div style={{display:"flex",alignItems:"center",gap:8}}>
-                      <div style={{flex:1,height:6,borderRadius:3,background:"var(--bg)",maxWidth:120}}>
-                        <div style={{height:"100%",borderRadius:3,background:wr.rate>=tAvg.r?"var(--green)":"var(--amber)",width:wr.rate+"%",transition:"width .6s"}}/>
-                      </div>
-                    </div>
-                  </td>
-                  <td style={{padding:"10px 8px",textAlign:"right",fontWeight:600,color:wr.san>0?"var(--green)":"var(--t4)",fontFamily:"var(--mono)"}}>{wr.san||"·"}</td>
-                </tr>);
-              })}</tbody>
-            </table></div>
-          </div>
-
-          {/* Breakdowns */}
-          <div className="fu fu4" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(300px,1fr))",gap:14}}>
-            <div className="card" style={{padding:"13px 16px"}}><div style={{fontSize:12,fontWeight:700,marginBottom:9,color:"var(--t1)"}}>By Project <span style={{fontWeight:400,color:"var(--t3)",fontSize:10}}>· click to view</span></div>
-              {teamPerf.tp.map(function(x,i){var p=x[0],d=x[1];var pct=d.t?Math.round(d.c/d.t*100):0;
-                return(<div key={i} onClick={function(){perfModal(p+" tickets","🏢","#2563EB",function(t){return t.Project===p;});}} style={{marginBottom:8,cursor:"pointer",padding:"4px 0",borderRadius:4}}>
-                  <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:5}}>
-                    <span style={{color:"var(--t2)",maxWidth:180,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p}</span>
-                    <span style={{color:"var(--t3)",fontFamily:"var(--mono)",fontSize:10}}>{d.c}/{d.t} · {pct}%</span>
-                  </div>
-                  <div style={{height:6,borderRadius:3,background:"var(--bg)"}}>
-                    <div style={{height:"100%",borderRadius:3,background:"linear-gradient(90deg,var(--blue),#60A5FA)",width:pct+"%",transition:"width .6s"}}/>
-                  </div>
-                </div>);
-              })}
-            </div>
-            <div className="card" style={{padding:"13px 16px"}}><div style={{fontSize:12,fontWeight:700,marginBottom:9,color:"var(--t1)"}}>By Type of Fix <span style={{fontWeight:400,color:"var(--t3)",fontSize:10}}>· click to view</span></div>
-              {teamPerf.tf.map(function(x,i){var f=x[0],c=x[1];var mx=teamPerf.tf[0]?teamPerf.tf[0][1]:1;
-                return(<div key={i} onClick={function(){perfModal("Type of Fix: "+f,"🔧","#059669",function(t){return t["Type of Fix"]===f;});}} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10,cursor:"pointer",padding:"3px 0",borderRadius:4}}>
-                  <span style={{fontSize:10,color:"var(--t2)",minWidth:100,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{f}</span>
-                  <div style={{flex:1,height:6,borderRadius:3,background:"var(--bg)"}}>
-                    <div style={{height:"100%",borderRadius:3,background:"var(--green)",width:(c/mx*100)+"%",transition:"width .6s"}}/>
-                  </div>
-                  <span style={{fontSize:10,color:"var(--t3)",minWidth:28,textAlign:"right",fontFamily:"var(--mono)"}}>{c}</span>
-                </div>);
-              })}
-            </div>
-            <div className="card" style={{padding:"13px 16px"}}><div style={{fontSize:12,fontWeight:700,marginBottom:9,color:"var(--t1)"}}>By Root Cause <span style={{fontWeight:400,color:"var(--t3)",fontSize:10}}>· click to view</span></div>
-              {teamPerf.tr.map(function(x,i){var r=x[0],c=x[1];var mx=teamPerf.tr[0]?teamPerf.tr[0][1]:1;
-                return(<div key={i} onClick={function(){perfModal("Root Cause: "+r,"📋","#D97706",function(t){return t["Root Cause"]===r;});}} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10,cursor:"pointer",padding:"3px 0",borderRadius:4}}>
-                  <span style={{fontSize:10,color:"var(--t2)",minWidth:110,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r}</span>
-                  <div style={{flex:1,height:6,borderRadius:3,background:"var(--bg)"}}>
-                    <div style={{height:"100%",borderRadius:3,background:"var(--amber)",width:(c/mx*100)+"%",transition:"width .6s"}}/>
-                  </div>
-                  <span style={{fontSize:10,color:"var(--t3)",minWidth:28,textAlign:"right",fontFamily:"var(--mono)"}}>{c}</span>
-                </div>);
-              })}
-            </div>
-          </div>
-        </>):w&&perf?(<>
-          <div className="fu" style={{marginBottom:20}}>
-            <h2 style={{fontSize:22,fontWeight:800,letterSpacing:"-.3px"}}>{w}</h2>
-            <p style={{color:"var(--t2)",fontSize:13,marginTop:4}}>Performance overview across all tickets</p>
-          </div>
-          <div className="fu fu1" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(230px,1fr))",gap:14,marginBottom:20}}>
-            <div className="card" style={{padding:24,display:"flex",alignItems:"center",gap:20}}>
-              <Ring pct={perf.rate} sz={82} sw={6} color={perf.rate>=tAvg.r?"#059669":"#D97706"} track="#E2E8F0">
-                <div style={{fontSize:20,fontWeight:900,color:perf.rate>=tAvg.r?"var(--green)":"var(--amber)"}}>{perf.rate}%</div>
-              </Ring>
-              <div><div style={{fontSize:10,color:"var(--t3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".5px"}}>Closure Rate</div>
-              <div style={{fontSize:13,color:"var(--t2)",marginTop:6}}>Team avg: <b>{tAvg.r}%</b></div>
-              {perf.rate>=tAvg.r?<div style={{fontSize:11,color:"var(--green)",marginTop:3,fontWeight:700}}>▲ Above average</div>:
-              <div style={{fontSize:11,color:"var(--rose)",marginTop:3,fontWeight:700}}>▼ Below average</div>}</div>
-            </div>
-            <div className="card" style={{padding:24}}>
-              <div style={{fontSize:10,color:"var(--t3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".5px"}}>Total Handled</div>
-              <div style={{fontSize:38,fontWeight:900,letterSpacing:"-1.5px",marginTop:6,color:"var(--t1)"}}>{perf.all.toLocaleString()}</div>
-              <div style={{display:"flex",gap:14,marginTop:12}}>{Object.entries(perf.bt).map(([k,v])=>(<div key={k} style={{fontSize:11,color:"var(--t2)"}}><b>{v}</b> {k}{v!==1?"s":""}</div>))}</div>
-            </div>
-            <div className="card" style={{padding:24}}>
-              <div style={{fontSize:10,color:"var(--t3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".5px"}}>Closed</div>
-              <div style={{fontSize:38,fontWeight:900,color:"var(--green)",letterSpacing:"-1.5px",marginTop:6}}>{perf.cl.toLocaleString()}</div>
-              <div style={{fontSize:12,color:"var(--t2)",marginTop:12}}><b style={{color:"var(--amber)"}}>{perf.op}</b> open · <b style={{color:"var(--green)"}}>{perf.san}</b> sanity tested</div>
-            </div>
-            <div className="card" style={{padding:24}}>
-              <div style={{fontSize:10,color:"var(--t3)",fontWeight:700,textTransform:"uppercase",letterSpacing:".5px"}}>Avg Resolution</div>
-              <div style={{fontSize:38,fontWeight:900,color:"var(--blue)",letterSpacing:"-1.5px",marginTop:6}}>{perf.avgR}<span style={{fontSize:16,fontWeight:500}}>d</span></div>
-              <div style={{fontSize:12,color:"var(--t2)",marginTop:12}}>From creation to resolution</div>
-            </div>
-          </div>
-
-          {/* Resolution Classification — Individual */}
-          <div className="fu fu2 card" style={{padding:"22px 24px",marginBottom:10}}>
-            <div style={{fontSize:13,fontWeight:700,marginBottom:9,color:"var(--t1)"}}>Resolution Classification</div>
-            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr 1fr",gap:12}}>
-              <div onClick={function(){pmHdOnly();}} style={{textAlign:"center",padding:14,background:"var(--green-bg)",borderRadius:12,border:"1px solid var(--green-border)",cursor:"pointer"}}>
-                <div style={{fontSize:28,fontWeight:900,color:"var(--green)",letterSpacing:"-1px"}}>{perf.hdOnly}</div>
-                <div style={{fontSize:10,fontWeight:700,color:"var(--green)",marginTop:4}}>Closed by HD</div>
-                <div style={{fontSize:9,color:"var(--t3)",marginTop:2}}>No LRPS ticket</div>
-              </div>
-              <div onClick={function(){pmEngAsst();}} style={{textAlign:"center",padding:14,background:"var(--violet-bg)",borderRadius:12,border:"1px solid var(--violet-border)",cursor:"pointer"}}>
-                <div style={{fontSize:28,fontWeight:900,color:"var(--violet)",letterSpacing:"-1px"}}>{perf.engAsst}</div>
-                <div style={{fontSize:10,fontWeight:700,color:"var(--violet)",marginTop:4}}>Engg Assisted</div>
-                <div style={{fontSize:9,color:"var(--t3)",marginTop:2}}>Had LRPS ticket</div>
-              </div>
-              <div style={{textAlign:"center",padding:14,background:"#FFF7ED",borderRadius:12,border:"1px solid #FED7AA"}}>
-                <div style={{fontSize:28,fontWeight:900,color:"var(--amber)",letterSpacing:"-1px"}}>{perf.allEngAsst}</div>
-                <div style={{fontSize:10,fontWeight:700,color:"var(--amber)",marginTop:4}}>Total → Engg</div>
-                <div style={{fontSize:9,color:"var(--t3)",marginTop:2}}>All tickets assigned</div>
-              </div>
-              <div style={{textAlign:"center",padding:14,background:"var(--blue-bg)",borderRadius:12,border:"1px solid #BFDBFE"}}>
-                <div style={{fontSize:28,fontWeight:900,color:"var(--blue)",letterSpacing:"-1px"}}>{perf.allHdOnly}</div>
-                <div style={{fontSize:10,fontWeight:700,color:"var(--blue)",marginTop:4}}>HD Only (All)</div>
-                <div style={{fontSize:9,color:"var(--t3)",marginTop:2}}>No LRPS (open+closed)</div>
-              </div>
-            </div>
-            {perf.cl>0&&<div style={{marginTop:12,height:8,borderRadius:4,background:"var(--bg)",display:"flex",overflow:"hidden"}}>
-              <div style={{width:(perf.hdOnly/perf.cl*100)+"%",background:"var(--green)",transition:"width .6s"}} title={"HD Only: "+perf.hdOnly}/>
-              <div style={{width:(perf.engAsst/perf.cl*100)+"%",background:"var(--violet)",transition:"width .6s"}} title={"Engg Assisted: "+perf.engAsst}/>
-            </div>}
-            {perf.cl>0&&<div style={{display:"flex",justifyContent:"center",gap:16,marginTop:6}}>
-              <span style={{fontSize:10,color:"var(--green)",fontWeight:600}}>● HD Only {perf.cl>0?Math.round(perf.hdOnly/perf.cl*100):0}%</span>
-              <span style={{fontSize:10,color:"var(--violet)",fontWeight:600}}>● Engg Assisted {perf.cl>0?Math.round(perf.engAsst/perf.cl*100):0}%</span>
-            </div>}
-          </div>
-
-          {/* Incident Clarification Analysis — Individual */}
-          <div className="fu fu2 card" style={{padding:"22px 24px",marginBottom:10}}>
-            <div style={{fontSize:13,fontWeight:700,marginBottom:4,color:"var(--t1)"}}>Incident Clarification Analysis</div>
-            <div style={{fontSize:11,color:"var(--t3)",marginBottom:9}}>Incidents with Root Cause = "Client Clarification" — HD vs Engineering resolution</div>
-            <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:12}}>
-              <div onClick={function(){pmIncidents();}} style={{textAlign:"center",padding:14,background:"var(--bg)",borderRadius:10,border:"1px solid var(--border)",cursor:"pointer"}}>
-                <div style={{fontSize:24,fontWeight:900,color:"var(--t1)"}}>{incClarData.incidents}</div>
-                <div style={{fontSize:10,fontWeight:600,color:"var(--t2)",marginTop:4}}>Total Incidents</div>
-              </div>
-              <div onClick={function(){pmIncClar();}} style={{textAlign:"center",padding:14,background:"var(--cyan-bg)",borderRadius:10,border:"1px solid var(--cyan-border)",cursor:"pointer"}}>
-                <div style={{fontSize:24,fontWeight:900,color:"var(--cyan)"}}>{incClarData.incClar}</div>
-                <div style={{fontSize:10,fontWeight:600,color:"var(--cyan)",marginTop:4}}>Clarification</div>
-                <div style={{fontSize:9,color:"var(--t3)",marginTop:2}}>{incClarData.incClarClosed} closed</div>
-              </div>
-              <div onClick={function(){pmIncClarHd();}} style={{textAlign:"center",padding:14,background:"var(--green-bg)",borderRadius:10,border:"1px solid var(--green-border)",cursor:"pointer"}}>
-                <div style={{fontSize:24,fontWeight:900,color:"var(--green)"}}>{incClarData.hdOnly}</div>
-                <div style={{fontSize:10,fontWeight:600,color:"var(--green)",marginTop:4}}>HD Closed</div>
-                <div style={{fontSize:9,color:"var(--t3)",marginTop:2}}>No LRPS</div>
-              </div>
-              <div onClick={function(){pmIncClarEng();}} style={{textAlign:"center",padding:14,background:"var(--violet-bg)",borderRadius:10,border:"1px solid var(--violet-border)",cursor:"pointer"}}>
-                <div style={{fontSize:24,fontWeight:900,color:"var(--violet)"}}>{incClarData.engAsst}</div>
-                <div style={{fontSize:10,fontWeight:600,color:"var(--violet)",marginTop:4}}>Engg Assisted</div>
-                <div style={{fontSize:9,color:"var(--t3)",marginTop:2}}>Had LRPS</div>
-              </div>
-            </div>
-            {incClarData.incClarClosed>0&&<div style={{marginTop:10,height:8,borderRadius:4,background:"var(--bg)",display:"flex",overflow:"hidden"}}>
-              <div style={{width:(incClarData.hdOnly/incClarData.incClarClosed*100)+"%",background:"var(--green)",transition:"width .6s"}}/>
-              <div style={{width:(incClarData.engAsst/incClarData.incClarClosed*100)+"%",background:"var(--violet)",transition:"width .6s"}}/>
-            </div>}
-          </div>
-
-          {perf.months.length>0&&(
-            <div className="fu fu2 card" style={{padding:"22px 24px",marginBottom:10}}>
-              <div style={{fontSize:13,fontWeight:700,marginBottom:10,color:"var(--t1)"}}>Monthly Volume <span style={{fontWeight:400,color:"var(--t3)",fontSize:11}}>· click bars to view tickets</span></div>
-              <div style={{display:"flex",alignItems:"flex-end",gap:8,height:140,padding:"0 4px"}}>
-                {perf.months.map(([m,d],i)=>{const mx=Math.max(...perf.months.map(([,x])=>Math.max(x.cr,x.cl)),1);
-                  return(<div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
-                    <div style={{display:"flex",gap:3,alignItems:"flex-end",width:"100%",height:110}}>
-                      <div onClick={function(){perfModal("Created in "+m,"📝","#2563EB",function(t){return fm(t.Created)===m;});}} style={{flex:1,background:"var(--blue-light)",borderRadius:"4px 4px 0 0",height:`${Math.max(d.cr/mx*100,8)}%`,border:"1px solid #BFDBFE",transition:"height .6s",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",minHeight:22}}>
-                        <span style={{fontSize:9,fontWeight:700,color:"var(--blue)"}}>{d.cr}</span>
-                      </div>
-                      <div onClick={function(){perfModal("Closed in "+m,"✅","#059669",function(t){return t.Status==="Closed"&&fm(t.Resolved)===m;});}} style={{flex:1,background:"var(--green-bg)",borderRadius:"4px 4px 0 0",height:`${Math.max(d.cl/mx*100,8)}%`,border:"1px solid var(--green-border)",transition:"height .6s",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",minHeight:22}}>
-                        <span style={{fontSize:9,fontWeight:700,color:"var(--green)"}}>{d.cl}</span>
-                      </div>
-                    </div>
-                    <div style={{fontSize:9,color:"var(--t3)",whiteSpace:"nowrap",fontWeight:600,marginTop:2}}>{m}</div>
-                  </div>);
-                })}
-              </div>
-              <div style={{display:"flex",gap:20,marginTop:12}}>
-                <div style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--t2)"}}><div style={{width:12,height:12,borderRadius:3,background:"var(--blue-light)",border:"1px solid #BFDBFE"}}/>Created</div>
-                <div style={{display:"flex",alignItems:"center",gap:6,fontSize:11,color:"var(--t2)"}}><div style={{width:12,height:12,borderRadius:3,background:"var(--green-bg)",border:"1px solid var(--green-border)"}}/>Closed</div>
-              </div>
-            </div>
-          )}
-          <div className="fu fu3" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(300px,1fr))",gap:14}}>
-            <div className="card" style={{padding:"13px 16px"}}><div style={{fontSize:12,fontWeight:700,marginBottom:9,color:"var(--t1)"}}>By Project <span style={{fontWeight:400,color:"var(--t3)",fontSize:10}}>· click to view</span></div>
-              {perf.tp.map(([p,d],i)=>{const pct=d.t?Math.round(d.c/d.t*100):0;
-                return(<div key={i} onClick={function(){perfModal(p+" tickets","🏢","#2563EB",function(t){return t.Project===p;});}} style={{marginBottom:8,cursor:"pointer",padding:"4px 0"}}>
-                  <div style={{display:"flex",justifyContent:"space-between",fontSize:11,marginBottom:5}}>
-                    <span style={{color:"var(--t2)",maxWidth:180,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{p}</span>
-                    <span style={{color:"var(--t3)",fontFamily:"var(--mono)",fontSize:10}}>{d.c}/{d.t} · {pct}%</span>
-                  </div>
-                  <div style={{height:6,borderRadius:3,background:"var(--bg)"}}>
-                    <div style={{height:"100%",borderRadius:3,background:"linear-gradient(90deg,var(--blue),#60A5FA)",width:`${pct}%`,transition:"width .6s"}}/>
-                  </div>
-                </div>);})}
-            </div>
-            <div className="card" style={{padding:"13px 16px"}}><div style={{fontSize:12,fontWeight:700,marginBottom:9,color:"var(--t1)"}}>By Type of Fix <span style={{fontWeight:400,color:"var(--t3)",fontSize:10}}>· click to view</span></div>
-              {perf.tf.map(([f,c],i)=>{const mx=perf.tf[0]?.[1]||1;
-                return(<div key={i} onClick={function(){perfModal("Type of Fix: "+f,"🔧","#059669",function(t){return t["Type of Fix"]===f;});}} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10,cursor:"pointer",padding:"3px 0"}}>
-                  <span style={{fontSize:10,color:"var(--t2)",minWidth:100,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{f}</span>
-                  <div style={{flex:1,height:6,borderRadius:3,background:"var(--bg)"}}>
-                    <div style={{height:"100%",borderRadius:3,background:"var(--green)",width:`${c/mx*100}%`,transition:"width .6s"}}/>
-                  </div>
-                  <span style={{fontSize:10,color:"var(--t3)",minWidth:28,textAlign:"right",fontFamily:"var(--mono)"}}>{c}</span>
-                </div>);})}
-            </div>
-            <div className="card" style={{padding:"13px 16px"}}><div style={{fontSize:12,fontWeight:700,marginBottom:9,color:"var(--t1)"}}>By Root Cause <span style={{fontWeight:400,color:"var(--t3)",fontSize:10}}>· click to view</span></div>
-              {perf.tr.map(([r,c],i)=>{const mx=perf.tr[0]?.[1]||1;
-                return(<div key={i} onClick={function(){perfModal("Root Cause: "+r,"📋","#D97706",function(t){return t["Root Cause"]===r;});}} style={{display:"flex",alignItems:"center",gap:10,marginBottom:10,cursor:"pointer",padding:"3px 0"}}>
-                  <span style={{fontSize:10,color:"var(--t2)",minWidth:110,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{r}</span>
-                  <div style={{flex:1,height:6,borderRadius:3,background:"var(--bg)"}}>
-                    <div style={{height:"100%",borderRadius:3,background:"var(--amber)",width:`${c/mx*100}%`,transition:"width .6s"}}/>
-                  </div>
-                  <span style={{fontSize:10,color:"var(--t3)",minWidth:28,textAlign:"right",fontFamily:"var(--mono)"}}>{c}</span>
-                </div>);})}
-            </div>
-          </div>
-        </>):null}
-      </>)}
 
       {/* ═══ DATA GAPS ═══ */}
       {tab==="gaps"&&(<>
