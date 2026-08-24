@@ -657,12 +657,12 @@ function render(){
           '<div class="chartcard"><div class="ct">Open by Priority <span style="color:var(--faint);font-weight:500">· '+critHigh+' Critical/High open</span></div>'+
             segBar(PRIO_ORDER.map(function(p){return {label:p,val:openByPrio[p],color:PRIO_COLOR[p],data:'data-prio="'+esc(p)+'"'};}))+
             legendRow(PRIO_ORDER.map(function(p){return {label:p,val:openByPrio[p],color:PRIO_COLOR[p]};}))+
-            insight('<b>'+critHigh+'</b> of '+openList.length+' open ticket'+(openList.length!==1?'s':'')+' '+(critHigh===1?'is':'are')+' <b>Critical/High</b> priority — these should be worked first.')+
+            insight(critHigh? ('<b>'+critHigh+'</b> of the '+openList.length+' open ticket'+(openList.length!==1?'s':'')+' '+(critHigh===1?'is':'are')+' <b>Critical or High</b> priority and '+(critHigh===1?'is':'are')+' being prioritised for resolution.') : 'None of the open tickets are Critical or High priority.')+
           '</div>'+
           '<div class="chartcard"><div class="ct">Open by Age <span style="color:var(--faint);font-weight:500">· oldest '+oldestOpen+'d</span></div>'+
             segBar(AGE_LABELS.map(function(l,i){return {label:l,val:ageCounts[i],color:AGE_COLORS[i],data:'data-age="'+i+'"'};}))+
             legendRow(AGE_LABELS.map(function(l,i){return {label:l,val:ageCounts[i],color:AGE_COLORS[i]};}))+
-            insight('<b>'+(ageCounts[2]+ageCounts[3])+'</b> open ticket'+((ageCounts[2]+ageCounts[3])!==1?'s':'')+' '+((ageCounts[2]+ageCounts[3])===1?'is':'are')+' over 30 days old'+(ageCounts[3]?', including <b>'+ageCounts[3]+'</b> beyond 60 days':'')+'. Ageing tickets risk client frustration — clear the oldest first.')+
+            insight((ageCounts[2]+ageCounts[3])? ('<b>'+(ageCounts[2]+ageCounts[3])+'</b> open ticket'+((ageCounts[2]+ageCounts[3])!==1?'s':'')+' '+((ageCounts[2]+ageCounts[3])===1?'is':'are')+' over 30 days old'+(ageCounts[3]?', including <b>'+ageCounts[3]+'</b> beyond 60 days':'')+'. These older items are being actively reviewed to bring them to closure.') : 'All open tickets are within 30 days old.')+
           '</div>'+
         '</div>'+
 
@@ -672,11 +672,11 @@ function render(){
           '<div class="chartcard"><div class="ct">New Tickets by Priority <span style="color:var(--faint);font-weight:500">· created each week</span></div>'+
             stackedBars(weeks,inflow,PRIO_ORDER,PRIO_COLOR)+
             '<div class="legend">'+PRIO_ORDER.map(function(p){return '<span class="li"><span class="sw" style="background:'+PRIO_COLOR[p]+'"></span>'+p+'</span>';}).join("")+'</div>'+
-            insight('<b>'+infLast+'</b> new ticket'+(infLast!==1?'s':'')+' in '+wkLabel(lastWk)+chg(infLast,infPrev,false)+'; mostly <b>'+domP+'</b> priority ('+domPn+'). Tall bars flag weeks that needed more capacity.')+
+            insight('<b>'+infLast+'</b> new ticket'+(infLast!==1?'s':'')+' in '+wkLabel(lastWk)+chg(infLast,infPrev,false)+', mostly <b>'+domP+'</b> priority ('+domPn+'). Taller bars indicate weeks with higher inbound volume.')+
           '</div>'+
           '<div class="chartcard"><div class="ct">Resolved Tickets <span style="color:var(--faint);font-weight:500">· closed each week</span></div>'+
             simpleBars(weeks,weeks.map(function(w){return resolved[w];}),["#0F766E"],"resolved")+
-            insight('<b>'+resLast+'</b> resolved in '+wkLabel(lastWk)+chg(resLast,resPrev,true)+' — averaging about <b>'+resAvg+'/week</b>. Compare against inflow: resolving fewer than arrive grows the backlog.')+
+            insight('<b>'+resLast+'</b> resolved in '+wkLabel(lastWk)+chg(resLast,resPrev,true)+' — averaging about <b>'+resAvg+'/week</b>. Comparing this with new tickets shows whether the backlog is growing or reducing.')+
           '</div>'+
         '</div>'+
 
@@ -685,7 +685,7 @@ function render(){
         caption('Where the open SVM work sits, and how quickly tickets are being resolved. <b>Click a row or point to list tickets.</b>')+
         '<div class="grid2">'+
           '<div class="chartcard"><div class="ct">Component-Wise Open Ticket Count (SVM) <span style="color:var(--faint);font-weight:500">· by product area</span></div>'+ hbars(comps,"var(--hd)")+
-            insight(compTop? ('Open SVM work is concentrated in <b>'+esc(compTop.label)+'</b>'+(compTop2?' and <b>'+esc(compTop2.label)+'</b>':'')+' — together <b>'+pct((compTop.val+(compTop2?compTop2.val:0)),svmOpenTot)+'%</b> of the '+svmOpenTot+' open SVM ticket'+(svmOpenTot!==1?'s':'')+'. Clearing these reduces the backlog fastest.') : 'No open tickets are currently on the SVM side for this client.')+
+            insight(compTop? ('Open SVM work is concentrated in <b>'+esc(compTop.label)+'</b>'+(compTop2?' and <b>'+esc(compTop2.label)+'</b>':'')+' — together <b>'+pct((compTop.val+(compTop2?compTop2.val:0)),svmOpenTot)+'%</b> of the '+svmOpenTot+' open SVM ticket'+(svmOpenTot!==1?'s':'')+', where our team is focusing effort.') : 'No open tickets are currently on the SVM side for this client.')+
           '</div>'+
           '<div class="chartcard"><div class="ct">Average Resolution Days <span style="color:var(--faint);font-weight:500">· created → resolved</span></div>'+
             lineChartMini(weeks,weeks.map(function(w){return resDays[w];}),"var(--client)","resdays")+
@@ -697,7 +697,7 @@ function render(){
         '<div class="sectitle">Open Tickets by Activity Stage <span class="sub">Client vs SVM · this export</span></div>'+
         caption('Where the open tickets sit in the delivery pipeline right now, and whose action is next. <b>Click a number to list those tickets.</b>')+
         currentStageHTML(stageRows)+
-        insight('Each row is a pipeline phase (from Status); the <b style="color:var(--client2)">Client</b> / <b style="color:var(--hd)">SVM</b> split is who must act next (from the Next Action field), so the same phase can have some of each.'+(topStage&&stageCount[topStage]?' The biggest phase is <b>'+esc(shortStage(topStage))+'</b> with <b>'+stageCount[topStage]+'</b> open.':'')+' A high <b style="color:var(--client2)">Client</b> column means those tickets are waiting on your team.')+
+        insight('<b style="color:var(--client2)">Client</b> and <b style="color:var(--hd)">SVM</b> show who needs to act next on the open tickets in each phase.'+(topStage&&stageCount[topStage]?' The biggest phase is <b>'+esc(shortStage(topStage))+'</b> ('+stageCount[topStage]+' open).':'')+' A high <b style="color:var(--client2)">Client</b> count means those tickets are waiting on your team.')+
 
         /* ── Pending ticket lists (printed in the PDF) ── */
         '<div class="sectitle">Pending Tickets — with SVM <span class="sub">'+svmPending.length+' open · our action</span></div>'+
