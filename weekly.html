@@ -742,7 +742,17 @@ function bind(){
     else { S.cols=S.cols.filter(function(x){return x!==k;}); }
     S.colsOpen=true; render();
   }; });
-  el("printbtn").onclick=function(){ window.print(); };
+  el("printbtn").onclick=function(){
+    var orig=document.title;
+    function slug(s){ return String(s||"").replace(/[^\w\s-]/g,"").trim().replace(/\s+/g,"-").slice(0,60); }
+    var parts=["Weekly-Report", slug(S.client)||"All-clients"];
+    if(S.na) parts.push(S.na.toUpperCase());
+    if(S.status) parts.push(slug(S.status));
+    parts.push(new Date().toISOString().slice(0,10));
+    document.title=parts.join("_");
+    window.print();
+    setTimeout(function(){ document.title=orig; }, 1000);
+  };
   el("backbtn").onclick=function(){ window.location.href="index.html"; };
   bindDrill();
 }
