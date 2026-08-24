@@ -678,7 +678,7 @@ function renderShell(){
   var rcList=[...new Set(RAW.map(function(t){return t.rc;}).filter(Boolean))].sort();
   var issueList=[...new Set(RAW.map(function(t){return t.issue;}).filter(Boolean))].sort();
   var projList=[...new Set(RAW.map(function(t){return t.project;}).filter(Boolean))].sort();
-  var exCount=RAW.filter(function(t){return (!t.components||!t.svm||!t.rc) && (!S.proj || t.project===S.proj);}).length;
+  var exCount=RAW.filter(function(t){return (!t.components||!t.svm||!t.rc||!t.currentWorker) && (!S.proj || t.project===S.proj);}).length;
   var pendCount=f.filter(function(t){return t.status && t.status!=="Closed";}).length;
 
   var app=el("app");
@@ -713,7 +713,7 @@ function renderShell(){
           '</div>'+
           '<div id="gs-dropdown" style="display:none;position:absolute;top:40px;right:0;width:460px;max-height:480px;overflow-y:auto;background:#fff;border:1px solid var(--line);border-radius:14px;box-shadow:0 12px 40px rgba(16,24,40,.18);z-index:300"></div>'+
         '</div>'+
-        '<button class="ghost" id="newfile">↻ New file</button>'+
+        '<button class="ghost" id="newfile">← Launcher</button>'+
         '<input type="file" id="fileinput" accept=".xlsx,.xls">'+
       '</div>'+
     '</div>'+
@@ -1277,27 +1277,29 @@ function viewExc(){
   var noComp=pool.filter(function(t){return !t.components;});
   var noSvm=pool.filter(function(t){return !t.svm;});
   var noRc=pool.filter(function(t){return !t.rc;});
+  var noCw=pool.filter(function(t){return !t.currentWorker;});
   var bothMissing=pool.filter(function(t){return !t.svm && !t.rc;});
-  var flagged=pool.filter(function(t){return !t.components||!t.svm||!t.rc;});
+  var flagged=pool.filter(function(t){return !t.components||!t.svm||!t.rc||!t.currentWorker;});
 
-  var active=S._excFilter||null; // 'comp' | 'svm' | 'rc' | 'both'
+  var active=S._excFilter||null; // 'comp' | 'svm' | 'rc' | 'cw' | 'both'
   var list=flagged;
-  if(active==="comp")list=noComp; else if(active==="svm")list=noSvm; else if(active==="rc")list=noRc; else if(active==="both")list=bothMissing;
+  if(active==="comp")list=noComp; else if(active==="svm")list=noSvm; else if(active==="rc")list=noRc; else if(active==="cw")list=noCw; else if(active==="both")list=bothMissing;
   list=list.slice().sort(function(a,b){return (b.created||0)-(a.created||0);});
 
   var out='';
   out+='<div class="card up pad" style="margin-bottom:9px;display:flex;gap:14px;align-items:center;border-color:var(--amber-soft);background:var(--amber-bg)">'+
     '<div class="ic" style="width:40px;height:40px;border-radius:11px;background:#fff;border:1px solid var(--amber-soft);display:flex;align-items:center;justify-content:center;font-size:19px">⚠️</div>'+
     '<div><div style="font-family:var(--disp);font-weight:700;font-size:15px;color:var(--amber)">Data quality exceptions</div>'+
-    '<div class="sub" style="margin-top:2px"><b>'+flagged.length.toLocaleString()+'</b> tickets are missing Components, SVM In Charge, or Root Cause'+((S.from||S.to)?' in the selected range':'')+'.</div></div></div>';
+    '<div class="sub" style="margin-top:2px"><b>'+flagged.length.toLocaleString()+'</b> tickets are missing Components, SVM In Charge, Root Cause, or Current Worker'+((S.from||S.to)?' in the selected range':'')+'.</div></div></div>';
 
   out+='<div class="grid up d1" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr));margin-bottom:9px">'+
     excCard("comp","🧩","Missing Components",noComp.length,active==="comp")+
     excCard("svm","👤","Missing SVM In Charge",noSvm.length,active==="svm")+
     excCard("rc","🏷️","Missing Root Cause",noRc.length,active==="rc")+
+    excCard("cw","🧑‍💼","Missing Current Worker",noCw.length,active==="cw")+
     excCard("both","🔻","Missing SVM & Root Cause",bothMissing.length,active==="both")+
   '</div>';
-  out+=(function(){ var gaps=[["Components",noComp.length],["SVM In Charge",noSvm.length],["Root Cause",noRc.length]].sort(function(a,b){return b[1]-a[1];});
+  out+=(function(){ var gaps=[["Components",noComp.length],["SVM In Charge",noSvm.length],["Root Cause",noRc.length],["Current Worker",noCw.length]].sort(function(a,b){return b[1]-a[1];});
     return note([
       '<b>'+flagged.length.toLocaleString()+'</b> tickets need attention'+((S.from||S.to)?' in the selected range':'')+' — '+pct(flagged.length,pool.length)+'% of loaded data.',
       'Most common gap: <b class="dn">'+gaps[0][0]+'</b> ('+gaps[0][1].toLocaleString()+' missing).',
@@ -1306,7 +1308,7 @@ function viewExc(){
 
   if(active){
     out+='<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;padding:8px 14px;background:var(--rose-bg);border:1px solid var(--rose-soft);border-radius:9px">'+
-      '<span style="color:var(--rose);font-size:12px;font-weight:600">Filtered: '+({comp:"Missing Components",svm:"Missing SVM In Charge",rc:"Missing Root Cause",both:"Missing SVM & Root Cause"}[active])+'</span>'+
+      '<span style="color:var(--rose);font-size:12px;font-weight:600">Filtered: '+({comp:"Missing Components",svm:"Missing SVM In Charge",rc:"Missing Root Cause",cw:"Missing Current Worker",both:"Missing SVM & Root Cause"}[active])+'</span>'+
       '<span class="mono" style="color:var(--rose);font-weight:700">→ '+list.length.toLocaleString()+'</span>'+
       '<button class="ghost" id="excClear" style="margin-left:auto">✕ Clear</button></div>';
   }
@@ -1317,12 +1319,12 @@ function viewExc(){
       '<th class="static">Key</th><th class="static">Summary</th><th class="static">SVM In Charge</th><th class="static">Current Worker</th><th class="static">Root Cause</th><th class="static">Components</th><th class="static">Status</th><th class="static">Missing</th>'+
     '</tr></thead><tbody>';
   list.slice(0,3000).forEach(function(t){
-    var miss=[]; if(!t.components)miss.push("Components"); if(!t.svm)miss.push("SVM In Charge"); if(!t.rc)miss.push("Root Cause");
+    var miss=[]; if(!t.components)miss.push("Components"); if(!t.svm)miss.push("SVM In Charge"); if(!t.rc)miss.push("Root Cause"); if(!t.currentWorker)miss.push("Current Worker");
     out+='<tr>'+
       '<td style="white-space:nowrap"><a class="jkey" href="'+JIRA+encodeURIComponent(t.key)+'" target="_blank" rel="noreferrer">'+esc(t.key)+'</a></td>'+
       '<td class="trunc" title="'+esc(t.summary)+'" style="color:var(--ink2)">'+esc(t.summary)+'</td>'+
       '<td style="white-space:nowrap">'+(t.svm?esc(t.svm):'<span style="color:var(--rose);font-weight:600">—</span>')+'</td>'+
-      '<td style="white-space:nowrap;color:var(--ink2)">'+(t.currentWorker?esc(t.currentWorker):'<span style="color:var(--faint)">—</span>')+'</td>'+
+      '<td style="white-space:nowrap;color:var(--ink2)">'+(t.currentWorker?esc(t.currentWorker):'<span style="color:var(--rose);font-weight:600">—</span>')+'</td>'+
       '<td style="white-space:nowrap">'+(t.rc?'<span class="pill">'+esc(t.rc)+'</span>':'<span style="color:var(--rose);font-weight:600">—</span>')+'</td>'+
       '<td style="white-space:nowrap">'+(t.components?esc(t.components):'<span style="color:var(--rose);font-weight:600">—</span>')+'</td>'+
       '<td style="color:var(--muted);font-size:11px;white-space:nowrap">'+esc(t.status)+'</td>'+
