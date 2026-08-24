@@ -510,8 +510,17 @@ function App(){
   function openCatModal(c){
     var label=CL[c];var cs=CS[c];
     var tix=flt.filter(function(t){return classify(t.Status)===c;});
+    if(c==="hd")tix=tix.filter(function(t){return t.Status!=="On-Hold"&&t.Status!=="Invoice Yet to Raise";});
     tix.sort(function(a,b){return ds(b.Updated||b.Created)-ds(a.Updated||a.Created);});
     setModal({title:label,icon:cs.icon,color:cs.badge,tickets:tix});
+  }
+  function openHoldModal(){
+    var tix=st.hold.slice().sort(function(a,b){return ds(b.Updated||b.Created)-ds(a.Updated||a.Created);});
+    setModal({title:"On-Hold tickets",icon:"⏸️",color:"#64748B",tickets:tix});
+  }
+  function openInvoiceModal(){
+    var tix=st.inv.slice().sort(function(a,b){return ds(b.Updated||b.Created)-ds(a.Updated||a.Created);});
+    setModal({title:"Invoice Yet to Raise",icon:"🧾",color:"#0891B2",tickets:tix});
   }
   function openAgeModal(i){
     var tix=flt.filter(function(t){return abk(ds(t.Updated||t.Created))===i;});
@@ -669,13 +678,18 @@ function App(){
   },[allFiltered,w,pf]);
 
   const st=useMemo(()=>{
-    const hd=[],cl=[],eng=[];const bk=[0,0,0,0,0];const sm={};const pm={};let ta=0;
+    const hd=[],cl=[],eng=[],hold=[],inv=[];const bk=[0,0,0,0,0];const sm={};const pm={};let ta=0;
     flt.forEach(t=>{
-      const c=classify(t.Status);if(c==="hd")hd.push(t);else if(c==="engg")eng.push(t);else cl.push(t);
+      const c=classify(t.Status);
+      if(c==="hd"){
+        if(t.Status==="On-Hold")hold.push(t);
+        else if(t.Status==="Invoice Yet to Raise")inv.push(t);
+        else hd.push(t);
+      } else if(c==="engg")eng.push(t); else cl.push(t);
       const a=ds(t.Updated||t.Created);bk[abk(a)]++;ta+=a;
       sm[t.Status]=(sm[t.Status]||0)+1;pm[t.Project]=(pm[t.Project]||0)+1;
     });
-    return{n:flt.length,hd,cl,eng,avg:flt.length?Math.round(ta/flt.length):0,bk,dng:bk[4],sm,pm};
+    return{n:flt.length,hd,cl,eng,hold,inv,avg:flt.length?Math.round(ta/flt.length):0,bk,dng:bk[4],sm,pm};
   },[flt]);
 
   const disp=useMemo(()=>{
@@ -865,13 +879,14 @@ function App(){
           <h2 style={{fontSize:22,fontWeight:800,letterSpacing:"-.3px",color:"var(--t1)"}}>
             {greeting()}{w?`, ${w.split(" ")[0]}`:""}!
           </h2>
-          {w&&<p style={{color:"var(--t2)",fontSize:13,marginTop:4}}>
-            You have <b style={{color:"var(--t1)"}}>{st.n} open ticket{st.n!==1?"s":""}</b>
-            {st.hd.length>0&&<> · <b style={{color:"var(--cyan)"}}>{st.hd.length} need your action</b></>}
+          <p style={{color:"var(--t2)",fontSize:13,marginTop:4}}>
+            <b onClick={function(){openAllModal();}} style={{color:"var(--t1)",cursor:"pointer",borderBottom:"1px dashed var(--t3)"}}>{st.n.toLocaleString()} open ticket{st.n!==1?"s":""}</b>
+            {" "}{w?`for ${w.split(" ")[0]}`:pf?`in ${pf}`:`across ${wks.length} workers`}
+            {st.hd.length>0&&<> · <b style={{color:"var(--cyan)"}}>{st.hd.length} need action</b></>}
             {st.cl.length>0&&<> · <b style={{color:"var(--amber)"}}>{st.cl.length} awaiting client</b></>}
             {st.eng.length>0&&<> · <b style={{color:"var(--violet)"}}>{st.eng.length} with engineering</b></>}
-          </p>}
-          {!w&&<p style={{color:"var(--t2)",fontSize:13,marginTop:4}}>{op.length} total open tickets across {wks.length} workers. Select a worker to drill down.</p>}
+            {!w&&!pf&&<>. Select a worker to drill down.</>}
+          </p>
         </div>
 
         {/* HD action banner */}
@@ -879,7 +894,7 @@ function App(){
           <div className="fu fu1 card" style={{padding:"11px 18px",marginBottom:8,display:"flex",alignItems:"center",gap:16,borderColor:"var(--cyan-border)",background:"var(--cyan-bg)"}}>
             <div style={{width:42,height:42,borderRadius:10,background:"#fff",border:"1px solid var(--cyan-border)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>🎯</div>
             <div style={{flex:1}}><div style={{color:"var(--cyan)",fontWeight:800,fontSize:14}}>{st.hd.length} ticket{st.hd.length!==1?"s":""} need YOUR action</div>
-            <div style={{color:"var(--t2)",fontSize:12,marginTop:2}}>Resolved / Acknowledged / Open — act on these to close them.</div></div>
+            <div style={{color:"var(--t2)",fontSize:12,marginTop:2}}>Open / Acknowledged / Analysis — act to progress these.</div></div>
             <button onClick={function(){openCatModal("hd");}} style={{background:"var(--cyan)",color:"#fff",border:"none",padding:"9px 18px",borderRadius:8,fontSize:12,fontWeight:700,flexShrink:0}}>View →</button>
           </div>
         )}
@@ -905,14 +920,20 @@ function App(){
           </div>);
         })()}
 
-        {/* KPIs — 4 triage-focused */}
-        <div className="fu fu2" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:12,marginBottom:10}}>
+        {/* KPIs — triage-focused */}
+        <div className="fu fu2" style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:12,marginBottom:10}}>
+          <KPI icon="📂" label="Open (total)" value={st.n.toLocaleString()} color="var(--blue)" bgColor="var(--blue-bg)" sub="All not-closed"
+            onClick={function(){openAllModal();}}/>
           <KPI icon="🎯" label="HD Action" value={st.hd.length} color="var(--cyan)" bgColor="var(--cyan-bg)" sub="Your action needed"
             onClick={function(){openCatModal("hd");}}/>
           <KPI icon="💬" label="Client F/U" value={st.cl.length} color="var(--amber)" bgColor="var(--amber-bg)" sub="Chase if stale"
             onClick={function(){openCatModal("client");}}/>
           <KPI icon="🔧" label="Engg F/U" value={st.eng.length} color="var(--violet)" bgColor="var(--violet-bg)" sub="Follow up with dev"
             onClick={function(){openCatModal("engg");}}/>
+          <KPI icon="⏸️" label="On-Hold" value={st.hold.length} color="#64748B" bgColor="#F1F5F9" sub="Parked — review reason"
+            onClick={function(){openHoldModal();}}/>
+          <KPI icon="🧾" label="Invoice Pending" value={st.inv.length} color="#0891B2" bgColor="#ECFEFF" sub="Yet to raise"
+            onClick={function(){openInvoiceModal();}}/>
           <KPI icon="🔴" label="Danger 90+" value={st.dng} color="var(--rose)" bgColor="var(--rose-bg)" sub="Stale — decide or close"
             onClick={function(){openDangerModal();}}/>
         </div>
