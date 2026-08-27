@@ -243,6 +243,14 @@ h1 .two{background:linear-gradient(100deg,var(--blue) 0%,#3A86C9 45%,var(--teal)
   font-size:13px;font-weight:600;padding:11px 18px;border-radius:10px;box-shadow:var(--sh2);opacity:0;transition:opacity .25s,transform .25s;pointer-events:none}
 .md-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .md-empty{text-align:center;color:var(--muted);font-size:13px;padding:36px 0}
+.md-subtoggle{display:flex;gap:8px;margin-bottom:12px}
+.md-chip{padding:8px 13px;border:1px solid var(--line2);border-radius:9px;background:var(--paper);color:var(--ink2);
+  font-family:var(--disp);font-weight:600;font-size:12.5px;display:inline-flex;align-items:center;gap:7px}
+.md-chip.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+.md-chip .c{font-family:var(--mono);font-size:10px;font-weight:700;background:rgba(0,0,0,.08);border-radius:20px;padding:1px 7px}
+.md-chip.on .c{background:rgba(255,255,255,.22)}
+.md-chip .r{font-family:var(--mono);font-size:10px;font-weight:700;background:#FEF3E2;color:var(--amber);border-radius:20px;padding:1px 7px}
+.md-chip.on .r{background:#F5D9A8;color:#7c3d06}
 </style>
 </head>
 <body>
@@ -612,33 +620,48 @@ if(HS){
     var km={}; if(rows[0]) Object.keys(rows[0]).forEach(function(k){ km[String(k).trim().toLowerCase()]=k; });
     return function(row,name){ var kk=km[name]; return kk!==undefined? row[kk] : ""; };
   }
-  /* Distinct Status values, and distinct people from BOTH SVM In Charge and
-     Current Worker (union), each with a ticket count so the important ones sort
-     to the top. */
-  function scanData(rows){
-    var get=colGetter(rows), st={}, nm={};
+  /* Distinct Status values, plus people from SVM In Charge and Current Worker kept
+     as SEPARATE lists (each with ticket counts, most-used first). Rows with no value
+     in a field are counted as a "(blank)" entry per field rather than dropped, so
+     unassigned tickets are visible. The person→group directory itself is keyed by
+     name, so someone who appears in both lists shares one group. */
+  function tallyField(rows, get, col){
+    var m={}, blank=0;
     rows.forEach(function(row){
-      var s=String(get(row,"status")||"").trim(); if(s) st[s]=(st[s]||0)+1;
-      [["svm in charge","svm"],["current worker","cw"]].forEach(function(p){
-        var v=String(get(row,p[0])||"").trim();
-        if(v){ if(!nm[v]) nm[v]={count:0,svm:false,cw:false}; nm[v].count++; nm[v][p[1]]=true; }
-      });
+      var v=String(get(row,col)||"").trim();
+      if(v) m[v]=(m[v]||0)+1; else blank++;
     });
+    var names=Object.keys(m).map(function(k){return {name:k,count:m[k]};}).sort(function(a,b){return b.count-a.count;});
+    return {names:names, blank:blank};
+  }
+  function scanData(rows){
+    var get=colGetter(rows), st={};
+    rows.forEach(function(row){ var s=String(get(row,"status")||"").trim(); if(s) st[s]=(st[s]||0)+1; });
     var statuses=Object.keys(st).map(function(k){return {name:k,count:st[k]};}).sort(function(a,b){return b.count-a.count;});
-    var names=Object.keys(nm).map(function(k){return {name:k,count:nm[k].count,svm:nm[k].svm,cw:nm[k].cw};}).sort(function(a,b){return b.count-a.count;});
-    return {statuses:statuses,names:names};
+    return {
+      statuses: statuses,
+      svm: tallyField(rows, get, "svm in charge"),
+      cw:  tallyField(rows, get, "current worker")
+    };
+  }
+  // Distinct people needing a group across BOTH fields (for the tab's review badge).
+  function allGroupNames(){
+    if(!MD.scan) return [];
+    var seen={}, out=[];
+    (MD.scan.svm.names||[]).concat(MD.scan.cw.names||[]).forEach(function(n){ if(!seen[n.name]){seen[n.name]=1;out.push(n);} });
+    return out;
   }
 
   /* Working state — a fresh copy of the saved config is loaded each time the
      panel opens, so Cancel discards unsaved edits and Save commits them. */
-  var MD={ tab:"status", rows:null, scan:null, cfg:null, search:"" };
+  var MD={ tab:"status", groupField:"svm", rows:null, scan:null, cfg:null, search:"" };
 
   var STATUS_OPTS=[["hd","HD (desk)"],["engg","Engineering"],["client","Client"]];
 
   function openMaster(){
     Promise.all([HS.loadConfig(), getRows()]).then(function(r){
-      MD.cfg=r[0]; MD.rows=r[1]||null; MD.search="";
-      MD.scan=MD.rows? scanData(MD.rows) : {statuses:[],names:[]};
+      MD.cfg=r[0]; MD.rows=r[1]||null; MD.search=""; MD.groupField="svm";
+      MD.scan=MD.rows? scanData(MD.rows) : {statuses:[],svm:{names:[],blank:0},cw:{names:[],blank:0}};
       MD.tab="status";
       el("mdOv").classList.add("open");
       renderTabsState(); render();
@@ -647,7 +670,7 @@ if(HS){
   function closeMaster(){ el("mdOv").classList.remove("open"); }
 
   /* ── review counters (the "discrepancy" flags shown on each tab) ── */
-  function statusReview(s){ return !window.HDClass.isKnown(s.name) && !hasOv("statusOverrides",s.name); }
+  function statusReview(s){ return !window.HDClass.isKnown(s.name) && !window.HDClass.isTerminal(s.name) && !hasOv("statusOverrides",s.name); }
   function groupReview(n){ return window.HDGroups.defaultGroupOf(n.name)==="Others" && !hasOv("groupOverrides",window.HDGroups.normName(n.name)); }
   function stageReview(s){ return window.HDStages.defaultStageOf(s.name)==="Other" && !hasOv("stageOverrides",s.name); }
   function hasOv(bucket,key){ return MD.cfg && MD.cfg[bucket] && Object.prototype.hasOwnProperty.call(MD.cfg[bucket],key); }
@@ -655,10 +678,10 @@ if(HS){
   function renderTabsState(){
     if(!MD.scan) return;
     var sR=MD.scan.statuses.filter(statusReview).length;
-    var gR=MD.scan.names.filter(groupReview).length;
+    var gR=allGroupNames().filter(groupReview).length;   // distinct unmapped people across both fields
     var tR=MD.scan.statuses.filter(stageReview).length;
     el("mdStatusReview").innerHTML = sR? '<span class="warn">'+sR+' review</span>' : '<span class="cnt">'+MD.scan.statuses.length+'</span>';
-    el("mdGroupReview").innerHTML  = gR? '<span class="warn">'+gR+' review</span>' : '<span class="cnt">'+MD.scan.names.length+'</span>';
+    el("mdGroupReview").innerHTML  = gR? '<span class="warn">'+gR+' review</span>' : '<span class="cnt">'+allGroupNames().length+'</span>';
     el("mdStageReview").innerHTML  = tR? '<span class="warn">'+tR+' review</span>' : '<span class="cnt">'+MD.scan.statuses.length+'</span>';
     document.querySelectorAll(".md-tab").forEach(function(b){ b.classList.toggle("on", b.dataset.mdtab===MD.tab); });
   }
@@ -668,9 +691,11 @@ if(HS){
   function curGroup(name){ var n=window.HDGroups.normName(name); return (MD.cfg.groupOverrides[n]) || window.HDGroups.defaultGroupOf(name); }
   function curStage(name){ return (MD.cfg.stageOverrides[name]) || window.HDStages.defaultStageOf(name); }
 
-  function badge(kind){ // def | cust | rev
+  function badge(kind){ // def | cust | rev | term | na
     if(kind==="rev") return '<span class="md-badge rev">needs review</span>';
     if(kind==="cust") return '<span class="md-badge cust">customised</span>';
+    if(kind==="term") return '<span class="md-badge def">terminal · n/a</span>';
+    if(kind==="na") return '<span class="md-badge def">n/a</span>';
     return '<span class="md-badge def">default</span>';
   }
   function rowKind(bucket,key,isReview){ if(hasOv(bucket,key)) return "cust"; return isReview? "rev":"def"; }
@@ -684,9 +709,15 @@ if(HS){
 
     var html="", note="";
     if(MD.tab==="status"){
-      note='<b>HD</b> and <b>Engineering</b> are both the SVM side (our team); the Trend Tracker &amp; Weekly Report treat both as "SVM". <b>Client</b> = waiting on the client. Rows not in the built-in map are flagged <b>needs review</b>.';
+      note='<b>HD</b> and <b>Engineering</b> are both the SVM side (our team); the Trend Tracker &amp; Weekly Report treat both as "SVM". <b>Client</b> = waiting on the client. Rows not in the built-in map are flagged <b>needs review</b>. Finished statuses like <b>Closed</b> need no classification and are marked <b>terminal · n/a</b>.';
       html+=optsSearch()+'<table class="md-table"><thead><tr><th>Status</th><th>Tickets</th><th>Classification</th><th>Source</th></tr></thead><tbody>';
       filt(MD.scan.statuses).forEach(function(s){
+        // Terminal (e.g. Closed): no owner classification applies — show as n/a, no action.
+        if(window.HDClass.isTerminal(s.name)){
+          html+='<tr><td class="md-name">'+esc(s.name)+'</td><td class="md-count">'+s.count.toLocaleString()+'</td>'+
+            '<td class="md-count">— (finished ticket)</td><td>'+badge("term")+'</td></tr>';
+          return;
+        }
         var rev=statusReview(s), val=curStatus(s.name), kind=rowKind("statusOverrides",s.name,rev);
         html+='<tr class="'+(kind==="rev"?"review":"")+'"><td class="md-name">'+esc(s.name)+'</td><td class="md-count">'+s.count.toLocaleString()+'</td>'+
           '<td><select class="md-sel '+(kind==="rev"?"rev":"")+'" data-kind="status" data-key="'+esc(s.name)+'">'+
@@ -695,17 +726,29 @@ if(HS){
       });
       html+='</tbody></table>';
     } else if(MD.tab==="group"){
-      note='People found in <b>SVM In Charge</b> and <b>Current Worker</b>. Anyone not in the built-in directory falls to <b>Others</b> and is flagged <b>needs review</b>. Use <b>＋ Add group…</b> to create a new group.';
+      note='<b>SVM In Charge</b> and <b>Current Worker</b> are shown as separate lists — switch with the toggle below. Anyone not in the built-in directory falls to <b>Others</b> and is flagged <b>needs review</b>. A person appearing in both lists shares one group. Use <b>＋ Add group…</b> to create a new group. Tickets with no value show as a <b>(blank)</b> row.';
       var groups=window.HDGroups.ORDER.slice(); // Group 1, Group 2, Others
       Object.keys(MD.cfg.groupOverrides).forEach(function(k){ var v=MD.cfg.groupOverrides[k]; if(groups.indexOf(v)<0) groups.push(v); }); // include custom groups
-      html+=optsSearch()+'<table class="md-table"><thead><tr><th>Person</th><th>Tickets</th><th>Seen in</th><th>Group</th><th>Source</th></tr></thead><tbody>';
-      filt(MD.scan.names).forEach(function(n){
+      var fld=MD.scan[MD.groupField]||{names:[],blank:0};
+      var fieldLabel=(MD.groupField==="svm"?"SVM In Charge":"Current Worker");
+      // sub-toggle: two chips (each shows how many need review in that field)
+      var svmR=(MD.scan.svm.names||[]).filter(groupReview).length, cwR=(MD.scan.cw.names||[]).filter(groupReview).length;
+      html+='<div class="md-subtoggle">'+
+        '<button class="md-chip'+(MD.groupField==="svm"?" on":"")+'" data-gfield="svm">SVM In Charge <span class="c">'+MD.scan.svm.names.length+'</span>'+(svmR?'<span class="r">'+svmR+'</span>':'')+'</button>'+
+        '<button class="md-chip'+(MD.groupField==="cw"?" on":"")+'" data-gfield="cw">Current Worker <span class="c">'+MD.scan.cw.names.length+'</span>'+(cwR?'<span class="r">'+cwR+'</span>':'')+'</button>'+
+      '</div>';
+      html+=optsSearch()+'<table class="md-table"><thead><tr><th>'+fieldLabel+'</th><th>Tickets</th><th>Group</th><th>Source</th></tr></thead><tbody>';
+      // blank / unassigned row first (only when there are such tickets, and not filtered out by search)
+      if(fld.blank>0 && (!MD.search || "(blank)".indexOf(MD.search.trim().toLowerCase())>-1)){
+        html+='<tr><td class="md-name" style="font-style:italic;color:var(--muted)">(blank / unassigned)</td>'+
+          '<td class="md-count">'+fld.blank.toLocaleString()+'</td>'+
+          '<td class="md-count">— (no name to map)</td><td>'+badge("na")+'</td></tr>';
+      }
+      filt(fld.names).forEach(function(n){
         var rev=groupReview(n), val=curGroup(n.name), kind=rowKind("groupOverrides",window.HDGroups.normName(n.name),rev);
-        var seen=[n.svm?"SVM In Charge":null,n.cw?"Current Worker":null].filter(Boolean).join(" · ");
         var opts=groups.map(function(gp){return '<option value="'+esc(gp)+'" '+(gp===val?"selected":"")+'>'+esc(gp)+'</option>';}).join("");
         if(groups.indexOf(val)<0) opts='<option value="'+esc(val)+'" selected>'+esc(val)+'</option>'+opts;
         html+='<tr class="'+(kind==="rev"?"review":"")+'"><td class="md-name">'+esc(n.name)+'</td><td class="md-count">'+n.count.toLocaleString()+'</td>'+
-          '<td class="md-count">'+esc(seen)+'</td>'+
           '<td><select class="md-sel '+(kind==="rev"?"rev":"")+'" data-kind="group" data-key="'+esc(n.name)+'">'+opts+
             '<option value="__ADD__">＋ Add group…</option></select></td><td>'+badge(kind)+'</td></tr>';
       });
@@ -724,8 +767,9 @@ if(HS){
       html+='</tbody></table>';
     }
     body.innerHTML='<div class="md-info">'+note+'</div>'+html;
-    var cnt=(MD.tab==="group"?MD.scan.names.length:MD.scan.statuses.length);
-    el("mdFootNote").textContent=cnt+" row"+(cnt!==1?"s":"")+" · changes apply when dashboards next load";
+    var cnt=(MD.tab==="group"?(MD.scan[MD.groupField].names.length):MD.scan.statuses.length);
+    var lbl=(MD.tab==="group"?((MD.groupField==="svm"?"SVM In Charge":"Current Worker")+" · "):"");
+    el("mdFootNote").textContent=lbl+cnt+" row"+(cnt!==1?"s":"")+" · changes apply when dashboards next load";
     bindRows();
     renderTabsState();
   }
@@ -735,6 +779,8 @@ if(HS){
      row reverts to "default"); any other choice records an override. */
   function bindRows(){
     var s=el("mdSearch"); if(s){ s.oninput=function(){ MD.search=this.value; var pos=this.selectionStart; render(); var n=el("mdSearch"); if(n){ n.focus(); try{n.setSelectionRange(pos,pos);}catch(e){} } }; }
+    // Group tab: switch between the SVM In Charge and Current Worker lists.
+    document.querySelectorAll("[data-gfield]").forEach(function(b){ b.onclick=function(){ MD.groupField=b.dataset.gfield; MD.search=""; render(); }; });
     document.querySelectorAll(".md-sel").forEach(function(sel){
       sel.onchange=function(){
         var kind=this.dataset.kind, key=this.dataset.key, val=this.value;
