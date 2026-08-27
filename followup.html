@@ -114,10 +114,11 @@ const J="https://svmhelpdesk.atlassian.net/browse/";
    rest (our side) splits into ENGG = with engineering/dev, HD = desk-level.
    Client is checked first so a resolved/awaiting-confirmation ticket counts as
    client, matching the other dashboards. Unknown statuses default to HD. */
-const HD_S=["Acknowledged","Assign HD (WFC)","Clarify","On-Hold","Open","Re-open Review","Analysis & Study","Sys/user configuration","Invoice Yet to Raise"];
-const CLIENT_S=["Waiting for customer","Resolved With Clarification","Resolved","Confirmation","Get Confirmation","Completed","DB Script Delivered","Delivered","Release Move to Production","Doubt Clarification","Clarification (Dev)","Published","CLIENT Approval (DB Script)","CLIENT RELEASE APPROVAL","Client Release Approval (PROD)","Client Hotfix Testing","Client Deployment (PROD)","Client Rejected (DB Script)"];
-const ENGG_S=["Technical Analysis","Development In Progress","Approval DB Admin","DB Admin Approval","DB Script Request","Impact Study","POC Release Approval","Project Lead Approval","Release Plan (Production)","Release Plan (UAT or Hot Fix)","Review","Script Release","SVM Hotfix Testing","Team Lead Review & Approval","Testing In Progress","Assign to SVM Deployment Team","Release In Progress","Release Kit Prep.","User Request"];
-const classify=s=>CLIENT_S.includes(s)?"client":ENGG_S.includes(s)?"engg":HD_S.includes(s)?"hd":"hd";
+/* Status lists + classifier now live in hd-store.js (window.HDClass) so all
+   three dashboards share ONE canonical map and can't drift. Thin aliases below
+   keep the rest of this file unchanged. */
+const HD_S=window.HDClass.HD, CLIENT_S=window.HDClass.CLIENT, ENGG_S=window.HDClass.ENGG;
+const classify=s=>window.HDClass.classify3(s);
 /* Priority ordering + a plain next-step hint per status, for the Action Queue. */
 const PRIO_ORD={"Show Stopper":0,"Critical":1,"High":2,"Medium":3,"Low":4};
 const prioRank=p=>(PRIO_ORD[p]!==undefined?PRIO_ORD[p]:5);
@@ -781,7 +782,7 @@ function App(){
     const ct={};GF.forEach(f=>ct[f]=0);const tx=[];
     l.forEach(t=>{const g=GF.filter(f=>{const v=t[f];return!v||String(v).trim()===""||String(v).trim().toLowerCase()==="nan";});if(g.length){g.forEach(x=>ct[x]++);tx.push({...t,_g:g});}});
     return{t:tx,s:ct};
-  },[raw,w,pf]);
+  },[dateFiltered,w,pf]);
   const dg=useMemo(()=>gf?gd.t.filter(t=>t._g.includes(gf)):gd.t,[gd,gf]);
 
   /* No inline upload — the file is uploaded once on the launcher (index.html)
