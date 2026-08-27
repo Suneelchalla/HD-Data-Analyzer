@@ -130,6 +130,44 @@
   };
 })();
 
+/* ═══════════════════ HD Dashboards — shared status classification ═══════════════════
+   ONE canonical Status→owner map for all three dashboards, so they can never
+   drift apart. Two axes are derived from the same lists:
+
+     • owner  (svm | client) — used by the Trend Tracker & Weekly Report.
+                                "svm" = anything on our side (Help Desk OR
+                                Engineering); "client" = waiting on the client.
+     • classify3 (hd | engg | client) — used by the Follow-up Tracker, which
+                                additionally splits the svm side into desk-level
+                                (HD) vs escalated-to-Engineering (ENGG).
+
+   Because CLIENT is the single source of truth for the svm/client boundary,
+   the two-way and three-way views are guaranteed consistent. Unknown statuses:
+   owner() returns null so the Trend/Weekly callers can fall back to the (less
+   reliable) "Next Action" column; classify3() defaults to "hd", matching the
+   Follow-up Tracker's original behaviour. Edit the lists here ONLY. */
+(function () {
+  var HD = ["Acknowledged","Assign HD (WFC)","Clarify","On-Hold","Open","Re-open Review","Analysis & Study","Sys/user configuration","Invoice Yet to Raise"];
+  var ENGG = ["Technical Analysis","Development In Progress","Approval DB Admin","DB Admin Approval","DB Script Request","Impact Study","POC Release Approval","Project Lead Approval","Release Plan (Production)","Release Plan (UAT or Hot Fix)","Review","Script Release","SVM Hotfix Testing","Team Lead Review & Approval","Testing In Progress","Assign to SVM Deployment Team","Release In Progress","Release Kit Prep.","User Request"];
+  var CLIENT = ["Waiting for customer","Resolved With Clarification","Resolved","Confirmation","Get Confirmation","Completed","DB Script Delivered","Delivered","Release Move to Production","Doubt Clarification","Clarification (Dev)","Published","CLIENT Approval (DB Script)","CLIENT RELEASE APPROVAL","Client Release Approval (PROD)","Client Hotfix Testing","Client Deployment (PROD)","Client Rejected (DB Script)"];
+
+  function has(arr, s) { return arr.indexOf(s) > -1; }
+
+  window.HDClass = {
+    HD: HD, ENGG: ENGG, CLIENT: CLIENT,
+    // Follow-up Tracker: three-way desk view. Unknown → "hd" (original default).
+    classify3: function (status) {
+      return has(CLIENT, status) ? "client" : has(ENGG, status) ? "engg" : "hd";
+    },
+    // Trend / Weekly: two-way owner view. Unknown → null (caller may fall back).
+    owner: function (status) {
+      if (has(CLIENT, status)) return "client";
+      if (has(HD, status) || has(ENGG, status)) return "svm";
+      return null;
+    }
+  };
+})();
+
 /* ══════════════════════ HD Dashboards — soft app lock ══════════════════════
    A light deterrent for the public GitHub Pages build. This is NOT real
    security: the source is open, so anyone who reads it can find or bypass the
