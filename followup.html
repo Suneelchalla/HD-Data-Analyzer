@@ -481,13 +481,17 @@ function App(){
      back to parsing the uploaded Excel and seeding the edit store from it. */
   useEffect(function(){
     if(!window.HDStore)return;
-    window.HDStore.loadFile().then(function(rec){
-      if(!rec){window.location.replace("index.html");return;}
-      setFn(rec.name);blobRef.current=rec.blob;setLoading(true);
-      window.HDStore.loadRows().then(function(edited){
-        if(edited&&edited.length){setRaw(edited);setLoading(false);return;}
-        px(rec.blob).then(function(rows){setRaw(rows);setLoading(false);window.HDStore.saveRows(rows);})
-          .catch(function(e){alert("Could not read stored file: "+e.message);window.location.replace("index.html");});
+    // Apply Master Data status overrides before rendering so classify() reflects them.
+    window.HDStore.loadConfig().then(function(cfg){
+      window.HDClass.setOverrides(cfg.statusOverrides);
+      window.HDStore.loadFile().then(function(rec){
+        if(!rec){window.location.replace("index.html");return;}
+        setFn(rec.name);blobRef.current=rec.blob;setLoading(true);
+        window.HDStore.loadRows().then(function(edited){
+          if(edited&&edited.length){setRaw(edited);setLoading(false);return;}
+          px(rec.blob).then(function(rows){setRaw(rows);setLoading(false);window.HDStore.saveRows(rows);})
+            .catch(function(e){alert("Could not read stored file: "+e.message);window.location.replace("index.html");});
+        });
       });
     });
   },[]);
