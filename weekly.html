@@ -754,7 +754,7 @@ function render(){
         insight('<b style="color:var(--client2)">Client</b> and <b style="color:var(--hd)">SVM</b> show who needs to act next on the open tickets in each phase.'+(topStage&&stageCount[topStage]?' The biggest phase is <b>'+esc(shortStage(topStage))+'</b> ('+stageCount[topStage]+' open).':'')+' A high <b style="color:var(--client2)">Client</b> count means those tickets are waiting on your team.')+
 
         /* ── Top 5 oldest spotlight tables ── */
-        '<div class="sectitle">🔴 Top 5 Oldest Open Tickets <span class="sub">longest-open items needing attention</span></div>'+
+        '<div class="sectitle">🔴 Top 5 Oldest — Client Side <span class="sub">longest-open items needing attention</span></div>'+
         top5OldestHTML(openList, 5)+
 
         '<div class="sectitle">🔴 Top 5 Oldest — SVM Side <span class="sub">longest-open items on our side</span></div>'+
