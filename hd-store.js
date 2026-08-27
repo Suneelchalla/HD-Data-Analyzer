@@ -6,7 +6,7 @@
    Jira export can exceed localStorage's ~5MB limit. The raw file (Blob) is
    stored as-is, so each dashboard parses it with its own existing XLSX code. */
 (function () {
-  var DB = "hd-tracker", STORE = "files", KEY = "current", ROWS_KEY = "edited-rows", SNAP_KEY = "weekly-snapshots";
+  var DB = "hd-tracker", STORE = "files", KEY = "current", ROWS_KEY = "edited-rows", SNAP_KEY = "weekly-snapshots", CFG_KEY = "master-config";
 
   function open() {
     return new Promise(function (res, rej) {
@@ -126,6 +126,45 @@
           t.oncomplete = function () { res(true); };
         });
       }).catch(function () { return false; });
+    },
+
+    /* ── Master Data config (Status / Group / Stage overrides) ──
+       Written by the Master Data module on the launcher; read by every dashboard
+       on load, which feeds it into HDClass/HDGroups/HDStages before rendering.
+       Shape: { statusOverrides:{}, groupOverrides:{}, stageOverrides:{}, savedAt }.
+       Like weekly snapshots, this is intentionally NOT cleared by "Change file" /
+       a new upload — corrections should persist across weekly exports. Reset only
+       via the module's own "Reset to defaults". loadConfig never returns null. */
+    saveConfig: function (cfg) {
+      return open().then(function (db) {
+        return new Promise(function (res, rej) {
+          var t = db.transaction(STORE, "readwrite");
+          t.objectStore(STORE).put({ cfg: cfg, savedAt: Date.now() }, CFG_KEY);
+          t.oncomplete = function () { res(true); };
+          t.onerror = function () { rej(t.error); };
+        });
+      });
+    },
+    loadConfig: function () {
+      return open().then(function (db) {
+        return new Promise(function (res, rej) {
+          var g = db.transaction(STORE, "readonly").objectStore(STORE).get(CFG_KEY);
+          g.onsuccess = function () {
+            var v = g.result && g.result.cfg ? g.result.cfg : {};
+            res({ statusOverrides: v.statusOverrides || {}, groupOverrides: v.groupOverrides || {}, stageOverrides: v.stageOverrides || {} });
+          };
+          g.onerror = function () { rej(g.error); };
+        });
+      }).catch(function () { return { statusOverrides: {}, groupOverrides: {}, stageOverrides: {} }; });
+    },
+    clearConfig: function () {
+      return open().then(function (db) {
+        return new Promise(function (res) {
+          var t = db.transaction(STORE, "readwrite");
+          t.objectStore(STORE).delete(CFG_KEY);
+          t.oncomplete = function () { res(true); };
+        });
+      }).catch(function () { return false; });
     }
   };
 })();
@@ -151,20 +190,88 @@
   var ENGG = ["Technical Analysis","Development In Progress","Approval DB Admin","DB Admin Approval","DB Script Request","Impact Study","POC Release Approval","Project Lead Approval","Release Plan (Production)","Release Plan (UAT or Hot Fix)","Review","Script Release","SVM Hotfix Testing","Team Lead Review & Approval","Testing In Progress","Assign to SVM Deployment Team","Release In Progress","Release Kit Prep.","User Request"];
   var CLIENT = ["Waiting for customer","Resolved With Clarification","Resolved","Confirmation","Get Confirmation","Completed","DB Script Delivered","Delivered","Release Move to Production","Doubt Clarification","Clarification (Dev)","Published","CLIENT Approval (DB Script)","CLIENT RELEASE APPROVAL","Client Release Approval (PROD)","Client Hotfix Testing","Client Deployment (PROD)","Client Rejected (DB Script)"];
 
+  /* User overrides from the Master Data module: { "<Status>": "hd"|"engg"|"client" }.
+     A dashboard calls setOverrides(cfg.statusOverrides) once on load (after reading
+     config from IndexedDB) BEFORE it renders, so every KPI/chart reflects the
+     corrected mapping. Empty overrides ⇒ identical behaviour to the built-in lists. */
+  var OV = {};
   function has(arr, s) { return arr.indexOf(s) > -1; }
+  // Built-in bucket for a status, or null if it's in none of the lists (i.e. brand-new/unknown).
+  function def3(s) { return has(CLIENT, s) ? "client" : has(ENGG, s) ? "engg" : has(HD, s) ? "hd" : null; }
 
   window.HDClass = {
     HD: HD, ENGG: ENGG, CLIENT: CLIENT,
-    // Follow-up Tracker: three-way desk view. Unknown → "hd" (original default).
-    classify3: function (status) {
-      return has(CLIENT, status) ? "client" : has(ENGG, status) ? "engg" : "hd";
-    },
-    // Trend / Weekly: two-way owner view. Unknown → null (caller may fall back).
-    owner: function (status) {
-      if (has(CLIENT, status)) return "client";
-      if (has(HD, status) || has(ENGG, status)) return "svm";
-      return null;
-    }
+    setOverrides: function (m) { OV = m || {}; },
+    getOverrides: function () { return OV; },
+    // Built-in (pre-override) bucket; unknown statuses default to "hd" (SVM side).
+    defaultClassify3: function (status) { return def3(status) || "hd"; },
+    // Is this status present in any built-in list? (false ⇒ "needs review" in the UI)
+    isKnown: function (status) { return def3(status) !== null; },
+    isOverridden: function (status) { return Object.prototype.hasOwnProperty.call(OV, status); },
+    // Follow-up Tracker: three-way desk view (override wins, then built-in, then "hd").
+    classify3: function (status) { return OV[status] || def3(status) || "hd"; },
+    // Trend / Weekly: two-way owner view. Unknown & un-overridden → null so callers
+    // can fall back to the (less reliable) "Next Action" column.
+    owner: function (status) { var c = OV[status] || def3(status); return c ? (c === "client" ? "client" : "svm") : null; }
+  };
+})();
+
+/* ═══════════════════ HD Dashboards — shared GROUP directory (person → group) ═══════════════════
+   Was hard-coded in trend.html as GROUP_MAP; centralised here so the Master Data
+   module can edit it and every dashboard shares one directory. Keyed on the
+   NORMALISED person name so it matches whether the name arrives via "SVM In
+   Charge" or "Current Worker" (the two fields the module scans). Overrides:
+   { "<normalised name>": "<Group>" }. */
+(function () {
+  var MAP = {
+    "muthuraj v":"Group 1","manikandan v":"Group 1","naveen n":"Group 1","vijay j":"Group 1","ramkumar m":"Group 1","lenin b premnath":"Group 1",
+    "sentamil selvan":"Group 2","thennarasu s":"Group 2","jayasree b":"Group 2","balamurugan r":"Group 2","alaudeen m":"Group 2","vignesh r":"Group 2"
+  };
+  var MEMBERS = {
+    "Group 1":"Exports (Muthuraj) · Imports (Manikandan) · Operations (Naveen N) · Ecom (Vijay) · PNC (Ramkumar/Lenin)",
+    "Group 2":"CMR (Sentamil) · NFR (Thennarasu) · Cost (Jayasree) · EMS (Balamurugan) · VSS (Alaudeen) · EDI (Vignesh)",
+    "Others":"All remaining people (and unassigned)"
+  };
+  var ORDER = ["Group 1","Group 2","Others"];
+  var OV = {};
+  function norm(s) { return String(s || "").toLowerCase().replace(/[.]/g, " ").replace(/\s+/g, " ").trim(); }
+
+  window.HDGroups = {
+    ORDER: ORDER, MEMBERS: MEMBERS, normName: norm, defaults: MAP,
+    setOverrides: function (m) { OV = m || {}; },
+    getOverrides: function () { return OV; },
+    defaultGroupOf: function (name) { if (!name) return "Others"; return MAP[norm(name)] || "Others"; },
+    isOverridden: function (name) { return Object.prototype.hasOwnProperty.call(OV, norm(name)); },
+    // Override wins, then built-in, then "Others".
+    groupOf: function (name) { if (!name) return "Others"; var n = norm(name); return OV[n] || MAP[n] || "Others"; }
+  };
+})();
+
+/* ═══════════════════ HD Dashboards — shared STAGE map (status → activity stage) ═══════════════════
+   Was hard-coded in weekly.html as STAGE_MAP; centralised so the Master Data
+   module can edit it. Overrides: { "<Status>": "<Stage>" }. Unknown → "Other". */
+(function () {
+  var MAP = {
+    "Analysis & Study":"Stage 1 - Analysis & Study",
+    "Testing In Progress":"Stage 2 - Fix in Progress","Technical Analysis":"Stage 2 - Fix in Progress","Team Lead Review & Approval":"Stage 2 - Fix in Progress","SVM Hotfix Testing":"Stage 2 - Fix in Progress","Release Plan (UAT or Hot Fix)":"Stage 2 - Fix in Progress","Release Kit Prep.":"Stage 2 - Fix in Progress","Impact Study":"Stage 2 - Fix in Progress","Doubt Clarification":"Stage 2 - Fix in Progress","Development In Progress":"Stage 2 - Fix in Progress","DB Script Request":"Stage 2 - Fix in Progress","Clarification (Dev)":"Stage 2 - Fix in Progress",
+    "POC Release Approval":"Stage 3 - Under Delivery","DB Script Delivered":"Stage 3 - Under Delivery","DB Admin Approval":"Stage 3 - Under Delivery","Client Release Approval (PROD)":"Stage 3 - Under Delivery","Client Hotfix Testing":"Stage 3 - Under Delivery","Client Deployment (PROD)":"Stage 3 - Under Delivery","CLIENT RELEASE APPROVAL":"Stage 3 - Under Delivery","CLIENT Approval (DB Script)":"Stage 3 - Under Delivery",
+    "Waiting for customer":"Stage 4 - Awaiting Confirmation","Resolved With Clarification":"Stage 4 - Awaiting Confirmation","Resolved":"Stage 4 - Awaiting Confirmation","Release Move to Production":"Stage 4 - Awaiting Confirmation","Release In Progress":"Stage 4 - Awaiting Confirmation","Delivered":"Stage 4 - Awaiting Confirmation",
+    "Script Release":"Script Release",
+    "Closed":"Stage 5 - Ticket Closure","Confirmation":"Stage 4 - Awaiting Confirmation","Completed":"Stage 5 - Ticket Closure","Invoice Yet to Raise":"Stage 5 - Ticket Closure","User Request":"Stage 1 - Analysis & Study","Sys/user configuration":"Stage 2 - Fix in Progress","Approval DB Admin":"Stage 3 - Under Delivery","Assign to SVM Deployment Team":"Stage 3 - Under Delivery","Published":"Stage 3 - Under Delivery"
+  };
+  var ORDER = ["Stage 1 - Analysis & Study","Stage 2 - Fix in Progress","Stage 3 - Under Delivery","Stage 4 - Awaiting Confirmation","Script Release","Other"];
+  var ALL = ORDER.concat(["Stage 5 - Ticket Closure"]);
+  var OV = {};
+
+  window.HDStages = {
+    ORDER: ORDER, ALL: ALL, defaults: MAP,
+    setOverrides: function (m) { OV = m || {}; },
+    getOverrides: function () { return OV; },
+    defaultStageOf: function (status) { return MAP[status] || "Other"; },
+    isOverridden: function (status) { return Object.prototype.hasOwnProperty.call(OV, status); },
+    stageOf: function (status) { return OV[status] || MAP[status] || "Other"; },
+    // Every stage name that can appear in a dropdown (built-in stages, minus the "Other" catch-all).
+    allStages: function () { return ORDER.filter(function (s) { return s !== "Other"; }).concat(["Stage 5 - Ticket Closure"]); }
   };
 })();
 
