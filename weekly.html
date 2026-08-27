@@ -262,23 +262,12 @@ function fdate(d){ return d? d.toLocaleDateString("en-GB",{day:"2-digit",month:"
 function fdt(d){ return d? d.toLocaleString("en-GB",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}) : "—"; }
 /* Owner (SVM vs Client) is decided by STATUS — the Jira "Next Action" column
    isn't reliably updated, so we don't trust it. Confirmed with the team.
-   Anything not listed falls back to the Next Action column, then "unset". */
-var STATUS_OWNER = {
-  // ── Client — waiting on the client ──
-  "Waiting for customer":"client","Resolved With Clarification":"client","Confirmation":"client",
-  "DB Script Delivered":"client","Delivered":"client","Resolved":"client","Completed":"client",
-  "CLIENT Approval (DB Script)":"client","CLIENT RELEASE APPROVAL":"client","Client Release Approval (PROD)":"client",
-  "Client Hotfix Testing":"client","Client Deployment (PROD)":"client","Release Move to Production":"client",
-  "Doubt Clarification":"client","Clarification (Dev)":"client","Published":"client",
-  // ── SVM — action on our side ──
-  "Technical Analysis":"svm","Analysis & Study":"svm","User Request":"svm","Team Lead Review & Approval":"svm",
-  "Development In Progress":"svm","Approval DB Admin":"svm","DB Admin Approval":"svm","Sys/user configuration":"svm",
-  "SVM Hotfix Testing":"svm","Testing In Progress":"svm","Assign to SVM Deployment Team":"svm",
-  "Release Plan (UAT or Hot Fix)":"svm","DB Script Request":"svm","Impact Study":"svm","Release Kit Prep.":"svm",
-  "Invoice Yet to Raise":"svm","POC Release Approval":"svm","Release In Progress":"svm"
-};
+   The map is now shared across all dashboards via hd-store.js (window.HDClass)
+   so it can't drift. Only statuses HDClass doesn't recognise fall back to the
+   Next Action column, then "unset". */
 function naKey(t){
-  if(t && STATUS_OWNER[t.status]) return STATUS_OWNER[t.status];
+  var o = t && window.HDClass.owner(t.status);
+  if(o) return o;
   var v=String(t&&t.na||"").trim().toUpperCase(); return v==="SVM"?"svm":v==="CLIENT"?"client":"unset";
 }
 
@@ -304,6 +293,7 @@ var RAW=[];          // all normalized tickets (all clients)
 var RAW_ROWS=[];
 var FILENAME="";
 var DATA_ASOF=null;  // max created/resolved date
+var SNAPS={};        // captured weekly open-backlog history (survives across uploads)
 var S={ client:"", na:"", status:"", cols:DEFAULT_COLS.slice(), colsOpen:false };
 
 /* ═══════════════════════ PARSE ═══════════════════════ */
@@ -352,6 +342,59 @@ function isOpen(t){ return t.status && t.status.toLowerCase()!=="closed"; }
 function computeAsOf(){
   var mx=0; RAW.forEach(function(t){ [t.created,t.resolved].forEach(function(d){ if(d){var m=d.getTime(); if(m>mx)mx=m;} }); });
   DATA_ASOF = mx? new Date(mx):null;
+}
+
+/* ═══════════════════════ WEEKLY SNAPSHOTS ═══════════════════════
+   A single Jira export only knows TODAY's open state — you can't reconstruct
+   what a ticket's status was three weeks ago. So inflow (by created date) and
+   resolved (by resolved date) are reconstructable from one export, but the
+   OPEN-BACKLOG level at the end of each past week is not. captureSnapshot()
+   records that point-in-time backlog every time a fresh export is opened,
+   keyed by the export's ISO week, so the report can show a real week-over-week
+   backlog trend that accumulates over time. Re-opening within the same week
+   overwrites that week's entry (the latest export is the most current). This
+   history deliberately survives new uploads — it's reset only by the explicit
+   "Reset history" button, which calls HDStore.clearSnapshots(). */
+function captureSnapshot(){
+  var wk = wkKey(DATA_ASOF || new Date());
+  if(!wk) return;
+  var clients={};
+  function bump(c,t){
+    if(!clients[c]) clients[c]={open:0,svm:0,client:0};
+    clients[c].open++;
+    var na=naKey(t); if(na==="svm")clients[c].svm++; else if(na==="client")clients[c].client++;
+  }
+  RAW.forEach(function(t){ if(!isOpen(t))return; var c=t.client||"(no project)"; bump(c,t); bump("__ALL__",t); });
+  SNAPS[wk]={ asOf:DATA_ASOF?DATA_ASOF.getTime():null, capturedAt:Date.now(), file:FILENAME, clients:clients };
+  if(window.HDStore) window.HDStore.saveSnapshots(SNAPS);   // persist in the background
+}
+/* Ordered [{wk, open, svm, client, asOf}] for the selected client (or __ALL__). */
+function backlogHistory(clientName){
+  return Object.keys(SNAPS).sort().map(function(wk){
+    var snap=SNAPS[wk]||{}; var c=(snap.clients&&snap.clients[clientName])||null;
+    return { wk:wk, open:c?c.open:0, svm:c?c.svm:0, client:c?c.client:0, asOf:snap.asOf||null, present:!!c };
+  });
+}
+
+/* Two/three-series line chart over captured weeks (open / SVM / client). */
+function multiLineChart(weeks, series){
+  var W=Math.max(weeks.length*70,320), H=190, padL=32, padB=26, padT=22, iw=W-padL-12, ih=H-padT-padB;
+  var allv=[]; series.forEach(function(s){ s.vals.forEach(function(v){ if(v!=null)allv.push(v); }); });
+  var mx=Math.max.apply(null,allv.concat([1])), mn=0; if(mx===mn)mx=mn+1;
+  function x(i){ return padL + iw*(weeks.length===1?0.5:i/(weeks.length-1)); }
+  function y(v){ return padT + ih*(1-(v-mn)/(mx-mn)); }
+  var out="";
+  // x-axis week labels
+  weeks.forEach(function(w,i){ out+='<text x="'+x(i).toFixed(1)+'" y="'+(H-7)+'" font-size="9" fill="var(--muted)" text-anchor="middle" font-weight="600" style="pointer-events:none">'+wkLabel(w)+'</text>'; });
+  series.forEach(function(s){
+    var poly=[], dots="", labels="";
+    weeks.forEach(function(w,i){ var v=s.vals[i]; if(v==null)return; var px=x(i),py=y(v); poly.push(px.toFixed(1)+","+py.toFixed(1));
+      dots+='<circle cx="'+px.toFixed(1)+'" cy="'+py.toFixed(1)+'" r="3.5" fill="#fff" stroke="'+s.color+'" stroke-width="2"/>';
+      if(s.labelPts) labels+='<text x="'+px.toFixed(1)+'" y="'+(py-7).toFixed(1)+'" font-size="9" fill="'+s.color+'" text-anchor="middle" font-weight="700" font-family="var(--mono)" style="pointer-events:none">'+v+'</text>';
+    });
+    out+='<polyline points="'+poly.join(" ")+'" fill="none" stroke="'+s.color+'" stroke-width="2.2" stroke-linejoin="round" style="pointer-events:none"/>'+dots+labels;
+  });
+  return '<svg viewBox="0 0 '+W+' '+H+'">'+out+'</svg>';
 }
 
 /* ═══════════════════════ DERIVE (selected client) ═══════════════════════ */
@@ -577,6 +620,18 @@ function render(){
   var topStage=STAGE_ORDER.filter(function(s){return s!=="Other";}).sort(function(a,b){return (stageCount[b]||0)-(stageCount[a]||0);})[0];
   var stageRows=currentStages(openList);
 
+  /* ── captured week-over-week backlog history (from snapshots) ── */
+  var hist=backlogHistory(S.client);
+  var histWeeks=hist.map(function(h){return h.wk;});
+  var histOpenVals=hist.map(function(h){return h.open;});
+  var histSeries=[
+    {name:"Open",   color:"var(--client)",  vals:histOpenVals, labelPts:true},
+    {name:"SVM",    color:"var(--hd)",       vals:hist.map(function(h){return h.svm;})},
+    {name:"Client", color:"var(--client2)",  vals:hist.map(function(h){return h.client;})}
+  ];
+  var histLast=histOpenVals.length?histOpenVals[histOpenVals.length-1]:null;
+  var histPrev=histOpenVals.length>1?histOpenVals[histOpenVals.length-2]:null;
+
   /* ── executive summary ── */
   var exText='<b>'+esc(S.client)+'</b> currently has <b>'+K.open+' open ticket'+(K.open!==1?'s':'')+'</b> — '
     +'<b style="color:var(--hd)">'+K.svm+' need SVM action</b> (our team) and <b style="color:var(--client2)">'+K.client+' are waiting on your team</b>, i.e. <b>'+K.clientPct+'%</b> of open work sits on the client side. '
@@ -680,6 +735,23 @@ function render(){
           '</div>'+
         '</div>'+
 
+        /* Captured open-backlog history — the one trend a single export can't rebuild */
+        '<div class="sectitle">Open Backlog — Week over Week <span class="sub">captured history · '+hist.length+' week'+(hist.length!==1?'s':'')+'</span>'+
+          '<button class="btn noprint" id="resethist" style="margin-left:auto;font-size:11px">↺ Reset history</button></div>'+
+        caption('Real end-of-week open backlog for <b>'+esc(S.client)+'</b>, captured each time a fresh export is opened. Unlike the charts above, this can\u2019t be rebuilt from a single export — it accumulates as you upload week by week.')+
+        (histWeeks.length>=2
+          ? '<div class="chartcard"><div class="ct">Open Backlog Trend <span style="color:var(--faint);font-weight:500">· total / SVM / client open</span></div>'+
+              multiLineChart(histWeeks,histSeries)+
+              '<div class="legend">'+
+                '<span class="li"><span class="sw" style="background:var(--client)"></span>Total open</span>'+
+                '<span class="li"><span class="sw" style="background:var(--hd)"></span>SVM action</span>'+
+                '<span class="li"><span class="sw" style="background:var(--client2)"></span>Client waiting</span>'+
+              '</div>'+
+              insight('Open backlog is now <b>'+(histLast!=null?histLast:0)+'</b>'+chg(histLast,histPrev,false)+'. This line grows from each weekly export — more captured weeks make the direction clearer.')+
+            '</div>'
+          : '<div class="insight">💡 History is building. This is the first captured week (<b>'+wkLabel(histWeeks[0]||CUR_WK)+'</b>, open backlog <b>'+(histLast!=null?histLast:0)+'</b>). Open a fresh export next week and a week-over-week trend line will appear here automatically.</div>'
+        )+
+
         /* Row 2: component / resolution days */
         '<div class="sectitle">Open Work &amp; Turnaround</div>'+
         caption('Where the open SVM work sits, and how quickly tickets are being resolved. <b>Click a row or point to list tickets.</b>')+
@@ -735,6 +807,11 @@ function bind(){
   el("nasel").onchange=function(e){ S.na=e.target.value; render(); };
   el("stsel").onchange=function(e){ S.status=e.target.value; render(); };
   var clr=el("clrsel"); if(clr) clr.onclick=function(){ S.na=""; S.status=""; render(); };
+  var rh=el("resethist"); if(rh) rh.onclick=function(){
+    if(!confirm("Reset all captured weekly history?\n\nThis clears the week-over-week open-backlog trend for every client and can't be undone. The current export is re-captured as a fresh starting point.")) return;
+    if(window.HDStore) window.HDStore.clearSnapshots();
+    SNAPS={}; captureSnapshot(); render();
+  };
   var dp=document.querySelector(".colpick"); if(dp) dp.addEventListener("toggle",function(){ S.colsOpen=dp.open; });
   document.querySelectorAll(".colchk").forEach(function(chk){ chk.onchange=function(){
     var k=chk.dataset.k;
@@ -822,11 +899,11 @@ function bindDrill(){
 /* ═══════════════════════ BOOT ═══════════════════════ */
 function boot(){
   if(!window.HDStore){ el("app").innerHTML='<div class="loading"><div style="font-size:15px;font-weight:700">Storage unavailable</div><div style="font-size:12px;color:var(--muted)">Open this from the launcher. <a href="index.html">Go to upload</a>.</div></div>'; return; }
-  Promise.all([HDStore.loadFile(), HDStore.loadRows()]).then(function(r){
-    var rec=r[0], edited=r[1];
+  Promise.all([HDStore.loadFile(), HDStore.loadRows(), HDStore.loadSnapshots()]).then(function(r){
+    var rec=r[0], edited=r[1]; SNAPS=r[2]||{};
     if(!rec){ window.location.replace("index.html"); return; }
     FILENAME=rec.name;
-    function go(rows){ RAW_ROWS=rows; RAW=normalize(rows); computeAsOf(); render(); }
+    function go(rows){ RAW_ROWS=rows; RAW=normalize(rows); computeAsOf(); captureSnapshot(); render(); }
     if(edited && edited.length){ go(edited); }
     else { readFile(rec.blob).then(go).catch(function(err){ alert("Could not read stored file: "+err.message); window.location.replace("index.html"); }); }
   });
