@@ -460,24 +460,12 @@ function isClar(rc){ return String(rc).toLowerCase().indexOf("clarification")>-1
 
 /* ── NEXT-ACTION (who acts next: SVM vs Client) ──
    The Jira "Next Action" column isn't reliably updated, so owner is decided by
-   STATUS (team-confirmed map, same as the Weekly Report). Anything not in the
-   map falls back to the Next Action column, then to "unset". */
-var STATUS_OWNER = {
-  // Client — waiting on the client
-  "Waiting for customer":"client","Resolved With Clarification":"client","Confirmation":"client",
-  "DB Script Delivered":"client","Delivered":"client","Resolved":"client","Completed":"client",
-  "CLIENT Approval (DB Script)":"client","CLIENT RELEASE APPROVAL":"client","Client Release Approval (PROD)":"client",
-  "Client Hotfix Testing":"client","Client Deployment (PROD)":"client","Release Move to Production":"client",
-  "Doubt Clarification":"client","Clarification (Dev)":"client","Published":"client",
-  // SVM — action on our side
-  "Technical Analysis":"svm","Analysis & Study":"svm","User Request":"svm","Team Lead Review & Approval":"svm",
-  "Development In Progress":"svm","Approval DB Admin":"svm","DB Admin Approval":"svm","Sys/user configuration":"svm",
-  "SVM Hotfix Testing":"svm","Testing In Progress":"svm","Assign to SVM Deployment Team":"svm",
-  "Release Plan (UAT or Hot Fix)":"svm","DB Script Request":"svm","Impact Study":"svm","Release Kit Prep.":"svm",
-  "Invoice Yet to Raise":"svm","POC Release Approval":"svm","Release In Progress":"svm"
-};
+   STATUS. The map is now shared across all dashboards via hd-store.js
+   (window.HDClass) so it can't drift. Only statuses HDClass doesn't recognise
+   fall back to the Next Action column, then to "unset". */
 function naKey(t){
-  if(t && STATUS_OWNER[t.status]) return STATUS_OWNER[t.status];
+  var o = t && window.HDClass.owner(t.status);
+  if(o) return o;
   var v=String(t&&t.nextActionRaw||"").trim().toUpperCase();
   if(v==="SVM") return "svm";
   if(v==="CLIENT") return "client";
