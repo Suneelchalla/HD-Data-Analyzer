@@ -175,8 +175,8 @@ select{appearance:none;background:var(--paper);border:1px solid var(--line);bord
   .chartcard svg{max-height:120px}
   .legend{margin-top:5px;gap:10px}
   .insight{padding:5px 9px;margin-top:5px;font-size:10px;line-height:1.5}
-  /* compact sections */
-  .sectitle{break-after:avoid;margin:8px 0 5px;padding:5px 10px;font-size:11px}
+  /* compact sections — allow sections to start anywhere on the page */
+  .sectitle{margin:8px 0 5px;padding:5px 10px;font-size:11px}
   .exec{padding:9px 12px;margin-bottom:8px}
   .exec p{font-size:12px;line-height:1.55}
   .callout{padding:8px 12px;margin-bottom:8px;font-size:11.5px}
@@ -186,8 +186,11 @@ select{appearance:none;background:var(--paper);border:1px solid var(--line);bord
   .kpi .lab{font-size:8.5px}
   .kpi .val{font-size:19px}
   .kpi .hint{font-size:7.5px}
-  /* tables */
-  .matrix,.ttable-wrap{break-inside:avoid}
+  /* tables: small matrix stays together, long ticket tables flow across pages */
+  .matrix{break-inside:avoid}
+  .ttable-wrap{break-inside:auto}
+  .ttable thead{display:table-header-group}
+  .ttable tr{break-inside:avoid}
   /* segmented bars */
   .segbar{height:24px}
   /* horizontal bars */
