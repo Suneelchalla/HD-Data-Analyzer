@@ -480,6 +480,28 @@ function hbars(items,color){
 /* ═══════════════════════ RENDER ═══════════════════════ */
 function caption(t){ return ''; }
 function insight(html){ return '<div class="insight">💡 '+html+'</div>'; }
+/* Top N oldest open tickets as a compact spotlight table */
+function top5OldestHTML(openList, n){
+  if(!openList.length) return '';
+  var sorted=openList.slice().sort(function(a,b){ return (ageDays(b)||0)-(ageDays(a)||0); });
+  var top=sorted.slice(0, n||5);
+  var h='<div class="ttable-wrap"><table class="ttable"><thead><tr>'+
+    '<th>Key</th><th>Summary</th><th>Status</th><th>Priority</th><th>Component</th><th>Next</th><th>Age (d)</th></tr></thead><tbody>';
+  top.forEach(function(t){
+    var na=naKey(t);
+    h+='<tr>'+
+      '<td class="key"><a href="'+JIRA+encodeURIComponent(t.key)+'" target="_blank" rel="noreferrer">'+esc(t.key)+'</a></td>'+
+      '<td class="sum" title="'+esc(t.summary)+'">'+esc(trunc(t.summary,70))+'</td>'+
+      '<td><span class="pill">'+esc(t.status||"—")+'</span></td>'+
+      '<td>'+esc(t.priority||"—")+'</td>'+
+      '<td>'+esc(t.componentsRaw||"—")+'</td>'+
+      '<td>'+(na==="svm"?'<span class="badge-na svm">SVM</span>':na==="client"?'<span class="badge-na client">Client</span>':'<span class="pill">—</span>')+'</td>'+
+      '<td class="num" style="color:var(--client);font-weight:800">'+ageDays(t)+'</td>'+
+    '</tr>';
+  });
+  h+='</tbody></table></div>';
+  return h;
+}
 /* horizontal segmented bar; parts=[{label,val,color,data}] (data = raw attr string) */
 function segBar(parts){
   var tot=parts.reduce(function(a,p){return a+p.val;},0)||1;
@@ -613,7 +635,8 @@ function render(){
     +'<b style="color:var(--hd)">'+K.svm+' need SVM action</b> (our team) and <b style="color:var(--client2)">'+K.client+' are waiting on your team</b>, i.e. <b>'+K.clientPct+'%</b> of open work sits on the client side. '
     +'<b>'+infLast+'</b> new ticket'+(infLast!==1?'s':'')+' came in during '+wkLabel(lastWk)+chg(infLast,infPrev,false)+', and <b>'+resLast+'</b> '+(resLast!==1?'were':'was')+' resolved'+chg(resLast,resPrev,true)+'. '
     +(compTop?'The heaviest open area is <b>'+esc(compTop.label)+'</b> ('+compTop.val+' SVM ticket'+(compTop.val!==1?'s':'')+'). ':'')
-    +(topStage&&stageCount[topStage]?'Most open tickets are at <b>'+esc(shortStage(topStage))+'</b>.':'');
+    +(topStage&&stageCount[topStage]?'Most open tickets are at <b>'+esc(shortStage(topStage))+'</b>. ':'')
+    +(oldestOpen>30?'The oldest open ticket has been open <b>'+oldestOpen+' days</b>.':'');
 
   var app=el("app");
   app.innerHTML=''+
@@ -696,6 +719,10 @@ function render(){
             insight((ageCounts[2]+ageCounts[3])? ('<b>'+(ageCounts[2]+ageCounts[3])+'</b> open ticket'+((ageCounts[2]+ageCounts[3])!==1?'s':'')+' '+((ageCounts[2]+ageCounts[3])===1?'is':'are')+' over 30 days old'+(ageCounts[3]?', including <b>'+ageCounts[3]+'</b> beyond 60 days':'')+'. These older items are being actively reviewed to bring them to closure.') : 'All open tickets are within 30 days old.')+
           '</div>'+
         '</div>'+
+
+        /* Top 5 oldest open tickets — spotlight */
+        '<div class="sectitle">🔴 Top 5 Oldest Open Tickets <span class="sub">longest-open items needing attention</span></div>'+
+        top5OldestHTML(openList, 5)+
 
         '<div class="sectitle">Weekly Trends — Last '+WEEKS_BACK+' Weeks</div>'+
         caption('How work came in and went out over the past '+WEEKS_BACK+' weeks. Weeks are ISO week numbers (e.g. W34). <b>Click any bar to list the tickets behind it.</b>')+
