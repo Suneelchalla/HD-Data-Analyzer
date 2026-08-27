@@ -292,19 +292,15 @@ tbody tr.rowlink:hover{background:var(--hd-bg)}
 /* ═══════════════════════════════ CONFIG ═══════════════════════════════ */
 var JIRA = "https://svmhelpdesk.atlassian.net/browse/";
 
-/* SVM In Charge → Group mapping (matched on the incharge person) */
-var GROUP_MAP = {
-  "muthuraj v":"Group 1","manikandan v":"Group 1","naveen n":"Group 1","vijay j":"Group 1","ramkumar m":"Group 1","lenin b premnath":"Group 1",
-  "sentamil selvan":"Group 2","thennarasu s":"Group 2","jayasree b":"Group 2","balamurugan r":"Group 2","alaudeen m":"Group 2","vignesh r":"Group 2"
-};
-var GROUP_MEMBERS = {
-  "Group 1":"Exports (Muthuraj) · Imports (Manikandan) · Operations (Naveen N) · Ecom (Vijay) · PNC (Ramkumar/Lenin)",
-  "Group 2":"CMR (Sentamil) · NFR (Thennarasu) · Cost (Jayasree) · EMS (Balamurugan) · VSS (Alaudeen) · EDI (Vignesh)",
-  "Others":"All remaining SVM In Charge (and unassigned)"
-};
-var GROUP_ORDER = ["Group 1","Group 2","Others"];
-function normName(s){ return String(s||"").toLowerCase().replace(/[.]/g," ").replace(/\s+/g," ").trim(); }
-function groupOf(svm){ if(!svm) return "Others"; return GROUP_MAP[normName(svm)] || "Others"; }
+/* SVM In Charge / Current Worker → Group. The directory now lives in hd-store.js
+   (window.HDGroups) so the Master Data module can edit it and all dashboards
+   share one source. Thin aliases keep the rest of this file unchanged; groupOf()
+   is override-aware. */
+var GROUP_MAP = window.HDGroups.defaults;
+var GROUP_MEMBERS = window.HDGroups.MEMBERS;
+var GROUP_ORDER = window.HDGroups.ORDER;
+function normName(s){ return window.HDGroups.normName(s); }
+function groupOf(svm){ return window.HDGroups.groupOf(svm); }
 var MONTHS_ORDER = []; // filled from data
 var RAW = [];          // normalized tickets
 var RAW_ROWS = [];     // raw rows (original Excel column names) — the editable truth
@@ -363,6 +359,42 @@ function weekDates(year,week){
   var s=isoWeekStart(year,week), e=new Date(s); e.setUTCDate(s.getUTCDate()+6);
   var day=function(d){return d.getUTCDate();}, mon=function(d){return d.toLocaleDateString("en-GB",{month:"short",timeZone:"UTC"});};
   return s.getUTCMonth()===e.getUTCMonth() ? day(s)+"–"+day(e)+" "+mon(s) : day(s)+" "+mon(s)+"–"+day(e)+" "+mon(e);
+}
+
+/* ── Data currency (resolved-date span of the whole export) ──
+   Set from ALL of RAW (not the filtered pool), because whether an ISO week is
+   "complete" is a calendar fact about the export's currency, independent of any
+   SVM/worker filter. Used to detect partial weeks in the Week-on-Week tab so a
+   still-in-progress week (e.g. an export taken mid-week) isn't compared head-to
+   -head with a full 7-day week. */
+var DATA_RES_MIN=null, DATA_RES_MAX=null;
+function computeResolvedSpan(){
+  DATA_RES_MIN=null; DATA_RES_MAX=null;
+  RAW.forEach(function(t){ var d=t.resolved; if(!d) return;
+    if(!DATA_RES_MIN||d<DATA_RES_MIN) DATA_RES_MIN=d;
+    if(!DATA_RES_MAX||d>DATA_RES_MAX) DATA_RES_MAX=d; });
+}
+/* How many of an ISO week's 7 days are actually covered by the export's
+   resolved-date span. Returns 1..7 (7 = complete). A week clipped by the start
+   OR the end of the data reads <7. days<7 ⇒ the week is partial and its raw
+   totals under-count relative to a full week. */
+function weekCoverageDays(year,week){
+  if(!DATA_RES_MAX) return 7;
+  function dayOnly(d){ return Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate()); }
+  var mon=isoWeekStart(year,week);                       // Monday 00:00 UTC
+  var sun=new Date(mon); sun.setUTCDate(mon.getUTCDate()+6);
+  var lo=Math.max(dayOnly(mon), DATA_RES_MIN?dayOnly(DATA_RES_MIN):dayOnly(mon));
+  var hi=Math.min(dayOnly(sun), dayOnly(DATA_RES_MAX));
+  if(hi<lo) return 0;
+  return Math.round((hi-lo)/86400000)+1;                 // inclusive day count
+}
+/* Whole ISO weeks between two week keys ("2026-W34"→"2026-W35" = 1). Used to
+   warn when the two compared weeks aren't calendar-adjacent (a week with zero
+   resolved tickets in scope is skipped by the selector, which can otherwise
+   make "Last 2 weeks" silently compare non-consecutive weeks). */
+function weeksBetweenKeys(ka,kb){
+  function parse(k){ var p=k.split("-W"); return isoWeekStart(+p[0],+p[1]); }
+  return Math.round((parse(kb)-parse(ka))/(7*86400000));
 }
 /* resolved-date pool for week analysis: dimension filters + date range on resolved */
 function weekPool(){
@@ -1560,12 +1592,14 @@ function viewPivots(){
 }
 
 /* ═══════════════════════════════ VIEW: WEEK ON WEEK ═══════════════════════════════ */
-function wowCard(label,a,b,isPct,color,metric){
+/* badge (optional): a small chip shown under the delta, e.g. a partial-week note. */
+function wowCard(label,a,b,isPct,color,metric,badge){
   var d=b-a, arrow=d>0?"▲":(d<0?"▼":"→"), cls=d>0?"up":(d<0?"down":"flat");
   return '<div class="card kpi clk" data-wcard="'+metric+'" style="text-align:center;padding:16px 14px">'+
     '<div class="kl">'+label+'</div>'+
     '<div class="kv" style="color:'+color+';font-size:25px;margin-top:8px">'+b+(isPct?"%":"")+'</div>'+
     '<div style="margin-top:9px"><span class="dchip '+cls+'">'+arrow+' '+Math.abs(d)+(isPct?" pts":"")+'</span> <span class="sub">vs '+a+(isPct?"%":"")+'</span></div>'+
+    (badge?'<div style="margin-top:6px"><span class="dchip flat" style="background:#FEF3E2;color:#B45309;border-color:#F5D9A8">'+badge+'</span></div>':'')+
   '</div>';
 }
 function deltaCell(d,isPct,neg){
@@ -1575,6 +1609,7 @@ function deltaCell(d,isPct,neg){
 }
 function viewWoW(){
   window.__piv={};
+  if(!DATA_RES_MAX) computeResolvedSpan();   // ensure data-currency span is ready for partial-week checks
   var pool=weekPool();
   var scopeNote=(S.svm||S.cw||S.rc||S.issue||S.proj)?" (filters applied)":"";
   var out='<div class="up" style="margin-bottom:9px"><div class="eyebrow">Week on Week</div>'+
@@ -1601,6 +1636,29 @@ function viewWoW(){
   function m(k){ var w=wk[k]; return {t:w.tix.length,hd:w.hd,eg:w.eg,hp:pct(w.hd,w.tix.length)}; }
   var A=m(S.weekA), B=m(S.weekB);
 
+  /* ── PARTIAL-WEEK & RUN-RATE (fixes the "apples-to-apples" problem) ──
+     A week whose 7 calendar days aren't all inside the export's resolved-date
+     span (typically the newest week, when the export is taken mid-week) will
+     naturally show fewer resolved tickets — so a raw "W35 vs W34" delta over-
+     states any drop. We compute each compared week's day-coverage and, when a
+     week is partial, expose a fair per-day run-rate and a full-week projection
+     instead of relying on the raw totals alone. */
+  var covA=weekCoverageDays(wk[S.weekA].year, wk[S.weekA].week);
+  var covB=weekCoverageDays(wk[S.weekB].year, wk[S.weekB].week);
+  var partialA=covA>0&&covA<7, partialB=covB>0&&covB<7;
+  var perDayA=covA>0?A.t/covA:0, perDayB=covB>0?B.t/covB:0;
+  var projB=Math.round(perDayB*7);                       // B's total at current pace over a full week
+  var perDayDeltaPct=perDayA>0?Math.round((perDayB-perDayA)/perDayA*100):0;
+  var bBadge=partialB?("◐ "+covB+"/7 days"):"";         // small chip on the Resolved card
+
+  /* ── ADJACENCY CHECK ──
+     The week selectors only list weeks that actually have resolved tickets in
+     scope, so a week with zero resolutions (e.g. a quiet week for one worker)
+     is skipped — which can make "Last 2 weeks" silently compare two NON-
+     consecutive weeks. Detect the gap so we can say so plainly. */
+  var gap=weeksBetweenKeys(lo,hi);                        // 1 = consecutive ISO weeks
+  var nonAdjacent=(vis.length>=2 && gap>1);
+
   var latest=keys[keys.length-1];
   var windowTxt = vis.length===1 ? ('Showing <b>'+weekLabel(vis[0])+'</b>') : ('Showing <b>'+weekLabel(lo)+'</b>–<b>'+weekLabel(hi)+'</b> · '+vis.length+' weeks');
   out+='<div class="card up d1 pad" style="margin-bottom:9px">'+
@@ -1611,17 +1669,26 @@ function viewWoW(){
       '<select class="fsel" id="weekB">'+keys.map(function(k){return '<option value="'+k+'" '+(S.weekB===k?"selected":"")+'>'+weekLabel(k)+' · '+weekDates(wk[k].year,wk[k].week)+'</option>';}).join("")+'</select>'+
       '<button class="chip'+(vis.length===2&&hi===latest?' on':'')+'" data-wowset="last2">Last 2 weeks</button>'+
       '<button class="chip'+(allSelected?' on':'')+'" data-wowset="all">All weeks</button>'+
+      /* loud, unmissable flags right in the control bar */
+      (partialB?'<span class="dchip flat" style="background:#FEF3E2;color:#B45309;border-color:#F5D9A8">⚠ '+weekLabel(S.weekB)+' in progress · '+covB+'/7 days</span>':'')+
+      (nonAdjacent?'<span class="dchip flat" style="background:#FEF3E2;color:#B45309;border-color:#F5D9A8">⚠ not consecutive · '+(gap-1)+' week'+((gap-1)!==1?'s':'')+' skipped</span>':'')+
       '<span class="click" style="margin-left:auto">'+windowTxt+' · click a metric to open tickets</span>'+
     '</div>'+
     '<div class="grid" style="grid-template-columns:repeat(4,1fr)">'+
-      wowCard("Resolved",A.t,B.t,false,"var(--ink)","all")+
+      wowCard("Resolved",A.t,B.t,false,"var(--ink)","all",bBadge)+
       wowCard("HD resolved",A.hd,B.hd,false,"var(--hd)","hd")+
       wowCard("Engg resolved",A.eg,B.eg,false,"var(--engg)","eg")+
       wowCard("HD share",A.hp,B.hp,true,"var(--hd)","hp")+
     '</div>'+
     note([
-      'From <b>'+weekLabel(S.weekA)+'</b> to <b>'+weekLabel(S.weekB)+'</b>, resolved '+((B.t-A.t)>=0?'rose':'fell')+' by <b>'+Math.abs(B.t-A.t)+'</b> ('+(A.t?Math.round((B.t-A.t)/A.t*100):0)+'%).',
-      'HD share moved <b class="'+((B.hp-A.hp)>=0?'up':'dn')+'">'+arrow(B.hp-A.hp)+' '+Math.abs(B.hp-A.hp)+' pts</b> ('+A.hp+'% → '+B.hp+'%).'
+      /* When B is partial, lead with the fair per-day/run-rate read; otherwise
+         the plain raw delta is already apples-to-apples. */
+      partialB
+        ? '<b>'+weekLabel(S.weekB)+' is only '+covB+' of 7 days in</b> (export data runs to '+fdate(DATA_RES_MAX)+'), so its <b>'+B.t+'</b> vs '+weekLabel(S.weekA)+"'s <b>"+A.t+'</b> isn\'t like-for-like. Per day: <b>'+(Math.round(perDayB*10)/10)+'/day</b> vs <b>'+(Math.round(perDayA*10)/10)+'/day</b> ('+(perDayDeltaPct>=0?'+':'')+perDayDeltaPct+'%). At this pace '+weekLabel(S.weekB)+' projects to <b>~'+projB+'</b> for the full week.'
+        : 'From <b>'+weekLabel(S.weekA)+'</b> to <b>'+weekLabel(S.weekB)+'</b>, resolved '+((B.t-A.t)>=0?'rose':'fell')+' by <b>'+Math.abs(B.t-A.t)+'</b> ('+(A.t?Math.round((B.t-A.t)/A.t*100):0)+'%).',
+      partialA?'Note: <b>'+weekLabel(S.weekA)+'</b> is also partial ('+covA+'/7 days) — it sits at the edge of the data window.':null,
+      nonAdjacent?'These two weeks aren\'t consecutive — <b>'+(gap-1)+'</b> week'+((gap-1)!==1?'s':'')+' with no resolved tickets in scope '+((gap-1)!==1?'were':'was')+' skipped between them.':null,
+      'HD share moved <b class="'+((B.hp-A.hp)>=0?'up':'dn')+'">'+arrow(B.hp-A.hp)+' '+Math.abs(B.hp-A.hp)+' pts</b> ('+A.hp+'% → '+B.hp+'%)'+((B.t<10||A.t<10)?' — note the small ticket counts make this share sensitive to a single ticket.':'.')
     ])+
   '</div>';
 
@@ -1639,10 +1706,12 @@ function viewWoW(){
     (function(){ var sum=vis.reduce(function(a,k){return a+wk[k].tix.length;},0);
       var busiest=vis.reduce(function(a,b){return wk[b].tix.length>wk[a].tix.length?b:a;});
       var lat=wk[vis[vis.length-1]];
+      var latCov=weekCoverageDays(lat.year,lat.week);          // partial-week marker for the newest bar
+      var latPartial=latCov>0&&latCov<7;
       return note([
         'Window of <b>'+vis.length+'</b> week'+(vis.length!==1?'s':'')+' — <b>'+sum.toLocaleString()+'</b> resolved, averaging <b>'+Math.round(sum/vis.length)+'</b>/week.',
         'Busiest in window: <b>'+weekLabel(busiest)+'</b> ('+weekDates(wk[busiest].year,wk[busiest].week)+') with <b>'+wk[busiest].tix.length+'</b> resolved.',
-        'Newest week <b>'+weekLabel(lat.key)+'</b> — HD share <b class="hd">'+pct(lat.hd,lat.tix.length)+'%</b> ('+lat.hd+' HD / '+lat.eg+' Engg).'
+        'Newest week <b>'+weekLabel(lat.key)+'</b>'+(latPartial?' <span class="dchip flat" style="background:#FEF3E2;color:#B45309;border-color:#F5D9A8">◐ partial '+latCov+'/7 days</span>':'')+' — HD share <b class="hd">'+pct(lat.hd,lat.tix.length)+'%</b> ('+lat.hd+' HD / '+lat.eg+' Engg)'+(latPartial?'. The shorter bar partly reflects the incomplete week, not only lower output.':'.')
       ]); })()+
   '</div>';
 
@@ -1651,7 +1720,8 @@ function viewWoW(){
     '<div style="overflow:auto;max-height:460px"><table class="ptable"><thead><tr><th class="rh">Week</th><th class="rh">Dates</th><th>Resolved</th><th>HD</th><th>Engg</th><th>HD %</th><th>Engg %</th><th>Δ Resolved</th><th>Δ HD %</th><th>Δ Engg %</th></tr></thead><tbody>';
   vis.forEach(function(k,i){ var w=wk[k]; var tot=w.tix.length; var hp=pct(w.hd,tot);
     var prev=i>0?wk[vis[i-1]]:null; var dTot=prev?tot-prev.tix.length:null; var dHp=prev?hp-pct(prev.hd,prev.tix.length):null;
-    out+='<tr class="rowlink" data-wk-row="'+k+'"><td class="rl">'+weekLabel(k)+'</td>'+
+    var covRow=weekCoverageDays(w.year,w.week); var partRow=covRow>0&&covRow<7;   // flag partial rows
+    out+='<tr class="rowlink" data-wk-row="'+k+'"><td class="rl">'+weekLabel(k)+(partRow?' <span title="Partial week — only '+covRow+' of 7 days are within the data" style="color:#B45309;font-weight:700">◐</span>':'')+'</td>'+
       '<td class="rl" style="font-weight:400;color:var(--muted)">'+weekDates(w.year,w.week)+'</td>'+
       '<td class="tot val" data-wkc="'+k+'" data-side="all">'+tot+'</td>'+
       '<td class="val" data-wkc="'+k+'" data-side="hd" style="color:var(--hd);font-weight:700">'+w.hd+'</td>'+
@@ -2120,7 +2190,7 @@ function renderLanding(){
   ["dragleave","drop"].forEach(function(ev){ dz.addEventListener(ev,function(e){e.preventDefault();dz.classList.remove("over");}); });
   dz.addEventListener("drop",function(e){
     var file=e.dataTransfer.files&&e.dataTransfer.files[0];
-    if(file){ FILENAME=file.name; readFile(file).then(function(rows){ RAW=normalize(rows).filter(function(t){return t.key;}); S.tab="perf"; render(); }).catch(function(err){alert("Could not read file: "+err.message);}); }
+    if(file){ FILENAME=file.name; readFile(file).then(function(rows){ RAW=normalize(rows).filter(function(t){return t.key;}); computeResolvedSpan(); S.tab="perf"; render(); }).catch(function(err){alert("Could not read file: "+err.message);}); }
   });
 }
 
@@ -2139,21 +2209,28 @@ renderMain=function(){
 function rebuildFromRows(rawRows){
   RAW_ROWS = rawRows;
   RAW = normalize(rawRows).filter(function(t){return t.key;});
+  computeResolvedSpan();   // refresh data-currency span for partial-week detection
 }
 
 /* boot — prefer in-app edits; otherwise read the shared Excel and seed the store */
 function boot(){
   if(!window.HDStore){ renderLanding(); return; }
-  HDStore.loadFile().then(function(rec){
-    if(!rec){ window.location.replace("index.html"); return; }
-    FILENAME=rec.name; BLOB=rec.blob;
-    HDStore.loadRows().then(function(edited){
-      if(edited && edited.length){ rebuildFromRows(edited); render(); return; }
-      readFile(rec.blob).then(function(rows){
-        rebuildFromRows(rows);
-        HDStore.saveRows(rows);
-        render();
-      }).catch(function(err){ alert("Could not read stored file: "+err.message); window.location.replace("index.html"); });
+  // Load Master Data overrides FIRST — group is baked in at normalize() time, so
+  // the status/group maps must be applied before rebuildFromRows() runs.
+  HDStore.loadConfig().then(function(cfg){
+    window.HDClass.setOverrides(cfg.statusOverrides);
+    window.HDGroups.setOverrides(cfg.groupOverrides);
+    HDStore.loadFile().then(function(rec){
+      if(!rec){ window.location.replace("index.html"); return; }
+      FILENAME=rec.name; BLOB=rec.blob;
+      HDStore.loadRows().then(function(edited){
+        if(edited && edited.length){ rebuildFromRows(edited); render(); return; }
+        readFile(rec.blob).then(function(rows){
+          rebuildFromRows(rows);
+          HDStore.saveRows(rows);
+          render();
+        }).catch(function(err){ alert("Could not read stored file: "+err.message); window.location.replace("index.html"); });
+      });
     });
   });
 }
