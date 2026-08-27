@@ -195,6 +195,54 @@ h1 .two{background:linear-gradient(100deg,var(--blue) 0%,#3A86C9 45%,var(--teal)
   .stage.live .flow{animation:none;stroke-dasharray:none}
   .statuspill.live .dot{animation:none}
 }
+
+/* ══════ Master Data module (settings) ══════ */
+.gearbtn{width:34px;height:34px;border-radius:9px;background:var(--card);border:1px solid var(--line);color:var(--ink2);
+  display:inline-flex;align-items:center;justify-content:center;font-size:16px;box-shadow:var(--sh);margin-right:10px}
+.gearbtn:hover{border-color:var(--muted);color:var(--ink)}
+.md-ov{position:fixed;inset:0;z-index:1000;background:rgba(15,23,42,.44);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+  display:none;align-items:center;justify-content:center;padding:24px}
+.md-ov.open{display:flex}
+.md-panel{background:var(--card);border-radius:18px;box-shadow:var(--sh2);width:min(920px,96vw);max-height:90vh;display:flex;flex-direction:column;overflow:hidden}
+.md-head{display:flex;align-items:center;gap:12px;padding:18px 22px;border-bottom:1px solid var(--line)}
+.md-head .t{font-family:var(--disp);font-weight:700;font-size:17px;color:var(--ink)}
+.md-head .s{font-size:11.5px;color:var(--muted);margin-top:2px}
+.md-x{margin-left:auto;width:34px;height:34px;border-radius:8px;border:1px solid var(--line);background:var(--paper);color:var(--ink2);font-size:15px}
+.md-x:hover{color:var(--ink);border-color:var(--muted)}
+.md-tabs{display:flex;gap:6px;padding:12px 22px 0}
+.md-tab{padding:9px 15px;border:1px solid var(--line);border-bottom:none;border-radius:9px 9px 0 0;background:var(--paper);color:var(--ink2);
+  font-family:var(--disp);font-weight:600;font-size:12.5px;display:inline-flex;align-items:center;gap:7px}
+.md-tab.on{background:var(--card);color:var(--ink);border-color:var(--line2)}
+.md-tab .cnt{font-family:var(--mono);font-size:10px;font-weight:700;background:var(--blue-soft);color:var(--blue);border:1px solid var(--blue-line);border-radius:20px;padding:1px 7px}
+.md-tab .warn{font-family:var(--mono);font-size:10px;font-weight:700;background:#FEF3E2;color:var(--amber);border:1px solid #F5D9A8;border-radius:20px;padding:1px 7px}
+.md-body{flex:1;overflow:auto;padding:16px 22px;border-top:1px solid var(--line2)}
+.md-info{font-size:12px;color:var(--ink2);background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px 13px;margin-bottom:13px;line-height:1.55}
+.md-search{width:100%;padding:9px 12px;border:1px solid var(--line2);border-radius:9px;font-size:13px;margin-bottom:11px;font-family:inherit}
+.md-table{width:100%;border-collapse:collapse;font-size:12.5px}
+.md-table th{text-align:left;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;
+  padding:7px 10px;border-bottom:2px solid var(--line2);position:sticky;top:0;background:var(--card);z-index:1}
+.md-table td{padding:7px 10px;border-bottom:1px solid var(--line)}
+.md-table tr.review td{background:#FFFBF2}
+.md-name{font-weight:600;color:var(--ink)}
+.md-count{font-family:var(--mono);color:var(--muted);font-size:11px}
+.md-badge{font-family:var(--mono);font-size:9px;font-weight:700;padding:2px 7px;border-radius:5px;text-transform:uppercase;letter-spacing:.3px}
+.md-badge.def{background:var(--paper);color:var(--faint);border:1px solid var(--line)}
+.md-badge.cust{background:var(--teal-soft);color:var(--teal);border:1px solid var(--teal-line)}
+.md-badge.rev{background:#FEF3E2;color:var(--amber);border:1px solid #F5D9A8}
+.md-sel{padding:6px 9px;border:1px solid var(--line2);border-radius:8px;font-size:12px;font-family:inherit;background:var(--card);color:var(--ink);min-width:150px}
+.md-sel.rev{border-color:#F5D9A8;background:#FFFBF2}
+.md-foot{display:flex;align-items:center;gap:10px;padding:14px 22px;border-top:1px solid var(--line)}
+.md-foot .note{font-size:11px;color:var(--muted)}
+.md-foot .spacer{flex:1}
+.md-btn{padding:10px 16px;border-radius:9px;font-family:var(--disp);font-weight:600;font-size:13px;border:1px solid var(--line2);background:var(--card);color:var(--ink2)}
+.md-btn:hover{border-color:var(--muted);color:var(--ink)}
+.md-btn.primary{background:var(--ink);color:#fff;border-color:var(--ink)}
+.md-btn.primary:hover{background:#1c2740}
+.md-btn.danger{color:#B42318;border-color:#F3C6C0}
+.md-toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(20px);z-index:1100;background:var(--ink);color:#fff;
+  font-size:13px;font-weight:600;padding:11px 18px;border-radius:10px;box-shadow:var(--sh2);opacity:0;transition:opacity .25s,transform .25s;pointer-events:none}
+.md-toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.md-empty{text-align:center;color:var(--muted);font-size:13px;padding:36px 0}
 </style>
 </head>
 <body>
@@ -228,6 +276,7 @@ h1 .two{background:linear-gradient(100deg,var(--blue) 0%,#3A86C9 45%,var(--teal)
     </span>
     <span class="brand">HD Dashboards</span>
     <span class="spacer"></span>
+    <button class="gearbtn" id="gearBtn" title="Master data validation (Status / Group / Stage mapping)">⚙️</button>
     <span class="statuspill" id="status"><span class="dot"></span><span id="statustext">No source file</span></span>
   </div>
 
@@ -335,6 +384,33 @@ h1 .two{background:linear-gradient(100deg,var(--blue) 0%,#3A86C9 45%,var(--teal)
 </div>
 
 <input type="file" id="fileinput" accept=".xlsx,.xls">
+
+<!-- ══════ Master Data validation module ══════ -->
+<div class="md-ov" id="mdOv">
+  <div class="md-panel" role="dialog" aria-modal="true" aria-label="Master data validation">
+    <div class="md-head">
+      <div>
+        <div class="t">⚙️ Master Data Validation</div>
+        <div class="s">Review how statuses and people are classified. Fix anything wrong, save, and the dashboards use it.</div>
+      </div>
+      <button class="md-x" id="mdClose" aria-label="Close">✕</button>
+    </div>
+    <div class="md-tabs" id="mdTabs">
+      <button class="md-tab on" data-mdtab="status">🏷️ Status <span id="mdStatusReview"></span></button>
+      <button class="md-tab" data-mdtab="group">👥 Group <span id="mdGroupReview"></span></button>
+      <button class="md-tab" data-mdtab="stage">🗂️ Stage <span id="mdStageReview"></span></button>
+    </div>
+    <div class="md-body" id="mdBody"></div>
+    <div class="md-foot">
+      <span class="note" id="mdFootNote"></span>
+      <span class="spacer"></span>
+      <button class="md-btn danger" id="mdReset">↺ Reset this tab to defaults</button>
+      <button class="md-btn" id="mdCancel">Cancel</button>
+      <button class="md-btn primary" id="mdSave">Save &amp; re-analyse</button>
+    </div>
+  </div>
+</div>
+<div class="md-toast" id="mdToast"></div>
 
 <script>
 var QUERY = 'issuetype IN (Incident, "Service Request") AND created >= "2025-01-01" AND created <= "2026-12-31" AND project IN (ALXSVM, BLWS, CSD, ESLGEN, ECCL, FMSC, GWFC, IBEX, HSL, LSC, MILAHA, LSCSAIL, SSL, SWIPHX, TSHG, TKC, TASLI, UGL, VCL, WLS, WLSV, UAFL, NPDL, GSS)';
@@ -495,6 +571,217 @@ if(HS){
     else { drawWires(); }
   });
 } else { drawWires(); }
+</script>
+
+<!-- ══════════════════════ Master Data validation module ══════════════════════
+     A settings panel (gear button, top-right) that surfaces the classification
+     "master data" — Status→bucket, Person→group, Status→stage — reading the ACTUAL
+     values in the loaded export, showing how each is currently classified, and
+     flagging anything unmapped as "needs review". Corrections save to IndexedDB
+     (HDStore.saveConfig) and every dashboard applies them on load. Nothing here is
+     required for the dashboards to work; it's purely for keeping the maps correct. -->
+<script>
+(function(){
+  if(!window.HDStore){ var g0=document.getElementById("gearBtn"); if(g0) g0.style.display="none"; return; }
+  var HS=window.HDStore;
+  function el(id){ return document.getElementById(id); }
+  function esc(s){ return String(s==null?"":s).replace(/[&<>"]/g,function(m){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[m];}); }
+
+  /* Same sheet-picker the dashboards use, so we scan exactly what they parse. */
+  function pickSheet(wb){
+    return wb.SheetNames.find(function(s){return s.toLowerCase().indexOf("jira issues")>-1;})
+      || wb.SheetNames.find(function(s){return s.toLowerCase().indexOf("issue")>-1;})
+      || wb.SheetNames[1] || wb.SheetNames[0];
+  }
+  /* Rows to scan: prefer in-app edited rows, else parse the stored Excel blob. */
+  function getRows(){
+    return HS.loadRows().then(function(edited){
+      if(edited && edited.length) return edited;
+      return HS.loadFile().then(function(rec){
+        if(!rec||!rec.blob) return null;
+        return new Promise(function(res,rej){
+          var r=new FileReader();
+          r.onload=function(e){ try{ var wb=XLSX.read(e.target.result,{type:"array",cellDates:true}); res(XLSX.utils.sheet_to_json(wb.Sheets[pickSheet(wb)],{defval:""})); }catch(err){ rej(err); } };
+          r.onerror=rej; r.readAsArrayBuffer(rec.blob);
+        });
+      });
+    });
+  }
+  /* Case-insensitive column reader keyed off the first row's headers. */
+  function colGetter(rows){
+    var km={}; if(rows[0]) Object.keys(rows[0]).forEach(function(k){ km[String(k).trim().toLowerCase()]=k; });
+    return function(row,name){ var kk=km[name]; return kk!==undefined? row[kk] : ""; };
+  }
+  /* Distinct Status values, and distinct people from BOTH SVM In Charge and
+     Current Worker (union), each with a ticket count so the important ones sort
+     to the top. */
+  function scanData(rows){
+    var get=colGetter(rows), st={}, nm={};
+    rows.forEach(function(row){
+      var s=String(get(row,"status")||"").trim(); if(s) st[s]=(st[s]||0)+1;
+      [["svm in charge","svm"],["current worker","cw"]].forEach(function(p){
+        var v=String(get(row,p[0])||"").trim();
+        if(v){ if(!nm[v]) nm[v]={count:0,svm:false,cw:false}; nm[v].count++; nm[v][p[1]]=true; }
+      });
+    });
+    var statuses=Object.keys(st).map(function(k){return {name:k,count:st[k]};}).sort(function(a,b){return b.count-a.count;});
+    var names=Object.keys(nm).map(function(k){return {name:k,count:nm[k].count,svm:nm[k].svm,cw:nm[k].cw};}).sort(function(a,b){return b.count-a.count;});
+    return {statuses:statuses,names:names};
+  }
+
+  /* Working state — a fresh copy of the saved config is loaded each time the
+     panel opens, so Cancel discards unsaved edits and Save commits them. */
+  var MD={ tab:"status", rows:null, scan:null, cfg:null, search:"" };
+
+  var STATUS_OPTS=[["hd","HD (desk)"],["engg","Engineering"],["client","Client"]];
+
+  function openMaster(){
+    Promise.all([HS.loadConfig(), getRows()]).then(function(r){
+      MD.cfg=r[0]; MD.rows=r[1]||null; MD.search="";
+      MD.scan=MD.rows? scanData(MD.rows) : {statuses:[],names:[]};
+      MD.tab="status";
+      el("mdOv").classList.add("open");
+      renderTabsState(); render();
+    });
+  }
+  function closeMaster(){ el("mdOv").classList.remove("open"); }
+
+  /* ── review counters (the "discrepancy" flags shown on each tab) ── */
+  function statusReview(s){ return !window.HDClass.isKnown(s.name) && !hasOv("statusOverrides",s.name); }
+  function groupReview(n){ return window.HDGroups.defaultGroupOf(n.name)==="Others" && !hasOv("groupOverrides",window.HDGroups.normName(n.name)); }
+  function stageReview(s){ return window.HDStages.defaultStageOf(s.name)==="Other" && !hasOv("stageOverrides",s.name); }
+  function hasOv(bucket,key){ return MD.cfg && MD.cfg[bucket] && Object.prototype.hasOwnProperty.call(MD.cfg[bucket],key); }
+
+  function renderTabsState(){
+    if(!MD.scan) return;
+    var sR=MD.scan.statuses.filter(statusReview).length;
+    var gR=MD.scan.names.filter(groupReview).length;
+    var tR=MD.scan.statuses.filter(stageReview).length;
+    el("mdStatusReview").innerHTML = sR? '<span class="warn">'+sR+' review</span>' : '<span class="cnt">'+MD.scan.statuses.length+'</span>';
+    el("mdGroupReview").innerHTML  = gR? '<span class="warn">'+gR+' review</span>' : '<span class="cnt">'+MD.scan.names.length+'</span>';
+    el("mdStageReview").innerHTML  = tR? '<span class="warn">'+tR+' review</span>' : '<span class="cnt">'+MD.scan.statuses.length+'</span>';
+    document.querySelectorAll(".md-tab").forEach(function(b){ b.classList.toggle("on", b.dataset.mdtab===MD.tab); });
+  }
+
+  /* current chosen value for a row = working override, else built-in default */
+  function curStatus(name){ return (MD.cfg.statusOverrides[name]) || window.HDClass.defaultClassify3(name); }
+  function curGroup(name){ var n=window.HDGroups.normName(name); return (MD.cfg.groupOverrides[n]) || window.HDGroups.defaultGroupOf(name); }
+  function curStage(name){ return (MD.cfg.stageOverrides[name]) || window.HDStages.defaultStageOf(name); }
+
+  function badge(kind){ // def | cust | rev
+    if(kind==="rev") return '<span class="md-badge rev">needs review</span>';
+    if(kind==="cust") return '<span class="md-badge cust">customised</span>';
+    return '<span class="md-badge def">default</span>';
+  }
+  function rowKind(bucket,key,isReview){ if(hasOv(bucket,key)) return "cust"; return isReview? "rev":"def"; }
+
+  function filt(list){ var q=MD.search.trim().toLowerCase(); return q? list.filter(function(x){return x.name.toLowerCase().indexOf(q)>-1;}) : list; }
+
+  function render(){
+    var body=el("mdBody");
+    if(!MD.rows){ body.innerHTML='<div class="md-empty">No export loaded yet. Load a Jira .xlsx on the launcher first, then reopen this panel.</div>';
+      el("mdFootNote").textContent=""; return; }
+
+    var html="", note="";
+    if(MD.tab==="status"){
+      note='<b>HD</b> and <b>Engineering</b> are both the SVM side (our team); the Trend Tracker &amp; Weekly Report treat both as "SVM". <b>Client</b> = waiting on the client. Rows not in the built-in map are flagged <b>needs review</b>.';
+      html+=optsSearch()+'<table class="md-table"><thead><tr><th>Status</th><th>Tickets</th><th>Classification</th><th>Source</th></tr></thead><tbody>';
+      filt(MD.scan.statuses).forEach(function(s){
+        var rev=statusReview(s), val=curStatus(s.name), kind=rowKind("statusOverrides",s.name,rev);
+        html+='<tr class="'+(kind==="rev"?"review":"")+'"><td class="md-name">'+esc(s.name)+'</td><td class="md-count">'+s.count.toLocaleString()+'</td>'+
+          '<td><select class="md-sel '+(kind==="rev"?"rev":"")+'" data-kind="status" data-key="'+esc(s.name)+'">'+
+            STATUS_OPTS.map(function(o){return '<option value="'+o[0]+'" '+(o[0]===val?"selected":"")+'>'+o[1]+'</option>';}).join("")+
+          '</select></td><td>'+badge(kind)+'</td></tr>';
+      });
+      html+='</tbody></table>';
+    } else if(MD.tab==="group"){
+      note='People found in <b>SVM In Charge</b> and <b>Current Worker</b>. Anyone not in the built-in directory falls to <b>Others</b> and is flagged <b>needs review</b>. Use <b>＋ Add group…</b> to create a new group.';
+      var groups=window.HDGroups.ORDER.slice(); // Group 1, Group 2, Others
+      Object.keys(MD.cfg.groupOverrides).forEach(function(k){ var v=MD.cfg.groupOverrides[k]; if(groups.indexOf(v)<0) groups.push(v); }); // include custom groups
+      html+=optsSearch()+'<table class="md-table"><thead><tr><th>Person</th><th>Tickets</th><th>Seen in</th><th>Group</th><th>Source</th></tr></thead><tbody>';
+      filt(MD.scan.names).forEach(function(n){
+        var rev=groupReview(n), val=curGroup(n.name), kind=rowKind("groupOverrides",window.HDGroups.normName(n.name),rev);
+        var seen=[n.svm?"SVM In Charge":null,n.cw?"Current Worker":null].filter(Boolean).join(" · ");
+        var opts=groups.map(function(gp){return '<option value="'+esc(gp)+'" '+(gp===val?"selected":"")+'>'+esc(gp)+'</option>';}).join("");
+        if(groups.indexOf(val)<0) opts='<option value="'+esc(val)+'" selected>'+esc(val)+'</option>'+opts;
+        html+='<tr class="'+(kind==="rev"?"review":"")+'"><td class="md-name">'+esc(n.name)+'</td><td class="md-count">'+n.count.toLocaleString()+'</td>'+
+          '<td class="md-count">'+esc(seen)+'</td>'+
+          '<td><select class="md-sel '+(kind==="rev"?"rev":"")+'" data-kind="group" data-key="'+esc(n.name)+'">'+opts+
+            '<option value="__ADD__">＋ Add group…</option></select></td><td>'+badge(kind)+'</td></tr>';
+      });
+      html+='</tbody></table>';
+    } else { // stage
+      note='Maps each <b>Status</b> to a Weekly-Report activity stage. A status with no mapping shows as <b>Other</b> and is flagged <b>needs review</b>.';
+      var stages=window.HDStages.allStages().concat(["Other"]);
+      html+=optsSearch()+'<table class="md-table"><thead><tr><th>Status</th><th>Tickets</th><th>Activity Stage</th><th>Source</th></tr></thead><tbody>';
+      filt(MD.scan.statuses).forEach(function(s){
+        var rev=stageReview(s), val=curStage(s.name), kind=rowKind("stageOverrides",s.name,rev);
+        var opts=stages.map(function(g){return '<option value="'+esc(g)+'" '+(g===val?"selected":"")+'>'+esc(g)+'</option>';}).join("");
+        if(stages.indexOf(val)<0) opts='<option value="'+esc(val)+'" selected>'+esc(val)+'</option>'+opts;
+        html+='<tr class="'+(kind==="rev"?"review":"")+'"><td class="md-name">'+esc(s.name)+'</td><td class="md-count">'+s.count.toLocaleString()+'</td>'+
+          '<td><select class="md-sel '+(kind==="rev"?"rev":"")+'" data-kind="stage" data-key="'+esc(s.name)+'">'+opts+'</select></td><td>'+badge(kind)+'</td></tr>';
+      });
+      html+='</tbody></table>';
+    }
+    body.innerHTML='<div class="md-info">'+note+'</div>'+html;
+    var cnt=(MD.tab==="group"?MD.scan.names.length:MD.scan.statuses.length);
+    el("mdFootNote").textContent=cnt+" row"+(cnt!==1?"s":"")+" · changes apply when dashboards next load";
+    bindRows();
+    renderTabsState();
+  }
+  function optsSearch(){ return '<input class="md-search" id="mdSearch" placeholder="Filter…" value="'+esc(MD.search)+'">'; }
+
+  /* Wire the dropdowns. Choosing the built-in default REMOVES the override (so the
+     row reverts to "default"); any other choice records an override. */
+  function bindRows(){
+    var s=el("mdSearch"); if(s){ s.oninput=function(){ MD.search=this.value; var pos=this.selectionStart; render(); var n=el("mdSearch"); if(n){ n.focus(); try{n.setSelectionRange(pos,pos);}catch(e){} } }; }
+    document.querySelectorAll(".md-sel").forEach(function(sel){
+      sel.onchange=function(){
+        var kind=this.dataset.kind, key=this.dataset.key, val=this.value;
+        if(kind==="status"){ setOv("statusOverrides", key, val, window.HDClass.defaultClassify3(key)); }
+        else if(kind==="stage"){ setOv("stageOverrides", key, val, window.HDStages.defaultStageOf(key)); }
+        else if(kind==="group"){
+          if(val==="__ADD__"){ var g=(window.prompt("New group name:")||"").trim(); if(!g){ render(); return; } val=g; }
+          setOv("groupOverrides", window.HDGroups.normName(key), val, window.HDGroups.defaultGroupOf(key));
+        }
+        render();
+      };
+    });
+  }
+  function setOv(bucket,key,val,def){
+    if(val===def){ delete MD.cfg[bucket][key]; }   // matches built-in ⇒ drop the override
+    else { MD.cfg[bucket][key]=val; }
+  }
+
+  function toast(msg){ var t=el("mdToast"); t.textContent=msg; t.classList.add("show"); clearTimeout(t._h); t._h=setTimeout(function(){ t.classList.remove("show"); },3200); }
+
+  function save(){
+    HS.saveConfig(MD.cfg).then(function(){
+      // keep in-memory maps consistent for anything on this page
+      window.HDClass.setOverrides(MD.cfg.statusOverrides);
+      window.HDGroups.setOverrides(MD.cfg.groupOverrides);
+      window.HDStages.setOverrides(MD.cfg.stageOverrides);
+      toast("Saved ✓  Open or refresh a dashboard to see the re-analysed numbers.");
+      render();
+    }).catch(function(err){ toast("Could not save: "+(err&&err.message||err)); });
+  }
+  function resetTab(){
+    var b=MD.tab==="status"?"statusOverrides":MD.tab==="group"?"groupOverrides":"stageOverrides";
+    if(!Object.keys(MD.cfg[b]).length){ toast("This tab already matches the defaults."); return; }
+    if(!window.confirm("Clear all your customisations on this tab and revert to the built-in defaults? (Takes effect when you Save.)")) return;
+    MD.cfg[b]={}; render();
+  }
+
+  /* ── wiring ── */
+  var gb=el("gearBtn"); if(gb) gb.onclick=openMaster;
+  el("mdClose").onclick=closeMaster;
+  el("mdCancel").onclick=closeMaster;
+  el("mdOv").addEventListener("click",function(e){ if(e.target===el("mdOv")) closeMaster(); });
+  document.addEventListener("keydown",function(e){ if(e.key==="Escape" && el("mdOv").classList.contains("open")) closeMaster(); });
+  el("mdSave").onclick=save;
+  el("mdReset").onclick=resetTab;
+  document.querySelectorAll(".md-tab").forEach(function(b){ b.onclick=function(){ MD.tab=b.dataset.mdtab; MD.search=""; render(); }; });
+})();
 </script>
 </body>
 </html>
