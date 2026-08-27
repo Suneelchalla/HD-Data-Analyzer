@@ -195,18 +195,24 @@
      config from IndexedDB) BEFORE it renders, so every KPI/chart reflects the
      corrected mapping. Empty overrides ⇒ identical behaviour to the built-in lists. */
   var OV = {};
+  /* Terminal statuses need no SVM/Client classification — the ticket is done, and
+     the dashboards exclude them from open-work anyway. They're recognised here so
+     the Master Data module doesn't flag them as "needs review" (no action needed). */
+  var TERMINAL = ["Closed"];
   function has(arr, s) { return arr.indexOf(s) > -1; }
   // Built-in bucket for a status, or null if it's in none of the lists (i.e. brand-new/unknown).
   function def3(s) { return has(CLIENT, s) ? "client" : has(ENGG, s) ? "engg" : has(HD, s) ? "hd" : null; }
 
   window.HDClass = {
-    HD: HD, ENGG: ENGG, CLIENT: CLIENT,
+    HD: HD, ENGG: ENGG, CLIENT: CLIENT, TERMINAL: TERMINAL,
     setOverrides: function (m) { OV = m || {}; },
     getOverrides: function () { return OV; },
     // Built-in (pre-override) bucket; unknown statuses default to "hd" (SVM side).
     defaultClassify3: function (status) { return def3(status) || "hd"; },
     // Is this status present in any built-in list? (false ⇒ "needs review" in the UI)
     isKnown: function (status) { return def3(status) !== null; },
+    // A finished status that needs no owner classification (no action in the module).
+    isTerminal: function (status) { return has(TERMINAL, status); },
     isOverridden: function (status) { return Object.prototype.hasOwnProperty.call(OV, status); },
     // Follow-up Tracker: three-way desk view (override wins, then built-in, then "hd").
     classify3: function (status) { return OV[status] || def3(status) || "hd"; },
