@@ -190,59 +190,15 @@ select{appearance:none;background:var(--paper);border:1px solid var(--line);bord
 /* ═══════════════════════ CONFIG ═══════════════════════ */
 var JIRA = "https://svmhelpdesk.atlassian.net/browse/";
 
-/* Status → Activity Stage — mirrors the SEDGE "Issue Count by Activity Stage"
-   grouping exactly. There is no Activity Stage column in the export, so this is
-   derived from Status. If a new Status appears, it lands in "Other" (visible)
-   until added here. */
-var STAGE_MAP = {
-  // ── Stage 1 — Analysis & Study ──
-  "Analysis & Study":"Stage 1 - Analysis & Study",
-  // ── Stage 2 — Fix in Progress ──
-  "Testing In Progress":"Stage 2 - Fix in Progress",
-  "Technical Analysis":"Stage 2 - Fix in Progress",
-  "Team Lead Review & Approval":"Stage 2 - Fix in Progress",
-  "SVM Hotfix Testing":"Stage 2 - Fix in Progress",
-  "Release Plan (UAT or Hot Fix)":"Stage 2 - Fix in Progress",
-  "Release Kit Prep.":"Stage 2 - Fix in Progress",
-  "Impact Study":"Stage 2 - Fix in Progress",
-  "Doubt Clarification":"Stage 2 - Fix in Progress",
-  "Development In Progress":"Stage 2 - Fix in Progress",
-  "DB Script Request":"Stage 2 - Fix in Progress",
-  "Clarification (Dev)":"Stage 2 - Fix in Progress",
-  // ── Stage 3 — Under Delivery ──
-  "POC Release Approval":"Stage 3 - Under Delivery",
-  "DB Script Delivered":"Stage 3 - Under Delivery",
-  "DB Admin Approval":"Stage 3 - Under Delivery",
-  "Client Release Approval (PROD)":"Stage 3 - Under Delivery",
-  "Client Hotfix Testing":"Stage 3 - Under Delivery",
-  "Client Deployment (PROD)":"Stage 3 - Under Delivery",
-  "CLIENT RELEASE APPROVAL":"Stage 3 - Under Delivery",
-  "CLIENT Approval (DB Script)":"Stage 3 - Under Delivery",
-  // ── Stage 4 — Awaiting Confirmation (delivered/resolved, awaiting confirmation or closure) ──
-  "Waiting for customer":"Stage 4 - Awaiting Confirmation",
-  "Resolved With Clarification":"Stage 4 - Awaiting Confirmation",
-  "Resolved":"Stage 4 - Awaiting Confirmation",
-  "Release Move to Production":"Stage 4 - Awaiting Confirmation",
-  "Release In Progress":"Stage 4 - Awaiting Confirmation",
-  "Delivered":"Stage 4 - Awaiting Confirmation",
-  // ── Script Release (own bucket in the SEDGE table) ──
-  "Script Release":"Script Release",
-
-  /* ── EXCEPTIONS: present in the export but NOT in the SEDGE table.
-        Placed by best fit — move any of these if you'd group them differently. */
-  "Closed":"Stage 5 - Ticket Closure",                 // terminal
-  "Confirmation":"Stage 4 - Awaiting Confirmation",            // 126 tickets — awaiting client confirmation
-  "Completed":"Stage 5 - Ticket Closure",              // terminal
-  "Invoice Yet to Raise":"Stage 5 - Ticket Closure",   // post-resolution admin
-  "User Request":"Stage 1 - Analysis & Study",         // new request being assessed
-  "Sys/user configuration":"Stage 2 - Fix in Progress",// config work
-  "Approval DB Admin":"Stage 3 - Under Delivery",      // approval step (mirrors DB Admin Approval)
-  "Assign to SVM Deployment Team":"Stage 3 - Under Delivery",
-  "Published":"Stage 3 - Under Delivery"
-};
-var STAGE_ORDER = ["Stage 1 - Analysis & Study","Stage 2 - Fix in Progress","Stage 3 - Under Delivery","Stage 4 - Awaiting Confirmation","Script Release","Other"];
-var STAGE_ALL   = STAGE_ORDER.concat(["Stage 5 - Ticket Closure"]);
-function stageOf(status){ return STAGE_MAP[status] || "Other"; }
+/* Status → Activity Stage. The map now lives in hd-store.js (window.HDStages) so
+   the Master Data module can edit it and it stays in one place. Thin aliases keep
+   the rest of this file unchanged; stageOf() is override-aware. There is no
+   Activity Stage column in the export, so this is derived from Status; an unknown
+   status lands in "Other" (visible) until mapped in Master Data. */
+var STAGE_MAP   = window.HDStages.defaults;
+var STAGE_ORDER = window.HDStages.ORDER;
+var STAGE_ALL   = window.HDStages.ALL;
+function stageOf(status){ return window.HDStages.stageOf(status); }
 
 var PRIO_ORDER = ["Critical","High","Medium","Low","Show Stopper"];
 var PRIO_COLOR = {"Critical":"var(--p-crit)","High":"var(--p-high)","Medium":"var(--p-med)","Low":"var(--p-low)","Show Stopper":"var(--p-stop)"};
@@ -899,8 +855,10 @@ function bindDrill(){
 /* ═══════════════════════ BOOT ═══════════════════════ */
 function boot(){
   if(!window.HDStore){ el("app").innerHTML='<div class="loading"><div style="font-size:15px;font-weight:700">Storage unavailable</div><div style="font-size:12px;color:var(--muted)">Open this from the launcher. <a href="index.html">Go to upload</a>.</div></div>'; return; }
-  Promise.all([HDStore.loadFile(), HDStore.loadRows(), HDStore.loadSnapshots()]).then(function(r){
+  Promise.all([HDStore.loadFile(), HDStore.loadRows(), HDStore.loadSnapshots(), HDStore.loadConfig()]).then(function(r){
     var rec=r[0], edited=r[1]; SNAPS=r[2]||{};
+    // Apply Master Data overrides BEFORE normalize() — stage is baked in there.
+    var cfg=r[3]||{}; window.HDClass.setOverrides(cfg.statusOverrides); window.HDStages.setOverrides(cfg.stageOverrides);
     if(!rec){ window.location.replace("index.html"); return; }
     FILENAME=rec.name;
     function go(rows){ RAW_ROWS=rows; RAW=normalize(rows); computeAsOf(); captureSnapshot(); render(); }
