@@ -720,10 +720,6 @@ function render(){
           '</div>'+
         '</div>'+
 
-        /* Top 5 oldest open tickets — spotlight */
-        '<div class="sectitle">🔴 Top 5 Oldest Open Tickets <span class="sub">longest-open items needing attention</span></div>'+
-        top5OldestHTML(openList, 5)+
-
         '<div class="sectitle">Weekly Trends — Last '+WEEKS_BACK+' Weeks</div>'+
         caption('How work came in and went out over the past '+WEEKS_BACK+' weeks. Weeks are ISO week numbers (e.g. W34). <b>Click any bar to list the tickets behind it.</b>')+
         '<div class="grid2">'+
@@ -756,6 +752,13 @@ function render(){
         caption('Where the open tickets sit in the delivery pipeline right now, and whose action is next. <b>Click a number to list those tickets.</b>')+
         currentStageHTML(stageRows)+
         insight('<b style="color:var(--client2)">Client</b> and <b style="color:var(--hd)">SVM</b> show who needs to act next on the open tickets in each phase.'+(topStage&&stageCount[topStage]?' The biggest phase is <b>'+esc(shortStage(topStage))+'</b> ('+stageCount[topStage]+' open).':'')+' A high <b style="color:var(--client2)">Client</b> count means those tickets are waiting on your team.')+
+
+        /* ── Top 5 oldest spotlight tables ── */
+        '<div class="sectitle">🔴 Top 5 Oldest Open Tickets <span class="sub">longest-open items needing attention</span></div>'+
+        top5OldestHTML(openList, 5)+
+
+        '<div class="sectitle">🔴 Top 5 Oldest — SVM Side <span class="sub">longest-open items on our side</span></div>'+
+        top5OldestHTML(svmPending, 5)+
 
         /* ── Pending ticket lists (printed in the PDF) ── */
         '<div class="sectitle">Pending Tickets — with SVM <span class="sub">'+svmPending.length+' open · our action</span></div>'+
