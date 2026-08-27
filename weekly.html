@@ -168,10 +168,11 @@ select{appearance:none;background:var(--paper);border:1px solid var(--line);bord
   /* smaller charts so they don't sprawl / leave blank pages */
   .chartcard svg{max-height:130px}
   .chartcard{padding:8px 11px;break-inside:avoid}
-  .grid2,.grid3{gap:9px}                          /* let rows flow across pages — no big blank gaps */
+  .grid2{grid-template-columns:1fr 1fr !important;gap:9px}
+  .grid3{grid-template-columns:repeat(3,1fr) !important;gap:9px}
+  .chartcard{page-break-inside:avoid;break-inside:avoid}
   .kpi,.matrix,.exec,.callout{break-inside:avoid}
   .sectitle{break-after:avoid;margin:9px 0 6px;padding:5px 11px}
-  .caption{margin:-3px 0 7px}
   .insight{padding:6px 10px;margin-top:6px}
   .exec{padding:11px 13px;margin-bottom:10px}
   .kpi{padding:9px 12px}
@@ -180,7 +181,7 @@ select{appearance:none;background:var(--paper);border:1px solid var(--line);bord
   .rbody{padding:14px 16px}
   *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
-@media (max-width:820px){ .grid3,.grid2{grid-template-columns:1fr} }
+@media screen and (max-width:820px){ .grid3,.grid2{grid-template-columns:1fr} }
 </style>
 </head>
 <body>
@@ -458,7 +459,7 @@ function hbars(items,color){
 }
 
 /* ═══════════════════════ RENDER ═══════════════════════ */
-function caption(t){ return '<div class="caption">'+t+'</div>'; }
+function caption(t){ return ''; }
 function insight(html){ return '<div class="insight">💡 '+html+'</div>'; }
 /* horizontal segmented bar; parts=[{label,val,color,data}] (data = raw attr string) */
 function segBar(parts){
@@ -629,7 +630,7 @@ function render(){
         '<div class="who">'+
           '<div class="kicker">Weekly Report</div>'+
           '<h1>'+esc(S.client)+'</h1>'+
-          '<div class="meta">Generated '+fdt(new Date())+' &nbsp;·&nbsp; data as of '+fdate(DATA_ASOF)+' &nbsp;·&nbsp; '+esc(FILENAME||"—")+'</div>'+
+          '<div class="meta">Generated '+fdt(new Date())+' &nbsp;·&nbsp; '+esc(FILENAME||"—")+'</div>'+
           ((S.na||S.status)?'<div class="meta" style="color:var(--client);font-weight:600">Filtered: '+[ (S.na?"Next action = "+(S.na==="svm"?"SVM":S.na==="client"?"Client":"Unset"):""), (S.status?"Status = "+esc(S.status):"") ].filter(Boolean).join(" · ")+'</div>':'')+
         '</div>'+
         '<div class="asof"><div class="box">Reporting window<br><b>'+wkLabel(weeks[0])+' → '+wkLabel(weeks[weeks.length-1])+'</b></div></div>'+
@@ -690,23 +691,6 @@ function render(){
             insight('<b>'+resLast+'</b> resolved in '+wkLabel(lastWk)+chg(resLast,resPrev,true)+' — averaging about <b>'+resAvg+'/week</b>. Comparing this with new tickets shows whether the backlog is growing or reducing.')+
           '</div>'+
         '</div>'+
-
-        /* Captured open-backlog history — the one trend a single export can't rebuild */
-        '<div class="sectitle">Open Backlog — Week over Week <span class="sub">captured history · '+hist.length+' week'+(hist.length!==1?'s':'')+'</span>'+
-          '<button class="btn noprint" id="resethist" style="margin-left:auto;font-size:11px">↺ Reset history</button></div>'+
-        caption('Real end-of-week open backlog for <b>'+esc(S.client)+'</b>, captured each time a fresh export is opened. Unlike the charts above, this can\u2019t be rebuilt from a single export — it accumulates as you upload week by week.')+
-        (histWeeks.length>=2
-          ? '<div class="chartcard"><div class="ct">Open Backlog Trend <span style="color:var(--faint);font-weight:500">· total / SVM / client open</span></div>'+
-              multiLineChart(histWeeks,histSeries)+
-              '<div class="legend">'+
-                '<span class="li"><span class="sw" style="background:var(--client)"></span>Total open</span>'+
-                '<span class="li"><span class="sw" style="background:var(--hd)"></span>SVM action</span>'+
-                '<span class="li"><span class="sw" style="background:var(--client2)"></span>Client waiting</span>'+
-              '</div>'+
-              insight('Open backlog is now <b>'+(histLast!=null?histLast:0)+'</b>'+chg(histLast,histPrev,false)+'. This line grows from each weekly export — more captured weeks make the direction clearer.')+
-            '</div>'
-          : '<div class="insight">💡 History is building. This is the first captured week (<b>'+wkLabel(histWeeks[0]||CUR_WK)+'</b>, open backlog <b>'+(histLast!=null?histLast:0)+'</b>). Open a fresh export next week and a week-over-week trend line will appear here automatically.</div>'
-        )+
 
         /* Row 2: component / resolution days */
         '<div class="sectitle">Open Work &amp; Turnaround</div>'+
