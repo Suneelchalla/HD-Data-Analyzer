@@ -814,7 +814,7 @@ function bindDateBar(){
 }
 function applyPreset(label){
   var now=new Date(), y=now.getFullYear(), m=now.getMonth();
-  function iso(d){ return d.toISOString().slice(0,10); }
+  function iso(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
   S.dlabel=label; S.from=""; S.to="";
   if(label==="This month"){ S.from=iso(new Date(y,m,1)); }
   else if(label==="Last month"){ S.from=iso(new Date(y,m-1,1)); S.to=iso(new Date(y,m,0)); }
@@ -2032,7 +2032,7 @@ function bindMain(){
    back to the shared store and re-normalizes, so every tab (and the Follow-up
    Tracker) recomputes — without re-uploading the Excel. */
 var ED_PAGE=50;
-function edFmt(v){ if(v===null||v===undefined) return ""; if(v instanceof Date) return isNaN(v)?"":v.toISOString().slice(0,10); return String(v); }
+function edFmt(v){ if(v===null||v===undefined) return ""; if(v instanceof Date) return isNaN(v)?"":v.getFullYear()+"-"+String(v.getMonth()+1).padStart(2,"0")+"-"+String(v.getDate()).padStart(2,"0"); return String(v); }
 function edInit(){
   ED.seq=0;
   ED.work=RAW_ROWS.map(function(r){ var o={__id:ED.seq++}; for(var k in r){ if(Object.prototype.hasOwnProperty.call(r,k)) o[k]=r[k]; } return o; });
