@@ -881,8 +881,9 @@ function App(){
           style={{padding:"5px 10px",border:"1px solid var(--border)",borderRadius:6,fontSize:11,color:"var(--t1)",background:"var(--card)",fontFamily:"var(--sans)"}}/>
 
         {(dtFrom||dtTo) && (
-          <span style={{fontSize:11,color:"var(--blue)",fontWeight:600,marginLeft:4}}>
-            {dateFiltered.length.toLocaleString()} records {dateRangeText}
+          <span style={{display:"inline-flex",alignItems:"center",gap:7,background:"var(--blue-bg)",border:"1px solid var(--blue-light)",padding:"5px 13px",borderRadius:8,fontSize:11.5,fontWeight:700,color:"var(--blue)",whiteSpace:"nowrap",marginLeft:4}}>
+            {dtFrom?fd(new Date(dtFrom)):"start"} → {dtTo?fd(new Date(dtTo)):"now"}
+            <span style={{color:"var(--t2)",fontWeight:600}}> · {dateFiltered.length.toLocaleString()} records</span>
           </span>
         )}
       </div>}
