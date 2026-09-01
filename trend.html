@@ -565,7 +565,7 @@ function openModal(title,icon,color,tickets){
           '</tr></thead><tbody>'+body+'</tbody></table>' : '<div class="empty">No tickets match this selection.</div>')+
       '</div>'+
       '<div class="mfoot"><span>Showing all '+rows.length+' tickets</span>'+
-        '<button class="ghost" style="margin-left:auto" id="mcsv">Export CSV</button></div>'+
+        '<button class="ghost" style="margin-left:auto" id="mcsv">\u2B07 Export Full Data</button></div>'+
     '</div>'+
   '</div>';
   var d=document.createElement("div"); d.innerHTML=html; document.body.appendChild(d.firstChild);
@@ -577,17 +577,31 @@ function openModal(title,icon,color,tickets){
 function closeModal(){ var ov=el("ov"); if(ov) ov.remove(); }
 document.addEventListener("keydown",function(e){ if(e.key==="Escape") closeModal(); });
 
-function exportCSV(rows,name){
-  var cols=["Key","Summary","Solved By","SVM In Charge","Current Worker","Root Cause","Issue Type","Status","Linked Issues","Created","Resolved"];
-  var lines=[cols.join(",")];
+function escCSV(v){var s=String(v==null?"":v instanceof Date&&!isNaN(v)?v.toISOString().slice(0,19).replace("T"," "):v);if(s.indexOf(",")>-1||s.indexOf('"')>-1||s.indexOf("\n")>-1)return'"'+s.replace(/"/g,'""')+'"';return s;}
+function exportFullCSV(rows,name){
+  if(!rows||!rows.length)return;
+  /* Collect ALL original columns from _raw, preserving order from the first row */
+  var sample=rows[0]._raw||rows[0]; var colOrder=[]; var colSet={};
+  Object.keys(sample).forEach(function(k){if(!colSet[k]){colSet[k]=1;colOrder.push(k);}});
+  rows.forEach(function(t){ var raw=t._raw||t; Object.keys(raw).forEach(function(k){if(!colSet[k]){colSet[k]=1;colOrder.push(k);}});});
+  /* Append computed columns */
+  colOrder.push("__Solved_By__","__Group__","__HD_or_Engg__");
+  var header=colOrder.map(function(c){return escCSV(c==="__Solved_By__"?"Solved By (computed)":c==="__Group__"?"Group (computed)":c==="__HD_or_Engg__"?"HD / Engg (computed)":c);}).join(",");
+  var lines=[header];
   rows.forEach(function(t){
-    var r=[t.key,'"'+String(t.summary).replace(/"/g,'""')+'"',t.isHD?"HD":"ENGG",t.svm,t.currentWorker,t.rc,t.issue,t.status,t.linked,fdate(t.created),fdate(t.resolved)];
-    lines.push(r.join(","));
+    var raw=t._raw||t;
+    lines.push(colOrder.map(function(c){
+      if(c==="__Solved_By__")return escCSV(t.isHD?"HD":"ENGG");
+      if(c==="__Group__")return escCSV(t.group||"");
+      if(c==="__HD_or_Engg__")return escCSV(t.isHD?"HD":"Engineering");
+      return escCSV(raw[c]);
+    }).join(","));
   });
-  var blob=new Blob([lines.join("\n")],{type:"text/csv"});
+  var blob=new Blob(["\uFEFF"+lines.join("\n")],{type:"text/csv;charset=utf-8"});
   var url=URL.createObjectURL(blob); var a=document.createElement("a");
-  a.href=url; a.download=(name||"tickets")+".csv"; a.click(); URL.revokeObjectURL(url);
+  a.href=url; a.download=(name||"tickets-full")+".csv"; a.click(); URL.revokeObjectURL(url);
 }
+function exportCSV(rows,name){ exportFullCSV(rows,name); }
 
 /* ═══════════════════════════════ SVG RING ═══════════════════════════════ */
 function ring(pctVal,size,sw,color,inner){
@@ -944,7 +958,8 @@ function viewPerf(){
   // hero
   out+='<div class="up" style="margin-bottom:9px"><div class="eyebrow">HD Performance</div>'+
     '<h1 style="font-size:16px;font-weight:700;letter-spacing:-.3px;margin-top:2px">Who resolved the work?</h1>'+
-    '<div class="sub" style="margin-top:3px">Scope: '+esc(scopeTxt)+'. <b style="color:var(--hd)">HD</b> = closed by Help Desk (no linked ticket) · <b style="color:var(--engg)">ENGG</b> = escalated to Engineering (has linked ticket).</div></div>';
+    '<div class="sub" style="margin-top:3px">Scope: '+esc(scopeTxt)+'. <b style="color:var(--hd)">HD</b> = closed by Help Desk (no linked ticket) · <b style="color:var(--engg)">ENGG</b> = escalated to Engineering (has linked ticket).</div>'+
+    '<button class="ghost" id="perfExport" style="margin-top:8px;display:inline-flex;align-items:center;gap:5px">\u2B07 Export Full Data ('+total.toLocaleString()+' tickets)</button></div>';
 
   // hero card
   out+='<div class="card up d1 pad" style="margin-bottom:9px;display:flex;gap:28px;align-items:center;flex-wrap:wrap">'+
@@ -1106,6 +1121,7 @@ function viewTrend(){
     '<span class="flabel">Status</span>'+
     '<select class="fsel" id="tStatus"><option value="Closed" '+(S.tStatus==="Closed"?"selected":"")+'>Closed (default)</option><option value="__ALL__" '+(S.tStatus==="__ALL__"?"selected":"")+'>Any status</option>'+stList.map(function(s){return '<option value="'+esc(s)+'" '+(S.tStatus===s?"selected":"")+'>'+esc(s)+'</option>';}).join("")+'</select>'+
     '<span class="sub" style="margin-left:auto">SVM, Current Worker &amp; date use the top filters</span>'+
+    '<button class="ghost" id="trendExport" style="margin-left:8px;display:inline-flex;align-items:center;gap:5px">\u2B07 Export Full Data ('+scope.length+')</button>'+
   '</div>';
 
   // View toggle: By Month / By Worker
@@ -1230,6 +1246,7 @@ function viewPending(){
     naBtn("client","\uD83D\uDCAC Client",cCl)+
     (cUn?naBtn("unset","\u2754 Unset",cUn):"")+
     '<span class="sub" style="margin-left:auto">SVM, Current Worker, Type &amp; date use the top filters</span>'+
+    '<button class="ghost" id="pendExport" style="margin-left:8px;display:inline-flex;align-items:center;gap:5px">\u2B07 Export Full Data ('+scope.length+')</button>'+
   '</div>';
 
   if(!wKeys.length){ out+='<div class="card pad"><div class="empty">No pending tickets in this scope. \uD83C\uDF89</div></div>'; return out; }
@@ -1334,7 +1351,7 @@ function viewExc(){
   }
 
   out+='<div class="card up d2" style="overflow:hidden">'+
-    '<div class="pad" style="border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center"><span class="sec-title">Tickets needing attention</span><button class="ghost" id="excCsv">Export CSV</button></div>'+
+    '<div class="pad" style="border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center"><span class="sec-title">Tickets needing attention</span><button class="ghost" id="excCsv">\u2B07 Export Full Data</button></div>'+
     '<div style="overflow:auto;max-height:520px"><table><thead><tr>'+
       '<th class="static">Key</th><th class="static">Summary</th><th class="static">SVM In Charge</th><th class="static">Current Worker</th><th class="static">Root Cause</th><th class="static">Components</th><th class="static">Status</th><th class="static">Missing</th>'+
     '</tr></thead><tbody>';
@@ -1504,7 +1521,8 @@ function viewPivots(){
   if(S.proj) pivScopeNotes.push('project <b>'+esc(S.proj)+'</b>');
   out+='<div class="up" style="margin-bottom:9px"><div class="eyebrow">Pivots</div>'+
     '<h1 style="font-size:16px;font-weight:700;letter-spacing:-.3px;margin-top:2px">Pivot tables</h1>'+
-    '<div class="sub" style="margin-top:3px">Excel-style cross-tabs. Every cell is clickable and opens those exact tickets, each linking to Jira. These pivots use the <b>'+pivScopeNotes.join(' + ')+'</b>'+((S.from||S.to||S.proj)?' — '+pool.length.toLocaleString()+' tickets in scope':'')+', then the <b>Issue Type · Root Cause · Status</b> filters below (each pivot opens with its own sensible defaults — change or reset them anytime).</div></div>';
+    '<div class="sub" style="margin-top:3px">Excel-style cross-tabs. Every cell is clickable and opens those exact tickets, each linking to Jira. These pivots use the <b>'+pivScopeNotes.join(' + ')+'</b>'+((S.from||S.to||S.proj)?' — '+pool.length.toLocaleString()+' tickets in scope':'')+', then the <b>Issue Type · Root Cause · Status</b> filters below (each pivot opens with its own sensible defaults — change or reset them anytime).'+
+    '<button class="ghost" id="pivExport" style="margin-left:12px;display:inline-flex;align-items:center;gap:5px">\u2B07 Export Current Pivot Data</button></div></div>';
   out+='<div class="pivnav">'+nav.map(function(x){return '<button data-piv-nav="'+x[0]+'" class="'+(S.pivot===x[0]?"on":"")+'">'+esc(x[1])+'</button>';}).join("")+'</div>';
   // (re)apply this pivot's default filters when the pivot changes; then let the user override
   if(S._pivFor!==S.pivot){ var _pd=pivDefaults(S.pivot); S.pIssue=_pd.issue; S.pRc=_pd.rc; S.pStatus=_pd.status; S._pivFor=S.pivot; }
@@ -1672,7 +1690,8 @@ function viewWoW(){
       /* loud, unmissable flags right in the control bar */
       (partialB?'<span class="dchip flat" style="background:#FEF3E2;color:#B45309;border-color:#F5D9A8">⚠ '+weekLabel(S.weekB)+' in progress · '+covB+'/7 days</span>':'')+
       (nonAdjacent?'<span class="dchip flat" style="background:#FEF3E2;color:#B45309;border-color:#F5D9A8">⚠ not consecutive · '+(gap-1)+' week'+((gap-1)!==1?'s':'')+' skipped</span>':'')+
-      '<span class="click" style="margin-left:auto">'+windowTxt+' · click a metric to open tickets</span>'+
+      '<span class="click" style="margin-left:auto">'+windowTxt+' \u00b7 click a metric to open tickets</span>'+
+      '<button class="ghost" id="wowExport" style="margin-left:8px;display:inline-flex;align-items:center;gap:5px">\u2B07 Export Full Data ('+poolR.length+')</button>'+
     '</div>'+
     '<div class="grid" style="grid-template-columns:repeat(4,1fr)">'+
       wowCard("Resolved",A.t,B.t,false,"var(--ink)","all",bBadge)+
@@ -1844,6 +1863,7 @@ function bindMain(){
     document.querySelectorAll("tr.rowlink[data-svm]").forEach(function(r){
       r.onclick=function(){ var s=r.dataset.svm; openModal(s+" — all tickets in scope","👤","#0F766E",f.filter(function(t){return (t.svm||"(unassigned)")===s;})); };
     });
+    var pe=el("perfExport"); if(pe) pe.onclick=function(){ exportFullCSV(f,"hd-performance-full"); };
   }
 
   if(S.tab==="trend"){
@@ -1899,6 +1919,7 @@ function bindMain(){
         openModal(k+" · "+(side==="hd"?"HD closed":"Engg escalated"),"👤",side==="hd"?"#0F766E":"#5B57D8",tix);
       };
     });
+    var te=el("trendExport"); if(te) te.onclick=function(){ exportFullCSV(scope,"trend-analysis-full"); };
   }
 
   if(S.tab==="pending"){
@@ -1913,6 +1934,10 @@ function bindMain(){
         openModal(k+" \u00b7 "+m.label+" next action ("+tix.length+")", m.icon, m.hex, tix);
       };
     });
+    var pendExp=el("pendExport"); if(pendExp) pendExp.onclick=function(){
+      var na=S.pendAction; var scope=na? pend.filter(function(t){return naKey(t)===na;}):pend;
+      exportFullCSV(scope,"pending-tickets-full");
+    };
   }
 
   if(S.tab==="pivots"){
@@ -1935,6 +1960,11 @@ function bindMain(){
         renderMain();
       };
     });
+    var pivExp=el("pivExport"); if(pivExp) pivExp.onclick=function(){
+      var pool=RAW.filter(function(t){ return inRange(t) && (!S.proj || t.project===S.proj); });
+      var ppool=applyPivFilters(pool);
+      exportFullCSV(ppool,"pivot-"+S.pivot+"-full");
+    };
   }
 
   if(S.tab==="wow"){
@@ -1977,6 +2007,13 @@ function bindMain(){
     document.querySelectorAll("tr.rowlink[data-wk-row]").forEach(function(r){
       r.onclick=function(){ var w=wk[r.dataset.wkRow]; if(!w) return; openModal(weekLabel(w.key)+" ("+weekDates(w.year,w.week)+") · all resolved","🗓️","#0F766E",w.tix); };
     });
+    // Export all tickets in the selected week window
+    var we=el("wowExport"); if(we) we.onclick=function(){
+      var ks=Object.keys(wk).sort();
+      var lo=S.weekA<=S.weekB?S.weekA:S.weekB, hi=S.weekA<=S.weekB?S.weekB:S.weekA;
+      var tix=[]; ks.forEach(function(k){ if(k>=lo&&k<=hi&&wk[k]) tix=tix.concat(wk[k].tix); });
+      exportFullCSV(tix,"week-on-week-"+lo+"-to-"+hi+"-full");
+    };
   }
 
   if(S.tab==="exc"){
