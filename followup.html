@@ -328,7 +328,7 @@ function TicketModal({data,onClose}){
    chart and pivot recomputes — no Excel re-upload needed. */
 function fmtCell(v){
   if(v===null||v===undefined)return"";
-  if(v instanceof Date)return isNaN(v)?"":v.toISOString().slice(0,10);
+  if(v instanceof Date)return isNaN(v)?"":v.getFullYear()+"-"+String(v.getMonth()+1).padStart(2,"0")+"-"+String(v.getDate()).padStart(2,"0");
   return String(v);
 }
 function DataEditor({rows,fileName,onApply,onRevert}){
@@ -573,8 +573,8 @@ function App(){
   function presetAllTime(){setDatePreset("All Time","","");}
   function presetThisMonth(){var d=new Date();var y=d.getFullYear();var m=String(d.getMonth()+1).padStart(2,"0");setDatePreset("This Month",y+"-"+m+"-01","");}
   function presetLastMonth(){var d=new Date();d.setMonth(d.getMonth()-1);var y=d.getFullYear();var m=String(d.getMonth()+1).padStart(2,"0");var last=new Date(y,d.getMonth()+1,0).getDate();setDatePreset("Last Month",y+"-"+m+"-01",y+"-"+m+"-"+String(last).padStart(2,"0"));}
-  function presetLast3M(){var d=new Date();d.setMonth(d.getMonth()-3);setDatePreset("Last 3 Months",d.toISOString().slice(0,10),"");}
-  function presetLast6M(){var d=new Date();d.setMonth(d.getMonth()-6);setDatePreset("Last 6 Months",d.toISOString().slice(0,10),"");}
+  function presetLast3M(){var d=new Date();d.setMonth(d.getMonth()-3);setDatePreset("Last 3 Months",d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"),"");}
+  function presetLast6M(){var d=new Date();d.setMonth(d.getMonth()-6);setDatePreset("Last 6 Months",d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"),"");}
   function presetThisYear(){var y=new Date().getFullYear();setDatePreset("This Year",y+"-01-01","");}
   function presetLastYear(){var y=new Date().getFullYear()-1;setDatePreset("Last Year",y+"-01-01",y+"-12-31");}
 
