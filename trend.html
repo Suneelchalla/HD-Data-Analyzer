@@ -139,6 +139,8 @@ main{max-width:1500px;margin:0 auto;padding:14px 24px 34px}
 .kpi{padding:12px 15px;cursor:default;transition:box-shadow .2s,transform .15s;position:relative;overflow:hidden}
 .kpi.clk{cursor:pointer}
 .kpi.clk:hover{box-shadow:var(--sh2);transform:translateY(-2px)}
+.kpi.clickable{cursor:pointer} .kpi.clickable:hover{box-shadow:var(--sh2);transform:translateY(-2px)}
+.dcell{cursor:pointer} .dcell:hover{background:var(--hd-bg)!important}
 .kpi .kv{font-size:25px;font-weight:700;font-family:var(--mono);letter-spacing:-1.5px;line-height:1}
 .kpi .kl{font-size:10px;color:var(--faint);text-transform:uppercase;letter-spacing:.6px;font-weight:700;margin-top:5px}
 .kpi .ks{font-size:11px;color:var(--muted);margin-top:3px}
@@ -320,7 +322,8 @@ var S = {
   tRc:"__CLAR__", tStatus:"Closed", tMode:"month",
   pivot:"hdworker",
   pIssue:"", pRc:"", pStatus:"", _pivFor:null,   // adjustable pivot filters
-  weekA:"", weekB:""
+  weekA:"", weekB:"",
+  dType:""  // daily flow type filter: "" = all, "Incident", "Service Request"
 };
 
 /* ═══════════════════════════════ HELPERS ═══════════════════════════════ */
@@ -731,6 +734,7 @@ function renderShell(){
       '</span><b>HD Trend Tracker</b></div>'+
       '<nav class="tabs">'+
         tabBtn("perf","📊","HD Performance",f.length)+
+        tabBtn("daily","📆","Daily Flow","")+
         tabBtn("trend","📈","Trend Analysis","")+
         tabBtn("pending","📋","Pending",pendCount)+
         tabBtn("wow","🗓️","Week on Week","")+
@@ -899,6 +903,7 @@ function animateMain(){
 function renderMain(){
   var main=el("main");
   if(S.tab==="perf") main.innerHTML=viewPerf();
+  else if(S.tab==="daily") main.innerHTML=viewDaily();
   else if(S.tab==="trend") main.innerHTML=viewTrend();
   else if(S.tab==="pending") main.innerHTML=viewPending();
   else if(S.tab==="wow") main.innerHTML=viewWoW();
@@ -1068,6 +1073,250 @@ function viewPerf(){
 }
 
 /* ═══════════════════════════════ VIEW: TREND ANALYSIS ═══════════════════════════════ */
+/* ═══════════════════════════════ VIEW: DAILY FLOW ═══════════════════════════════ */
+function dKey(d){ return d? d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0") : null; }
+function dLabel(k){ if(!k) return "—"; var p=k.split("-"); var d=new Date(+p[0],+p[1]-1,+p[2]); return d.toLocaleDateString("en-GB",{day:"2-digit",month:"short"}); }
+function dLabelFull(k){ if(!k) return "—"; var p=k.split("-"); var d=new Date(+p[0],+p[1]-1,+p[2]); return d.toLocaleDateString("en-GB",{weekday:"short",day:"2-digit",month:"short",year:"numeric"}); }
+function dWeekday(k){ var p=k.split("-"); return new Date(+p[0],+p[1]-1,+p[2]).getDay(); }
+var WDAYS=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+function viewDaily(){
+  window.__piv={};
+  var pool=RAW.filter(function(t){ return inRange(t) && (!S.svm||t.svm===S.svm) && (!S.cw||t.currentWorker===S.cw) && (!S.issue||t.issue===S.issue) && (!S.rc||t.rc===S.rc) && (!S.proj||t.project===S.proj); });
+  var resolvedPool=RAW.filter(function(t){
+    if(!t.resolved) return false;
+    if(S.svm && t.svm!==S.svm) return false;
+    if(S.cw && t.currentWorker!==S.cw) return false;
+    if(S.issue && t.issue!==S.issue) return false;
+    if(S.rc && t.rc!==S.rc) return false;
+    if(S.proj && t.project!==S.proj) return false;
+    /* date range for resolved uses the same S.from / S.to window */
+    if(S.from && t.resolved < new Date(S.from+"T00:00:00")) return false;
+    if(S.to && t.resolved > new Date(S.to+"T23:59:59")) return false;
+    return true;
+  });
+
+  /* type sub-filter */
+  var typeList=[...new Set(pool.concat(resolvedPool).map(function(t){return t.issue;}).filter(Boolean))].sort();
+  var tp=S.dType;
+  var created=tp? pool.filter(function(t){return t.issue===tp;}) : pool;
+  var resolved=tp? resolvedPool.filter(function(t){return t.issue===tp;}) : resolvedPool;
+
+  /* Bucket by day */
+  var byDay={};
+  function ensure(k){ if(!byDay[k]) byDay[k]={created:[],resolved:[],inc:0,sr:0,other:0,closedInc:0,closedSr:0,closedOther:0}; }
+  created.forEach(function(t){ var k=dKey(t.created); if(!k) return; ensure(k); byDay[k].created.push(t);
+    if(t.issue==="Incident") byDay[k].inc++; else if(t.issue==="Service Request") byDay[k].sr++; else byDay[k].other++;
+  });
+  resolved.forEach(function(t){ var k=dKey(t.resolved); if(!k) return; ensure(k); byDay[k].resolved.push(t);
+    if(t.issue==="Incident") byDay[k].closedInc++; else if(t.issue==="Service Request") byDay[k].closedSr++; else byDay[k].closedOther++;
+  });
+  var days=Object.keys(byDay).sort();
+
+  /* ── Scope note ── */
+  var scopeParts=[];
+  if(S.from||S.to) scopeParts.push("date range");
+  if(S.svm) scopeParts.push("SVM: "+S.svm); if(S.cw) scopeParts.push("worker: "+S.cw);
+  if(S.proj) scopeParts.push("project: "+S.proj); if(tp) scopeParts.push("type: "+tp);
+  var scopeTxt=scopeParts.length? scopeParts.join(" · ") : "all data";
+
+  var out='<div class="up" style="margin-bottom:9px"><div class="eyebrow">Daily Flow</div>'+
+    '<h1 style="font-size:16px;font-weight:700;letter-spacing:-.3px;margin-top:2px">Day-by-day ticket movement</h1>'+
+    '<div class="sub" style="margin-top:3px">How many tickets were <b style="color:var(--hd)">created</b> and <b style="color:var(--engg)">closed (resolved)</b> each day. Scope: <b>'+esc(scopeTxt)+'</b>.</div></div>';
+
+  /* Type sub-filter bar */
+  out+='<div class="card up d1 pad" style="margin-bottom:9px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">'+
+    '<span class="flabel">Issue Type</span>'+
+    '<button class="chip'+(tp?'':' on')+'" data-dtype="">All types · '+(created.length+resolved.length)+'</button>'+
+    typeList.map(function(t){ var cn=created.filter(function(x){return x.issue===t;}).length; return '<button class="chip'+(tp===t?' on':'')+'" data-dtype="'+esc(t)+'">'+esc(t)+' · '+cn+' created</button>'; }).join("")+
+    '<span class="sub" style="margin-left:auto">SVM, Worker, Root Cause &amp; date use the top filters</span>'+
+    '<button class="ghost" id="dailyExport" style="margin-left:8px;display:inline-flex;align-items:center;gap:5px">\u2B07 Export Full Data</button>'+
+  '</div>';
+
+  if(!days.length){ return out+'<div class="card pad"><div class="empty">No tickets in this date range. Adjust the top-level date range or filters.</div></div>'; }
+
+  /* ── KPI computation ── */
+  var totCreated=created.length, totResolved=resolved.length;
+  var netChange=totCreated-totResolved;
+  var incCreated=created.filter(function(t){return t.issue==="Incident";}).length;
+  var srCreated=created.filter(function(t){return t.issue==="Service Request";}).length;
+  var avgCreate=days.length? Math.round(totCreated/days.length*10)/10 : 0;
+  var avgResolve=days.length? Math.round(totResolved/days.length*10)/10 : 0;
+  var peakCreateDay=days.reduce(function(a,b){return byDay[b].created.length>byDay[a].created.length?b:a;});
+  var peakResolveDay=days.reduce(function(a,b){return byDay[b].resolved.length>byDay[a].resolved.length?b:a;});
+
+  /* ── KPI cards ── */
+  out+='<div class="grid up d1" style="grid-template-columns:repeat(6,1fr);margin-bottom:9px">'+
+    '<div class="card kpi clickable" data-dkpi="created"><div class="kv" style="color:var(--hd)">'+totCreated+'</div><div class="kl">CREATED</div><div class="ks">in scope</div></div>'+
+    '<div class="card kpi clickable" data-dkpi="incident"><div class="kv" style="color:#D97706">'+incCreated+'</div><div class="kl">INCIDENTS</div><div class="ks">'+pct(incCreated,totCreated)+'% of created</div></div>'+
+    '<div class="card kpi clickable" data-dkpi="sr"><div class="kv" style="color:#7C3AED">'+srCreated+'</div><div class="kl">SERVICE REQ.</div><div class="ks">'+pct(srCreated,totCreated)+'% of created</div></div>'+
+    '<div class="card kpi clickable" data-dkpi="resolved"><div class="kv" style="color:var(--engg)">'+totResolved+'</div><div class="kl">CLOSED</div><div class="ks">in scope</div></div>'+
+    '<div class="card kpi"><div class="kv" style="color:'+(netChange>0?'var(--rose)':'var(--hd)')+'">'+((netChange>0?'+':'')+netChange)+'</div><div class="kl">NET CHANGE</div><div class="ks">created \u2212 closed</div></div>'+
+    '<div class="card kpi"><div class="kv">'+avgCreate+'</div><div class="kl">AVG / DAY</div><div class="ks">create '+avgCreate+' · close '+avgResolve+'</div></div>'+
+  '</div>';
+
+  /* ── Big area chart: Created vs Closed day-wise ── */
+  var CHART_W=1100, CHART_H=260, PAD_L=44, PAD_R=20, PAD_T=20, PAD_B=50;
+  var plotW=CHART_W-PAD_L-PAD_R, plotH=CHART_H-PAD_T-PAD_B;
+  var maxVal=1;
+  days.forEach(function(k){ maxVal=Math.max(maxVal,byDay[k].created.length,byDay[k].resolved.length); });
+  /* round max up for nice grid lines */
+  var gridStep=maxVal<=5?1:maxVal<=15?2:maxVal<=30?5:maxVal<=80?10:maxVal<=200?20:50;
+  var gridMax=Math.ceil(maxVal/gridStep)*gridStep;
+  function cx(i){ return PAD_L + (i/(days.length-1||1))*plotW; }
+  function cy(v){ return PAD_T + plotH - (v/gridMax)*plotH; }
+
+  var createdPts=days.map(function(k,i){ return cx(i)+","+cy(byDay[k].created.length); });
+  var resolvedPts=days.map(function(k,i){ return cx(i)+","+cy(byDay[k].resolved.length); });
+  /* area fill paths */
+  var baseline=PAD_T+plotH;
+  var createArea="M"+PAD_L+","+baseline+" L"+createdPts.join(" L")+" L"+cx(days.length-1)+","+baseline+" Z";
+  var resolveArea="M"+PAD_L+","+baseline+" L"+resolvedPts.join(" L")+" L"+cx(days.length-1)+","+baseline+" Z";
+
+  out+='<div class="card up d2 pad" style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span class="sec-title">Created vs Closed — day by day</span><span class="click">hover for details · click a dot to open tickets</span></div>';
+  out+='<div style="position:relative;width:100%;overflow-x:auto"><svg viewBox="0 0 '+CHART_W+' '+CHART_H+'" style="width:100%;height:auto;display:block;font-family:var(--mono)" xmlns="http://www.w3.org/2000/svg">';
+  /* grid lines */
+  for(var g=0;g<=gridMax;g+=gridStep){
+    var yy=cy(g);
+    out+='<line x1="'+PAD_L+'" y1="'+yy+'" x2="'+(CHART_W-PAD_R)+'" y2="'+yy+'" stroke="var(--line)" stroke-width="0.5"/>';
+    out+='<text x="'+(PAD_L-6)+'" y="'+(yy+3)+'" text-anchor="end" fill="var(--muted)" font-size="9">'+g+'</text>';
+  }
+  /* area fills */
+  out+='<path d="'+createArea+'" fill="var(--hd)" opacity="0.12"/>';
+  out+='<path d="'+resolveArea+'" fill="var(--engg)" opacity="0.10"/>';
+  /* lines */
+  if(days.length>1){
+    out+='<polyline points="'+createdPts.join(" ")+'" fill="none" stroke="var(--hd)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>';
+    out+='<polyline points="'+resolvedPts.join(" ")+'" fill="none" stroke="var(--engg)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="6 3"/>';
+  }
+  /* dots + invisible hover targets */
+  days.forEach(function(k,i){
+    var crN=byDay[k].created.length, rsN=byDay[k].resolved.length;
+    out+='<circle cx="'+cx(i)+'" cy="'+cy(crN)+'" r="4" fill="var(--hd)" class="ddot" data-dk="'+k+'" data-ds="created" style="cursor:pointer"><title>'+dLabelFull(k)+' — '+crN+' created</title></circle>';
+    out+='<circle cx="'+cx(i)+'" cy="'+cy(rsN)+'" r="4" fill="var(--engg)" class="ddot" data-dk="'+k+'" data-ds="resolved" style="cursor:pointer"><title>'+dLabelFull(k)+' — '+rsN+' closed</title></circle>';
+  });
+  /* x-axis labels — show a label every Nth day to avoid overlap */
+  var labelEvery=days.length<=15?1:days.length<=31?2:days.length<=90?7:14;
+  days.forEach(function(k,i){ if(i%labelEvery===0||i===days.length-1){
+    var wd=dWeekday(k); var isWknd=wd===0||wd===6;
+    out+='<text x="'+cx(i)+'" y="'+(baseline+14)+'" text-anchor="middle" fill="'+(isWknd?"var(--rose)":"var(--muted)")+'" font-size="8" font-weight="'+(isWknd?'700':'400')+'">'+dLabel(k)+'</text>';
+    out+='<text x="'+cx(i)+'" y="'+(baseline+24)+'" text-anchor="middle" fill="'+(isWknd?"var(--rose)":"var(--faint)")+'" font-size="7">'+WDAYS[wd]+'</text>';
+  }});
+  out+='</svg></div>';
+  out+='<div class="legend" style="margin-top:6px"><span class="li"><span class="sw" style="background:var(--hd)"></span>Created (solid)</span><span class="li"><span class="sw" style="background:var(--engg)"></span>Closed (dashed)</span></div>';
+  out+=note([
+    'Peak creation: <b>'+dLabelFull(peakCreateDay)+'</b> with <b>'+byDay[peakCreateDay].created.length+'</b> tickets.',
+    'Peak closure: <b>'+dLabelFull(peakResolveDay)+'</b> with <b>'+byDay[peakResolveDay].resolved.length+'</b> tickets.',
+    netChange>0? 'Backlog <b class="dn">grew</b> by <b>'+netChange+'</b> tickets (more created than closed).' : netChange<0? 'Backlog <b class="up">shrank</b> by <b>'+Math.abs(netChange)+'</b> tickets (more closed than created).' : 'Inflow and outflow are exactly balanced.'
+  ]);
+  out+='</div>';
+
+  /* ── Stacked bar chart: Created by type per day ── */
+  var barMax=1; days.forEach(function(k){ barMax=Math.max(barMax,byDay[k].created.length); });
+  var BAR_H=140;
+  out+='<div class="card up d3 pad" style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><span class="sec-title">Created by type — daily breakdown</span><span class="click">click a segment to open tickets</span></div>';
+  out+='<div class="stackwrap" style="align-items:flex-end">';
+  days.forEach(function(k,i){
+    var d=byDay[k], tot=d.created.length; if(!tot) tot=0;
+    var hpx=tot>0? Math.max(Math.round(tot/barMax*BAR_H),6) : 4;
+    var wd=dWeekday(k); var isWknd=wd===0||wd===6;
+    out+='<div class="col" style="min-width:0;flex:1"><div class="tot" style="font-size:9px">'+(tot||""  )+'</div>';
+    out+='<div class="stack" style="height:'+hpx+'px">';
+    if(d.other>0) out+='<div class="seg" data-dbar="'+k+'" data-dbtype="other" style="flex:'+d.other+';background:#94A3B8;cursor:pointer" title="Other '+d.other+'"></div>';
+    if(d.sr>0) out+='<div class="seg" data-dbar="'+k+'" data-dbtype="sr" style="flex:'+d.sr+';background:#7C3AED;cursor:pointer" title="Service Req. '+d.sr+'">'+(d.sr/tot*hpx>=14?'<span class="sv" style="font-size:8px">'+d.sr+'</span>':'')+'</div>';
+    if(d.inc>0) out+='<div class="seg" data-dbar="'+k+'" data-dbtype="inc" style="flex:'+d.inc+';background:#D97706;cursor:pointer" title="Incident '+d.inc+'">'+(d.inc/tot*hpx>=14?'<span class="sv" style="font-size:8px">'+d.inc+'</span>':'')+'</div>';
+    out+='</div>';
+    if(i%labelEvery===0||i===days.length-1) out+='<div class="wx" style="font-size:7px;'+(isWknd?'color:var(--rose);font-weight:700':'')+'">'+dLabel(k)+'</div>';
+    else out+='<div class="wx"></div>';
+    out+='</div>';
+  });
+  out+='</div><div class="legend" style="margin-top:6px"><span class="li"><span class="sw" style="background:#D97706"></span>Incident</span><span class="li"><span class="sw" style="background:#7C3AED"></span>Service Request</span><span class="li"><span class="sw" style="background:#94A3B8"></span>Other</span></div></div>';
+
+  /* ── Weekday heatmap ── */
+  var wdCreate=Array(7).fill(0), wdResolve=Array(7).fill(0), wdCount=Array(7).fill(0);
+  days.forEach(function(k){ var wd=dWeekday(k); wdCreate[wd]+=byDay[k].created.length; wdResolve[wd]+=byDay[k].resolved.length; wdCount[wd]++; });
+  var wdMax=Math.max.apply(null,wdCreate.concat([1]));
+  out+='<div class="card up d4 pad" style="margin-bottom:9px"><span class="sec-title">Weekday pattern</span><div class="sub" style="margin-bottom:10px">Average tickets created and closed by day of week.</div>';
+  out+='<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:8px;text-align:center">';
+  [1,2,3,4,5,6,0].forEach(function(wd){
+    var isWknd=wd===0||wd===6;
+    var avgC=wdCount[wd]?Math.round(wdCreate[wd]/wdCount[wd]*10)/10:0;
+    var avgR=wdCount[wd]?Math.round(wdResolve[wd]/wdCount[wd]*10)/10:0;
+    var pctFill=wdMax>0? Math.round(wdCreate[wd]/wdMax*100) : 0;
+    out+='<div style="padding:10px 6px;border-radius:10px;background:linear-gradient(to top,'+(isWknd?'var(--rose-bg)':'var(--hd-bg)')+' '+pctFill+'%, var(--paper) '+pctFill+'%);border:1px solid var(--line)">'+
+      '<div style="font-weight:800;font-size:13px;'+(isWknd?'color:var(--rose)':'')+'">'+WDAYS[wd]+'</div>'+
+      '<div style="font-size:20px;font-weight:800;color:var(--hd);margin:4px 0">'+avgC+'</div>'+
+      '<div style="font-size:9px;color:var(--muted);font-weight:600">avg created</div>'+
+      '<div style="font-size:14px;font-weight:700;color:var(--engg);margin-top:4px">'+avgR+'</div>'+
+      '<div style="font-size:9px;color:var(--muted);font-weight:600">avg closed</div>'+
+      '<div style="font-size:9px;color:var(--faint);margin-top:3px">'+wdCount[wd]+' day'+(wdCount[wd]!==1?'s':'')+'</div>'+
+    '</div>';
+  });
+  out+='</div>'+note([
+    (function(){ var best=1,bv=0; [1,2,3,4,5,6,0].forEach(function(w){if(wdCreate[w]>bv){bv=wdCreate[w];best=w;}}); return 'Busiest creation day: <b>'+WDAYS[best]+'</b> with <b>'+bv+'</b> total created ('+wdCount[best]+' '+WDAYS[best]+'s in range).'; })(),
+    (function(){ var best=1,bv=0; [1,2,3,4,5,6,0].forEach(function(w){if(wdResolve[w]>bv){bv=wdResolve[w];best=w;}}); return 'Busiest closure day: <b>'+WDAYS[best]+'</b> with <b>'+bv+'</b> total closed.'; })()
+  ])+'</div>';
+
+  /* ── Daily detail table ── */
+  out+='<div class="card up d5" style="overflow:hidden;margin-bottom:9px"><div class="pad" style="border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center"><span class="sec-title">Daily detail</span><span class="click">click any row or number to open tickets</span></div>';
+  out+='<div style="overflow:auto;max-height:520px"><table class="ptable"><thead><tr>'+
+    '<th class="rh">Date</th><th class="rh">Day</th>'+
+    '<th style="color:var(--hd)">Created</th><th style="color:#D97706">Incidents</th><th style="color:#7C3AED">Svc Req</th>'+
+    '<th style="color:var(--engg)">Closed</th><th>Net</th><th>Cumulative</th>'+
+  '</tr></thead><tbody>';
+  var cumul=0;
+  days.forEach(function(k){
+    var d=byDay[k], crN=d.created.length, rsN=d.resolved.length;
+    var net=crN-rsN; cumul+=net;
+    var wd=dWeekday(k); var isWknd=wd===0||wd===6;
+    out+='<tr class="rowlink drow" data-drow="'+k+'" style="'+(isWknd?"background:var(--paper)":"")+'">'+
+      '<td class="rl">'+dLabel(k)+'</td>'+
+      '<td class="rl" style="font-weight:'+(isWknd?'700':'400')+';color:'+(isWknd?'var(--rose)':'var(--muted)')+'">'+WDAYS[wd]+'</td>'+
+      '<td class="val dcell" data-dk="'+k+'" data-ds="created" style="color:var(--hd);font-weight:700">'+crN+'</td>'+
+      '<td class="val dcell" data-dk="'+k+'" data-ds="incident" style="color:#D97706;font-weight:600">'+d.inc+'</td>'+
+      '<td class="val dcell" data-dk="'+k+'" data-ds="sr" style="color:#7C3AED;font-weight:600">'+d.sr+'</td>'+
+      '<td class="val dcell" data-dk="'+k+'" data-ds="resolved" style="color:var(--engg);font-weight:700">'+rsN+'</td>'+
+      '<td style="font-weight:700;color:'+(net>0?'var(--rose)':net<0?'var(--hd)':'var(--muted)')+'">'+((net>0?'+':'')+net)+'</td>'+
+      '<td class="mono" style="font-weight:600;color:'+(cumul>0?'var(--rose)':cumul<0?'var(--hd)':'var(--muted)')+'">'+((cumul>0?'+':'')+cumul)+'</td>'+
+    '</tr>';
+  });
+  /* totals row */
+  out+='</tbody><tfoot><tr style="font-weight:800;border-top:2px solid var(--line)">'+
+    '<td colspan="2" style="text-align:right;padding-right:12px">TOTAL</td>'+
+    '<td style="color:var(--hd)">'+totCreated+'</td>'+
+    '<td style="color:#D97706">'+incCreated+'</td>'+
+    '<td style="color:#7C3AED">'+srCreated+'</td>'+
+    '<td style="color:var(--engg)">'+totResolved+'</td>'+
+    '<td style="color:'+(netChange>0?'var(--rose)':netChange<0?'var(--hd)':'var(--muted)')+'">'+((netChange>0?'+':'')+netChange)+'</td>'+
+    '<td></td></tr></tfoot></table></div></div>';
+
+  /* ── Observations ── */
+  var obs=[];
+  if(totCreated>0 && totResolved>0){
+    var ratio=Math.round(totResolved/totCreated*100);
+    if(ratio>=100) obs.push('Closure rate <b class="up">'+ratio+'%</b> — the team is closing tickets faster than they\'re coming in.');
+    else if(ratio>=80) obs.push('Closure rate <b>'+ratio+'%</b> — team is nearly keeping pace with inflow.');
+    else obs.push('Closure rate <b class="dn">'+ratio+'%</b> — inflow is outpacing closures; backlog is growing.');
+  }
+  if(incCreated>0 && srCreated>0){
+    var incPct=pct(incCreated,totCreated);
+    obs.push('Incident-to-Service-Request ratio: <b>'+incCreated+'</b> incidents ('+incPct+'%) vs <b>'+srCreated+'</b> service requests ('+(100-incPct)+'%).');
+  }
+  /* find zero-creation days (weekdays only) */
+  var zeroDays=days.filter(function(k){ var wd=dWeekday(k); return wd!==0 && wd!==6 && byDay[k].created.length===0; });
+  if(zeroDays.length>0 && zeroDays.length<=5) obs.push(zeroDays.length+' weekday'+(zeroDays.length>1?'s':'')+' with zero tickets created: '+zeroDays.map(function(k){return '<b>'+dLabelFull(k)+'</b>';}).join(", ")+'.');
+  else if(zeroDays.length>5) obs.push('<b>'+zeroDays.length+' weekdays</b> had zero tickets created in this range.');
+  /* weekend traffic */
+  var wkndCreated=days.filter(function(k){var w=dWeekday(k);return w===0||w===6;}).reduce(function(a,k){return a+byDay[k].created.length;},0);
+  if(wkndCreated>0) obs.push('<b>'+wkndCreated+'</b> tickets created on weekends ('+pct(wkndCreated,totCreated)+'% of total).');
+  if(obs.length) out+='<div class="card up d6 pad" style="margin-bottom:9px"><div style="font-weight:800;font-size:12px;margin-bottom:6px">\uD83D\uDCA1 OBSERVATIONS</div>'+obs.map(function(o){return '<div class="sub" style="margin-bottom:4px">\u2022 '+o+'</div>';}).join("")+'</div>';
+
+  window.__dailyByDay=byDay;
+  window.__dailyCreated=created;
+  window.__dailyResolved=resolved;
+  return out;
+}
+
 function viewTrend(){
   var f=filtered(); // respects global svm/issue/date (and rc if set, but trend has own rc scope)
   // trend scope: apply local root-cause + status on top of global (ignore global rc to avoid double-limiting; use tRc instead)
@@ -1857,6 +2106,70 @@ function bindMain(){
   });
   bindPivotCells();
 
+  if(S.tab==="daily"){
+    var byDay=window.__dailyByDay||{};
+    var dCreated=window.__dailyCreated||[];
+    var dResolved=window.__dailyResolved||[];
+    /* type sub-filter chips */
+    document.querySelectorAll("[data-dtype]").forEach(function(b){
+      b.onclick=function(){ S.dType=b.dataset.dtype; renderMain(); };
+    });
+    /* KPI card clicks */
+    document.querySelectorAll("[data-dkpi]").forEach(function(c){
+      c.onclick=function(){
+        var kpi=c.dataset.dkpi;
+        if(kpi==="created") openModal("All created tickets","📆","#0F766E",dCreated);
+        else if(kpi==="incident") openModal("Incidents created","🔶","#D97706",dCreated.filter(function(t){return t.issue==="Incident";}));
+        else if(kpi==="sr") openModal("Service Requests created","🟣","#7C3AED",dCreated.filter(function(t){return t.issue==="Service Request";}));
+        else if(kpi==="resolved") openModal("All closed tickets","✅","#5B57D8",dResolved);
+      };
+    });
+    /* chart dot clicks */
+    document.querySelectorAll(".ddot").forEach(function(d){
+      d.onclick=function(){
+        var k=d.dataset.dk, side=d.dataset.ds, day=byDay[k];
+        if(!day) return;
+        if(side==="created") openModal(dLabelFull(k)+" — created ("+day.created.length+")","📆","#0F766E",day.created);
+        else openModal(dLabelFull(k)+" — closed ("+day.resolved.length+")","✅","#5B57D8",day.resolved);
+      };
+    });
+    /* stacked bar segment clicks */
+    document.querySelectorAll("[data-dbar]").forEach(function(s){
+      s.onclick=function(){
+        var k=s.dataset.dbar, tp=s.dataset.dbtype, day=byDay[k];
+        if(!day) return;
+        var tix,title;
+        if(tp==="inc"){ tix=day.created.filter(function(t){return t.issue==="Incident";}); title=dLabelFull(k)+" — Incidents created"; }
+        else if(tp==="sr"){ tix=day.created.filter(function(t){return t.issue==="Service Request";}); title=dLabelFull(k)+" — Service Requests created"; }
+        else { tix=day.created.filter(function(t){return t.issue!=="Incident"&&t.issue!=="Service Request";}); title=dLabelFull(k)+" — Other created"; }
+        openModal(title,"📆",tp==="inc"?"#D97706":tp==="sr"?"#7C3AED":"#94A3B8",tix);
+      };
+    });
+    /* table row + cell clicks */
+    document.querySelectorAll(".drow").forEach(function(r){
+      r.onclick=function(ev){
+        if(ev.target.closest(".dcell")) return;  /* let cell handler run */
+        var k=r.dataset.drow, day=byDay[k]; if(!day) return;
+        var all=day.created.concat(day.resolved.filter(function(t){ return day.created.indexOf(t)===-1; }));
+        openModal(dLabelFull(k)+" — all activity ("+all.length+")","📆","#0F766E",all);
+      };
+    });
+    document.querySelectorAll(".dcell").forEach(function(td){
+      td.onclick=function(ev){
+        ev.stopPropagation();
+        var k=td.dataset.dk, side=td.dataset.ds, day=byDay[k]; if(!day) return;
+        var tix,title;
+        if(side==="created"){ tix=day.created; title=dLabelFull(k)+" — created"; }
+        else if(side==="incident"){ tix=day.created.filter(function(t){return t.issue==="Incident";}); title=dLabelFull(k)+" — incidents"; }
+        else if(side==="sr"){ tix=day.created.filter(function(t){return t.issue==="Service Request";}); title=dLabelFull(k)+" — service requests"; }
+        else { tix=day.resolved; title=dLabelFull(k)+" — closed"; }
+        openModal(title,"📆",side==="resolved"?"#5B57D8":side==="incident"?"#D97706":side==="sr"?"#7C3AED":"#0F766E",tix);
+      };
+    });
+    /* export button */
+    var de=el("dailyExport"); if(de) de.onclick=function(){ exportFullCSV(dCreated.concat(dResolved.filter(function(t){return dCreated.indexOf(t)===-1;})),"daily-flow-full"); };
+  }
+
   if(S.tab==="perf"){
     var f=filtered();
     var hd=f.filter(function(t){return t.isHD;});
@@ -2211,7 +2524,7 @@ function handleUpload(e){
     ED={ work:[], filters:{}, blankFilters:{}, search:"", sortCol:null, sortDir:"asc", page:0, dirty:false, seq:0 };
     // reset view state on new upload
     S.svm=""; S.cw=""; S.rc=""; S.issue=""; S.proj=""; S.from=""; S.to=""; S.dlabel="All time"; S._excFilter=null; S.pendAction="";
-    S.tab="perf"; S.tRc="__CLAR__"; S.tStatus="Closed"; S.pivot="hdworker"; S.pIssue=""; S.pRc=""; S.pStatus=""; S._pivFor=null; S.weekA=""; S.weekB=""; S.sortCol="total"; S.sortDir="desc";
+    S.tab="perf"; S.tRc="__CLAR__"; S.tStatus="Closed"; S.pivot="hdworker"; S.pIssue=""; S.pRc=""; S.pStatus=""; S._pivFor=null; S.weekA=""; S.weekB=""; S.sortCol="total"; S.sortDir="desc"; S.dType="";
     render();
     // footer
   }).catch(function(err){ alert("Could not read file: "+err.message); if(btn){btn.textContent="Upload Jira Excel";btn.disabled=false;} });
