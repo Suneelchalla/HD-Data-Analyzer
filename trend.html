@@ -1103,6 +1103,21 @@ function viewTrend(){
 
   var rcList=[...new Set(RAW.map(function(t){return t.rc;}).filter(Boolean))].sort();
   var stList=[...new Set(RAW.map(function(t){return t.status;}).filter(Boolean))].sort();
+
+  /* Count tickets per dropdown option so users can see which choices yield data */
+  var rcBasePool=base; // base already has date+global filters
+  var stBasePool=base.filter(function(t){ // tickets matching root cause (to count per-status)
+    if(S.tRc==="__CLAR__") return isClar(t.rc);
+    if(S.tRc==="__ALL__") return true;
+    return t.rc===S.tRc;
+  });
+  var rcCountAll=rcBasePool.length;
+  var rcCountClar=rcBasePool.filter(function(t){return isClar(t.rc);}).length;
+  var rcCounts={}; rcList.forEach(function(s){ rcCounts[s]=rcBasePool.filter(function(t){return t.rc===s;}).length; });
+  var stCountAll=stBasePool.length;
+  var stCountClosed=stBasePool.filter(function(t){return t.status==="Closed";}).length;
+  var stCounts={}; stList.forEach(function(s){ stCounts[s]=stBasePool.filter(function(t){return t.status===s;}).length; });
+
   var rcName = S.tRc==="__CLAR__"?"Clarification": (S.tRc==="__ALL__"?"all root causes": S.tRc);
   var stName = S.tStatus==="__ALL__"?"any status":S.tStatus;
   var svmName = S.svm||"all SVM staff";
@@ -1117,9 +1132,9 @@ function viewTrend(){
   // local controls
   out+='<div class="card up d1 pad" style="margin-bottom:9px;display:flex;gap:14px;align-items:center;flex-wrap:wrap">'+
     '<span class="flabel">Root cause</span>'+
-    '<select class="fsel" id="tRc"><option value="__CLAR__" '+(S.tRc==="__CLAR__"?"selected":"")+'>Clarification (default)</option><option value="__ALL__" '+(S.tRc==="__ALL__"?"selected":"")+'>All root causes</option>'+rcList.map(function(s){return '<option value="'+esc(s)+'" '+(S.tRc===s?"selected":"")+'>'+esc(s)+'</option>';}).join("")+'</select>'+
+    '<select class="fsel" id="tRc"><option value="__CLAR__" '+(S.tRc==="__CLAR__"?"selected":"")+'>Clarification (default) · '+rcCountClar+'</option><option value="__ALL__" '+(S.tRc==="__ALL__"?"selected":"")+'>All root causes · '+rcCountAll+'</option>'+rcList.map(function(s){return '<option value="'+esc(s)+'" '+(S.tRc===s?"selected":"")+'>'+esc(s)+' · '+rcCounts[s]+'</option>';}).join("")+'</select>'+
     '<span class="flabel">Status</span>'+
-    '<select class="fsel" id="tStatus"><option value="Closed" '+(S.tStatus==="Closed"?"selected":"")+'>Closed (default)</option><option value="__ALL__" '+(S.tStatus==="__ALL__"?"selected":"")+'>Any status</option>'+stList.map(function(s){return '<option value="'+esc(s)+'" '+(S.tStatus===s?"selected":"")+'>'+esc(s)+'</option>';}).join("")+'</select>'+
+    '<select class="fsel" id="tStatus"><option value="Closed" '+(S.tStatus==="Closed"?"selected":"")+'>Closed (default) · '+stCountClosed+'</option><option value="__ALL__" '+(S.tStatus==="__ALL__"?"selected":"")+'>Any status · '+stCountAll+'</option>'+stList.map(function(s){return '<option value="'+esc(s)+'" '+(S.tStatus===s?"selected":"")+'>'+esc(s)+(stCounts[s]?' · '+stCounts[s]:' · 0')+'</option>';}).join("")+'</select>'+
     '<span class="sub" style="margin-left:auto">SVM, Current Worker &amp; date use the top filters</span>'+
     '<button class="ghost" id="trendExport" style="margin-left:8px;display:inline-flex;align-items:center;gap:5px">\u2B07 Export Full Data ('+scope.length+')</button>'+
   '</div>';
@@ -1133,7 +1148,19 @@ function viewTrend(){
   var activeMap = S.tMode==="month" ? byM : byW;
   var activeKeys = S.tMode==="month" ? mKeys : wKeys;
 
-  if(!activeKeys.length){ out+='<div class="card pad"><div class="empty">No tickets match this scope. Try widening the root cause or status.</div></div>'; return out; }
+  if(!activeKeys.length){
+    var baseN=base.length;
+    var afterRcN=base.filter(function(t){ if(S.tRc==="__CLAR__") return isClar(t.rc); if(S.tRc==="__ALL__") return true; return t.rc===S.tRc; }).length;
+    out+='<div class="card pad"><div class="empty">No tickets match this scope.</div>'+
+      '<div style="margin-top:10px;font-size:12px;color:var(--muted);line-height:1.8;text-align:center">'+
+        '<b>'+baseN+'</b> tickets in date range'+
+        ' → <b>'+afterRcN+'</b> match root cause <b>'+esc(rcName)+'</b>'+
+        ' → <b>'+scope.length+'</b> match status <b>'+esc(stName)+'</b>'+
+      '</div>'+
+      '<div style="margin-top:8px;text-align:center;font-size:12px;color:var(--muted)">Try choosing <b>"Any status"</b> or <b>"All root causes"</b> to widen the scope, or adjust the date range.</div>'+
+    '</div>';
+    return out;
+  }
 
   // per-card rendering (month or worker)
   out+='<div class="grid up d2" style="grid-template-columns:repeat(auto-fit,minmax(330px,1fr));margin-bottom:9px">';
@@ -1412,9 +1439,11 @@ function applyPivFilters(pool){
 }
 function pivControls(pool){
   function sel(id,label,f,val){
-    var opts='<option value="">All '+esc(label)+'</option>';
-    if(pivHasBlank(pool,f)) opts+='<option value="__BLANK__" '+(val==="__BLANK__"?"selected":"")+'>(blank)</option>';
-    pivDistinct(pool,f).forEach(function(v){ opts+='<option value="'+esc(v)+'" '+(val===v?"selected":"")+'>'+esc(v)+'</option>'; });
+    var allCount=pool.length;
+    var blankCount=pool.filter(function(t){return !t[f]||String(t[f]).trim()==="";}).length;
+    var opts='<option value="">All '+esc(label)+' \u00b7 '+allCount+'</option>';
+    if(pivHasBlank(pool,f)) opts+='<option value="__BLANK__" '+(val==="__BLANK__"?"selected":"")+'>(blank) \u00b7 '+blankCount+'</option>';
+    pivDistinct(pool,f).forEach(function(v){ var c=pool.filter(function(t){return t[f]===v;}).length; opts+='<option value="'+esc(v)+'" '+(val===v?"selected":"")+'>'+esc(v)+' \u00b7 '+c+'</option>'; });
     return '<span class="flabel">'+esc(label)+'</span><select class="fsel piv-f" id="'+id+'">'+opts+'</select>';
   }
   var active=(S.pIssue||S.pRc||S.pStatus);
