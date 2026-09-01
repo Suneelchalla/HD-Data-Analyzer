@@ -535,9 +535,18 @@ function bestWorstHD(tix,minN){ // returns {best,worst} worker HD share among th
 }
 
 /* ═══════════════════════════════ MODAL ═══════════════════════════════ */
-function openModal(title,icon,color,tickets){
+function openModal(title,icon,color,tickets,dateMode){
+  /* dateMode: "created" | "resolved" | undefined (default = resolved||created) */
+  var dateHead = dateMode==="created"?"Created":dateMode==="resolved"?"Resolved":"Date";
+  function dateVal(t){
+    if(dateMode==="created") return fdate(t.created);
+    if(dateMode==="resolved") return fdate(t.resolved);
+    return fdate(t.resolved||t.created);
+  }
   var rows=tickets.slice().sort(function(a,b){
-    var da=(a.resolved||a.created||0), db=(b.resolved||b.created||0);
+    var da,db;
+    if(dateMode==="created"){ da=(a.created||0); db=(b.created||0); }
+    else { da=(a.resolved||a.created||0); db=(b.resolved||b.created||0); }
     return db-da;
   });
   var body=rows.map(function(t){
@@ -551,7 +560,7 @@ function openModal(title,icon,color,tickets){
       '<td style="color:var(--muted);font-size:11px;white-space:nowrap">'+esc(t.issue||"—")+'</td>'+
       '<td style="white-space:nowrap">'+(t.linked?'<a class="jkey" style="color:var(--engg)" href="'+JIRA+encodeURIComponent(t.linked.split(";")[0])+'" target="_blank" rel="noreferrer">'+esc(t.linked.split(";")[0])+'</a>':'<span style="color:var(--faint)">—</span>')+'</td>'+
       '<td style="color:var(--muted);font-size:11px;white-space:nowrap">'+esc(t.status||"—")+'</td>'+
-      '<td class="mono" style="color:var(--muted);font-size:11px;white-space:nowrap">'+fdate(t.resolved||t.created)+'</td>'+
+      '<td class="mono" style="color:var(--muted);font-size:11px;white-space:nowrap">'+dateVal(t)+'</td>'+
     '</tr>';
   }).join("");
   var html=''+
@@ -564,7 +573,7 @@ function openModal(title,icon,color,tickets){
       '</div>'+
       '<div class="mb">'+
         (rows.length? '<table><thead><tr>'+
-          '<th class="static">Key</th><th class="static">Summary</th><th class="static">Solved</th><th class="static">SVM In Charge</th><th class="static">Current Worker</th><th class="static">Root Cause</th><th class="static">Type</th><th class="static">Linked</th><th class="static">Status</th><th class="static">Date</th>'+
+          '<th class="static">Key</th><th class="static">Summary</th><th class="static">Solved</th><th class="static">SVM In Charge</th><th class="static">Current Worker</th><th class="static">Root Cause</th><th class="static">Type</th><th class="static">Linked</th><th class="static">Status</th><th class="static">'+dateHead+'</th>'+
           '</tr></thead><tbody>'+body+'</tbody></table>' : '<div class="empty">No tickets match this selection.</div>')+
       '</div>'+
       '<div class="mfoot"><span>Showing all '+rows.length+' tickets</span>'+
@@ -2118,10 +2127,10 @@ function bindMain(){
     document.querySelectorAll("[data-dkpi]").forEach(function(c){
       c.onclick=function(){
         var kpi=c.dataset.dkpi;
-        if(kpi==="created") openModal("All created tickets","📆","#0F766E",dCreated);
-        else if(kpi==="incident") openModal("Incidents created","🔶","#D97706",dCreated.filter(function(t){return t.issue==="Incident";}));
-        else if(kpi==="sr") openModal("Service Requests created","🟣","#7C3AED",dCreated.filter(function(t){return t.issue==="Service Request";}));
-        else if(kpi==="resolved") openModal("All closed tickets","✅","#5B57D8",dResolved);
+        if(kpi==="created") openModal("All created tickets","📆","#0F766E",dCreated,"created");
+        else if(kpi==="incident") openModal("Incidents created","🔶","#D97706",dCreated.filter(function(t){return t.issue==="Incident";}),"created");
+        else if(kpi==="sr") openModal("Service Requests created","🟣","#7C3AED",dCreated.filter(function(t){return t.issue==="Service Request";}),"created");
+        else if(kpi==="resolved") openModal("All closed tickets","✅","#5B57D8",dResolved,"resolved");
       };
     });
     /* chart dot clicks */
@@ -2129,8 +2138,8 @@ function bindMain(){
       d.onclick=function(){
         var k=d.dataset.dk, side=d.dataset.ds, day=byDay[k];
         if(!day) return;
-        if(side==="created") openModal(dLabelFull(k)+" — created ("+day.created.length+")","📆","#0F766E",day.created);
-        else openModal(dLabelFull(k)+" — closed ("+day.resolved.length+")","✅","#5B57D8",day.resolved);
+        if(side==="created") openModal(dLabelFull(k)+" — created ("+day.created.length+")","📆","#0F766E",day.created,"created");
+        else openModal(dLabelFull(k)+" — closed ("+day.resolved.length+")","✅","#5B57D8",day.resolved,"resolved");
       };
     });
     /* stacked bar segment clicks */
@@ -2142,13 +2151,13 @@ function bindMain(){
         if(tp==="inc"){ tix=day.created.filter(function(t){return t.issue==="Incident";}); title=dLabelFull(k)+" — Incidents created"; }
         else if(tp==="sr"){ tix=day.created.filter(function(t){return t.issue==="Service Request";}); title=dLabelFull(k)+" — Service Requests created"; }
         else { tix=day.created.filter(function(t){return t.issue!=="Incident"&&t.issue!=="Service Request";}); title=dLabelFull(k)+" — Other created"; }
-        openModal(title,"📆",tp==="inc"?"#D97706":tp==="sr"?"#7C3AED":"#94A3B8",tix);
+        openModal(title,"📆",tp==="inc"?"#D97706":tp==="sr"?"#7C3AED":"#94A3B8",tix,"created");
       };
     });
     /* table row + cell clicks */
     document.querySelectorAll(".drow").forEach(function(r){
       r.onclick=function(ev){
-        if(ev.target.closest(".dcell")) return;  /* let cell handler run */
+        if(ev.target.closest(".dcell")) return;
         var k=r.dataset.drow, day=byDay[k]; if(!day) return;
         var all=day.created.concat(day.resolved.filter(function(t){ return day.created.indexOf(t)===-1; }));
         openModal(dLabelFull(k)+" — all activity ("+all.length+")","📆","#0F766E",all);
@@ -2158,12 +2167,12 @@ function bindMain(){
       td.onclick=function(ev){
         ev.stopPropagation();
         var k=td.dataset.dk, side=td.dataset.ds, day=byDay[k]; if(!day) return;
-        var tix,title;
-        if(side==="created"){ tix=day.created; title=dLabelFull(k)+" — created"; }
-        else if(side==="incident"){ tix=day.created.filter(function(t){return t.issue==="Incident";}); title=dLabelFull(k)+" — incidents"; }
-        else if(side==="sr"){ tix=day.created.filter(function(t){return t.issue==="Service Request";}); title=dLabelFull(k)+" — service requests"; }
-        else { tix=day.resolved; title=dLabelFull(k)+" — closed"; }
-        openModal(title,"📆",side==="resolved"?"#5B57D8":side==="incident"?"#D97706":side==="sr"?"#7C3AED":"#0F766E",tix);
+        var tix,title,dm;
+        if(side==="created"){ tix=day.created; title=dLabelFull(k)+" — created"; dm="created"; }
+        else if(side==="incident"){ tix=day.created.filter(function(t){return t.issue==="Incident";}); title=dLabelFull(k)+" — incidents"; dm="created"; }
+        else if(side==="sr"){ tix=day.created.filter(function(t){return t.issue==="Service Request";}); title=dLabelFull(k)+" — service requests"; dm="created"; }
+        else { tix=day.resolved; title=dLabelFull(k)+" — closed"; dm="resolved"; }
+        openModal(title,"📆",side==="resolved"?"#5B57D8":side==="incident"?"#D97706":side==="sr"?"#7C3AED":"#0F766E",tix,dm);
       };
     });
     /* export button */
@@ -2176,15 +2185,15 @@ function bindMain(){
     var eg=f.filter(function(t){return !t.isHD;});
     // hero track
     var ht=el("heroTrack");
-    if(ht){ ht.querySelectorAll(".seg").forEach(function(s){ s.onclick=function(){ s.dataset.side==="hd"?openModal("HD resolved","🟢","#0F766E",hd):openModal("Engg resolved","🟣","#5B57D8",eg); }; }); }
+    if(ht){ ht.querySelectorAll(".seg").forEach(function(s){ s.onclick=function(){ s.dataset.side==="hd"?openModal("HD resolved","🟢","#0F766E",hd,"resolved"):openModal("Engg resolved","🟣","#5B57D8",eg,"resolved"); }; }); }
     // KPIs
     document.querySelectorAll("[data-kpi]").forEach(function(c){
       c.onclick=function(){
         var k=c.dataset.kpi;
-        if(k==="all")openModal("All tickets in scope","📦","#111A2B",f);
-        else if(k==="hd")openModal("HD resolved","🟢","#0F766E",hd);
-        else if(k==="eg")openModal("Engg resolved","🟣","#5B57D8",eg);
-        else if(k==="closed")openModal("Closed tickets","✅","#334155",f.filter(function(t){return t.status==="Closed";}));
+        if(k==="all")openModal("All tickets in scope","📦","#111A2B",f,"resolved");
+        else if(k==="hd")openModal("HD resolved","🟢","#0F766E",hd,"resolved");
+        else if(k==="eg")openModal("Engg resolved","🟣","#5B57D8",eg,"resolved");
+        else if(k==="closed")openModal("Closed tickets","✅","#334155",f.filter(function(t){return t.status==="Closed";}),"resolved");
         else if(k==="inc")openModal("Incidents","🔺","#B45309",f.filter(function(t){return t.issue==="Incident";}));
         else if(k==="srq")openModal("Service Requests","📨","#334155",f.filter(function(t){return t.issue==="Service Request";}));
       };
