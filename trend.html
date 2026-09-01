@@ -799,7 +799,7 @@ function dateBar(){
     '<input type="date" class="dinput" id="dfrom" value="'+S.from+'">'+
     '<span class="sub">→</span>'+
     '<input type="date" class="dinput" id="dto" value="'+S.to+'">'+
-    '<span class="sub" id="rangenote" style="margin-left:6px;color:var(--hd);font-weight:600"></span>'+
+    (S.from||S.to? '<span id="rangenote" style="margin-left:8px;display:inline-flex;align-items:center;gap:7px;background:var(--hd-bg);border:1px solid var(--hd-soft);padding:5px 13px;border-radius:8px;font-size:11.5px;font-weight:700;color:var(--hd);white-space:nowrap">'+(S.from?fdate(new Date(S.from+"T00:00:00")):"start")+' → '+(S.to?fdate(new Date(S.to+"T00:00:00")):"now")+'<span style="color:var(--ink2);font-weight:600"> · <span id="rangecount"></span></span></span>' : '<span id="rangenote" style="margin-left:6px"></span>')+
     rangeLabel+
   '</div>';
 }
@@ -809,8 +809,8 @@ function bindDateBar(){
   });
   el("dfrom").onchange=function(e){ S.from=e.target.value; S.dlabel="Custom"; render(); };
   el("dto").onchange=function(e){ S.to=e.target.value; S.dlabel="Custom"; render(); };
-  var note=el("rangenote");
-  if(note && (S.from||S.to)){ note.textContent=filtered().length+" tickets in range"; }
+  var cnt=el("rangecount");
+  if(cnt && (S.from||S.to)){ cnt.textContent=filtered().length+" tickets in range"; }
 }
 function applyPreset(label){
   var now=new Date(), y=now.getFullYear(), m=now.getMonth();
