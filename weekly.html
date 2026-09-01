@@ -308,7 +308,8 @@ function normalize(rows){
       resolved:toDate(pick(row,"resolved")),
       na:String(pick(row,"next action")||"").trim(),
       currentWorker:String(pick(row,"current worker")||"").trim(),
-      svmInCharge:String(pick(row,"svm in charge")||"").trim()
+      svmInCharge:String(pick(row,"svm in charge")||"").trim(),
+      _raw:row
     };
   }).filter(function(t){return t.key;});
 }
@@ -477,6 +478,30 @@ function hbars(items,color){
   }).join("");
 }
 
+/* ═══════════════════════ FULL DATA EXPORT ═══════════════════════ */
+function escCSV(v){var s=String(v==null?"":v instanceof Date&&!isNaN(v)?v.toISOString().slice(0,19).replace("T"," "):v);if(s.indexOf(",")>-1||s.indexOf('"')>-1||s.indexOf("\n")>-1)return'"'+s.replace(/"/g,'""')+'"';return s;}
+function exportFullCSV(tickets,name){
+  if(!tickets||!tickets.length)return;
+  var sample=tickets[0]._raw||tickets[0]; var colOrder=[]; var colSet={};
+  Object.keys(sample).forEach(function(k){if(!colSet[k]){colSet[k]=1;colOrder.push(k);}});
+  tickets.forEach(function(t){ var raw=t._raw||t; Object.keys(raw).forEach(function(k){if(!colSet[k]){colSet[k]=1;colOrder.push(k);}});});
+  colOrder.push("__Stage__","__Next_Action__","__Age_Days__");
+  var header=colOrder.map(function(c){return escCSV(c==="__Stage__"?"Stage (computed)":c==="__Next_Action__"?"Next Action (computed)":c==="__Age_Days__"?"Age Days (computed)":c);}).join(",");
+  var lines=[header];
+  tickets.forEach(function(t){
+    var raw=t._raw||t;
+    lines.push(colOrder.map(function(c){
+      if(c==="__Stage__")return escCSV(t.stage||"");
+      if(c==="__Next_Action__"){var na=naKey(t);return escCSV(na==="svm"?"SVM":na==="client"?"Client":"Unset");}
+      if(c==="__Age_Days__")return ageDays(t);
+      return escCSV(raw[c]);
+    }).join(","));
+  });
+  var blob=new Blob(["\uFEFF"+lines.join("\n")],{type:"text/csv;charset=utf-8"});
+  var url=URL.createObjectURL(blob); var a=document.createElement("a");
+  a.href=url; a.download=(name||"tickets-full")+".csv"; a.click(); URL.revokeObjectURL(url);
+}
+
 /* ═══════════════════════ RENDER ═══════════════════════ */
 function caption(t){ return ''; }
 function insight(html){ return '<div class="insight">💡 '+html+'</div>'; }
@@ -554,11 +579,14 @@ function ticketTable(tix,colKeys){
 function openModal(title,tix){
   closeModal();
   var ov=document.createElement("div"); ov.className="ovl noprint"; ov.id="ovl";
-  ov.innerHTML='<div class="modal"><div class="mhead"><span class="mt">'+esc(title)+' · '+tix.length+' ticket'+(tix.length!==1?'s':'')+'</span><button id="mclose" title="Close (Esc)">✕</button></div>'+
+  ov.innerHTML='<div class="modal"><div class="mhead"><span class="mt">'+esc(title)+' \u00b7 '+tix.length+' ticket'+(tix.length!==1?'s':'')+'</span>'+
+    '<button id="mexp" class="btn" style="margin-left:auto;padding:7px 14px;font-size:11px;font-weight:700;display:inline-flex;align-items:center;gap:5px">\u2B07 Export Full Data</button>'+
+    '<button id="mclose" title="Close (Esc)">\u2715</button></div>'+
     '<div class="mbody">'+ticketTable(tix,MODAL_COLS)+'</div></div>';
   ov.addEventListener("click",function(e){ if(e.target===ov) closeModal(); });
   document.body.appendChild(ov);
   var b=el("mclose"); if(b) b.onclick=closeModal;
+  var ex=el("mexp"); if(ex) ex.onclick=function(){ exportFullCSV(tix,(title||"tickets").replace(/[^\w]+/g,"-").toLowerCase()+"-full"); };
 }
 function closeModal(){ var o=el("ovl"); if(o) o.remove(); }
 document.addEventListener("keydown",function(e){ if(e.key==="Escape") closeModal(); });
@@ -662,8 +690,9 @@ function render(){
         '</div>'+
       '</details>'+
       '<span class="spacer"></span>'+
-      '<button class="btn primary" id="printbtn">🖨️ Print / Save PDF</button>'+
-      '<button class="btn" id="backbtn">← Launcher</button>'+
+      '<button class="btn" id="exportAllBtn" style="display:inline-flex;align-items:center;gap:5px">\u2B07 Export Full Data ('+ct.length+')</button>'+
+      '<button class="btn primary" id="printbtn">\uD83D\uDDA8\uFE0F Print / Save PDF</button>'+
+      '<button class="btn" id="backbtn">\u2190 Launcher</button>'+
     '</div>'+
     /* the printable sheet */
     '<div class="sheet" id="sheet">'+
@@ -761,11 +790,11 @@ function render(){
         top5OldestHTML(svmPending, 5)+
 
         /* ── Pending ticket lists (printed in the PDF) ── */
-        '<div class="sectitle">Pending Tickets — with SVM <span class="sub">'+svmPending.length+' open · our action</span></div>'+
+        '<div class="sectitle">Pending Tickets — with SVM <span class="sub">'+svmPending.length+' open · our action</span><button class="btn noprint expbtn" data-exp="svm" style="font-size:10px;padding:4px 10px;margin-left:auto">\u2B07 Export Full Data</button></div>'+
         caption('Open tickets where the next action is on the SVM Help Desk side. Oldest first. <b class="noprint">Use “🧩 Columns” up top to choose what shows.</b>')+
         ticketTable(svmPending,S.cols)+
 
-        '<div class="sectitle">Pending Tickets — with Client <span class="sub">'+clientPending.length+' open · awaiting your team</span></div>'+
+        '<div class="sectitle">Pending Tickets — with Client <span class="sub">'+clientPending.length+' open · awaiting your team</span><button class="btn noprint expbtn" data-exp="client" style="font-size:10px;padding:4px 10px;margin-left:auto">\u2B07 Export Full Data</button></div>'+
         caption('Open tickets waiting on the client. Oldest first.')+
         ticketTable(clientPending,S.cols)+
 
@@ -808,6 +837,7 @@ function bind(){
     else { S.cols=S.cols.filter(function(x){return x!==k;}); }
     S.colsOpen=true; render();
   }; });
+  var expAll=el("exportAllBtn"); if(expAll) expAll.onclick=function(){ var ct=clientTickets(); exportFullCSV(ct, "weekly-"+S.client.replace(/[^\w]+/g,"-").toLowerCase()+"-full"); };
   el("printbtn").onclick=function(){
     var orig=document.title;
     function slug(s){ return String(s||"").replace(/[^\w\s-]/g,"").trim().replace(/\s+/g,"-").slice(0,60); }
@@ -883,6 +913,14 @@ function bindDrill(){
   // Action-needed callout → client-pending list
   var cc=document.querySelector(".clientcallout");
   if(cc) cc.onclick=function(){ openModal("Pending with Client — "+S.client, openL.filter(function(t){return naKey(t)==="client";})); };
+
+  // Export Full Data buttons on pending sections
+  q(".expbtn[data-exp]").forEach(function(btn){ btn.onclick=function(e){
+    e.stopPropagation();
+    var side=btn.dataset.exp;
+    var tix=side==="svm"? openL.filter(function(t){return naKey(t)==="svm";}) : openL.filter(function(t){return naKey(t)==="client";});
+    exportFullCSV(tix, "pending-"+(side==="svm"?"svm":"client")+"-"+S.client.replace(/[^\w]+/g,"-").toLowerCase()+"-full");
+  }; });
 }
 
 /* ═══════════════════════ BOOT ═══════════════════════ */
