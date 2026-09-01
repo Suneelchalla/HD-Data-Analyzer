@@ -236,13 +236,25 @@ function ABar({bk,total,onClick,active}){
   </div>);
 }
 
-function exportCSV(tickets,filename){
-  const cols=["Key","Summary","Status","Category","Project","Priority","Created","Updated","Age (days)","Current Worker","Linked Issues","Linked Ticket status"];
-  const rows=tickets.map(t=>[t.Key,`"${(t.Summary||'').replace(/"/g,'""')}"`,t.Status,CL[classify(t.Status)],t.Project,t.Priority,fd(t.Created),fd(t.Updated),ds(t.Updated||t.Created),t["Current Worker"],t["Linked Issues"],t["Linked Ticket status"]]);
-  const csv=[cols.join(","),...rows.map(r=>r.join(","))].join("\n");
-  const blob=new Blob([csv],{type:"text/csv"});
-  const url=URL.createObjectURL(blob);const a=document.createElement("a");a.href=url;a.download=filename||"tickets.csv";a.click();URL.revokeObjectURL(url);
+function escCSV(v){var s=String(v==null?"":v instanceof Date&&!isNaN(v)?v.toISOString().slice(0,19).replace("T"," "):v);if(s.indexOf(",")>-1||s.indexOf('"')>-1||s.indexOf("\n")>-1)return'"'+s.replace(/"/g,'""')+'"';return s;}
+function exportFullCSV(tickets,filename){
+  if(!tickets||!tickets.length)return;
+  var colSet={},colOrder=[];
+  tickets.forEach(function(t){Object.keys(t).forEach(function(k){if(k!=="_sla"&&k!=="_raw"&&!colSet[k]){colSet[k]=1;colOrder.push(k);}});});
+  /* Append computed columns at the end */
+  colOrder.push("__Category__","__Age_Days__");
+  var lines=[colOrder.map(function(c){return escCSV(c==="__Category__"?"Category (computed)":c==="__Age_Days__"?"Age Days (computed)":c);}).join(",")];
+  tickets.forEach(function(t){
+    lines.push(colOrder.map(function(c){
+      if(c==="__Category__")return escCSV(CL[classify(t.Status)]||"");
+      if(c==="__Age_Days__")return ds(t.Updated||t.Created);
+      return escCSV(t[c]);
+    }).join(","));
+  });
+  var blob=new Blob(["\uFEFF"+lines.join("\n")],{type:"text/csv;charset=utf-8"});
+  var url=URL.createObjectURL(blob);var a=document.createElement("a");a.href=url;a.download=filename||"tickets-full.csv";a.click();URL.revokeObjectURL(url);
 }
+function exportCSV(tickets,filename){ exportFullCSV(tickets,filename); }
 
 /* ─── Modal Component ─── */
 function TicketModal({data,onClose}){
@@ -261,6 +273,7 @@ function TicketModal({data,onClose}){
             <div style={{fontSize:16,fontWeight:800,color:"var(--t1)"}}>{data.title}</div>
             <div style={{fontSize:12,color:"var(--t2)",marginTop:2}}>{tix.length} ticket{tix.length!==1?"s":""}</div>
           </div>
+          <button onClick={function(){exportFullCSV(tix,(data.title||"tickets").replace(/[^\w]+/g,"-").toLowerCase()+"-full");}} style={{padding:"8px 14px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg)",fontSize:12,fontWeight:700,color:"var(--t2)",display:"flex",alignItems:"center",gap:5,whiteSpace:"nowrap"}} title="Export all columns to CSV">⬇ Export Full Data</button>
           <button onClick={onClose} style={{width:36,height:36,borderRadius:8,border:"1px solid var(--border)",background:"var(--bg)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,color:"var(--t2)"}}>✕</button>
         </div>
         {/* Modal table */}
