@@ -101,6 +101,29 @@ input[type="date"]:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,9
 .blob-1{width:300px;height:300px;background:rgba(37,99,235,.08);top:-5%;right:-5%;animation:ripple 8s ease-in-out infinite}
 .blob-2{width:250px;height:250px;background:rgba(124,58,237,.07);bottom:-5%;left:-3%;animation:ripple 10s ease-in-out infinite 2s}
 .blob-3{width:200px;height:200px;background:rgba(6,182,212,.06);top:40%;left:-8%;animation:ripple 12s ease-in-out infinite 4s}
+
+/* ── MULTI-SELECT DROPDOWN (React) ── */
+.msel-r{position:relative;display:inline-block}
+.msel-r-btn{display:flex;align-items:center;gap:6px;background:var(--bg);color:var(--t1);border:1px solid var(--border);border-radius:8px;padding:8px 14px;font-size:12px;font-weight:600;cursor:pointer;min-width:180px;max-width:320px;white-space:nowrap;font-family:inherit;text-align:left}
+.msel-r-btn:hover{border-color:var(--border2)}
+.msel-r-btn.open{border-color:var(--blue);box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+.msel-r-btn .txt{flex:1;overflow:hidden;text-overflow:ellipsis}
+.msel-r-btn .cnt{background:var(--blue);color:#fff;font-size:10px;font-weight:700;padding:1px 7px;border-radius:10px;flex-shrink:0}
+.msel-r-btn .arrow{color:var(--t3);font-size:10px;flex-shrink:0;transition:transform .15s}
+.msel-r-btn.open .arrow{transform:rotate(180deg)}
+.msel-r-dd{position:absolute;top:calc(100% + 4px);left:0;min-width:100%;width:max-content;max-width:380px;max-height:380px;background:#fff;border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow3);z-index:200;display:flex;flex-direction:column;overflow:hidden}
+.msel-r-dd .srch{border:none;border-bottom:1px solid var(--border);padding:9px 12px;font-size:12px;color:var(--t1);font-family:inherit;outline:none;width:100%;background:var(--bg)}
+.msel-r-dd .acts{display:flex;gap:4px;padding:6px 10px;border-bottom:1px solid var(--border);background:var(--bg)}
+.msel-r-dd .acts button{background:none;border:1px solid var(--border);color:var(--t3);padding:3px 10px;border-radius:6px;font-size:10px;font-weight:600;font-family:inherit;cursor:pointer}
+.msel-r-dd .acts button:hover{color:var(--t1);border-color:var(--border2)}
+.msel-r-dd .lst{overflow-y:auto;flex:1;padding:4px 0}
+.msel-r-dd .opt{display:flex;align-items:center;gap:8px;padding:6px 12px;cursor:pointer;font-size:12px;color:var(--t1);transition:background .1s}
+.msel-r-dd .opt:hover{background:var(--bg)}
+.msel-r-dd .opt .chk{width:15px;height:15px;border:1.5px solid var(--border2);border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;background:#fff;transition:all .12s}
+.msel-r-dd .opt.on .chk{background:var(--blue);border-color:var(--blue)}
+.msel-r-dd .opt .lbl{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.msel-r-dd .opt .n{font-family:var(--mono);font-size:10px;color:var(--t4)}
+.msel-r-dd .emp{padding:16px;text-align:center;color:var(--t3);font-size:11px}
 </style>
 </head>
 <body>
@@ -320,6 +343,64 @@ function TicketModal({data,onClose}){
   );
 }
 
+
+/* ─── MultiSelect Component ─── */
+function MultiSelect({allLabel, options, selected, onChange, minWidth}){
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState("");
+  const ref = useRef();
+
+  useEffect(function(){
+    function handleClick(e){ if(ref.current && !ref.current.contains(e.target)) setOpen(false); }
+    document.addEventListener("mousedown", handleClick);
+    return function(){ document.removeEventListener("mousedown", handleClick); };
+  },[]);
+
+  var filtered = search ? options.filter(function(o){ return o[0].toLowerCase().indexOf(search.toLowerCase()) > -1; }) : options;
+  var text = selected.length === 0 ? allLabel : selected.length <= 2 ? selected.join(", ") : selected.length + " selected";
+
+  function toggle(val){
+    var idx = selected.indexOf(val);
+    if(idx > -1) onChange(selected.filter(function(v){ return v !== val; }));
+    else onChange(selected.concat([val]));
+  }
+  function selectAll(){ onChange(options.map(function(o){ return o[0]; })); }
+  function clearAll(){ onChange([]); }
+
+  return(
+    <div className="msel-r" ref={ref} style={{minWidth:minWidth||180}}>
+      <button type="button" className={"msel-r-btn"+(open?" open":"")} onClick={function(){ setOpen(!open); setSearch(""); }}>
+        <span className="txt">{text}</span>
+        {selected.length > 0 && <span className="cnt">{selected.length}</span>}
+        <span className="arrow">▾</span>
+      </button>
+      {open && (
+        <div className="msel-r-dd">
+          <input className="srch" placeholder="Search…" value={search} onChange={function(e){ setSearch(e.target.value); }} onClick={function(e){ e.stopPropagation(); }} autoFocus/>
+          <div className="acts">
+            <button onClick={selectAll}>Select all</button>
+            <button onClick={clearAll}>Clear</button>
+          </div>
+          <div className="lst">
+            {filtered.length === 0 && <div className="emp">No matches</div>}
+            {filtered.map(function(o){
+              var val = o[0], count = o[1];
+              var on = selected.indexOf(val) > -1;
+              return(
+                <div key={val} className={"opt"+(on?" on":"")} onClick={function(){ toggle(val); }}>
+                  <span className="chk">{on?"✓":""}</span>
+                  <span className="lbl">{val}</span>
+                  {count !== undefined && <span className="n">{count}</span>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ─── Main App ─── */
 /* ═══ EDITABLE DATA GRID ═══
    Spreadsheet-style editor over the raw rows: per-column filters, global
@@ -453,13 +534,13 @@ function DataEditor({rows,fileName,onApply,onRevert}){
 
 function App(){
   const[raw,setRaw]=useState(null);
-  const[w,setW]=useState("");
+  const[w,setW]=useState([]);
   const[tab,setTab]=useState("followup");
   const[cf,setCf]=useState(null);
   const[af,setAf]=useState(null);
   const[sf,setSf]=useState(null);
   const[gf,setGf]=useState(null);
-  const[pf,setPf]=useState("");
+  const[pf,setPf]=useState([]);
   const[search,setSearch]=useState("");
   const[sortCol,setSortCol]=useState("age");
   const[sortDir,setSortDir]=useState("desc");
@@ -476,7 +557,7 @@ function App(){
   const handleFile=useCallback(async function(e){
     const f=e.target.files?.[0];if(!f)return;
     setLoading(true);setFn(f.name);
-    try{setRaw(await px(f));setW("");setCf(null);setAf(null);setSf(null);setGf(null);setPf("");setSearch("");setDtFrom("");setDtTo("");setDtLabel("All Time");setModal(null);}
+    try{setRaw(await px(f));setW([]);setCf(null);setAf(null);setSf(null);setGf(null);setPf([]);setSearch("");setDtFrom("");setDtTo("");setDtLabel("All Time");setModal(null);}
     catch(err){alert(err.message);}
     setLoading(false);e.target.value="";
   },[]);
@@ -511,7 +592,7 @@ function App(){
 
   /* Commit edits from the Edit Data tab: everything recomputes off `raw`. */
   function applyEditedRows(newRows){
-    setRaw(newRows);setW("");setCf(null);setAf(null);setSf(null);setGf(null);setPf("");setSearch("");setModal(null);
+    setRaw(newRows);setW([]);setCf(null);setAf(null);setSf(null);setGf(null);setPf([]);setSearch("");setModal(null);
     if(window.HDStore)window.HDStore.saveRows(newRows);
   }
   /* Throw away edits and reload the originally uploaded file. */
@@ -609,16 +690,16 @@ function App(){
 
   const flt=useMemo(()=>{
     let l=op;
-    if(w)l=l.filter(t=>t["Current Worker"]===w);
-    if(pf)l=l.filter(t=>t.Project===pf);
+    if(w.length)l=l.filter(t=>w.indexOf(t["Current Worker"])>-1);
+    if(pf.length)l=l.filter(t=>pf.indexOf(t.Project)>-1);
     return l;
   },[op,w,pf]);
 
   /* All tickets filtered by worker/project (includes closed) for SLA */
   var allFiltered=useMemo(function(){
     var l=dateFiltered||[];
-    if(w)l=l.filter(function(t){return t["Current Worker"]===w;});
-    if(pf)l=l.filter(function(t){return t.Project===pf;});
+    if(w.length)l=l.filter(function(t){return w.indexOf(t["Current Worker"])>-1;});
+    if(pf.length)l=l.filter(function(t){return pf.indexOf(t.Project)>-1;});
     return l;
   },[dateFiltered,w,pf]);
 
@@ -684,8 +765,8 @@ function App(){
   /* Incident + Clarification breakdown computation */
   var incClarData=useMemo(function(){
     var src=allFiltered||[];
-    if(w)src=src.filter(function(t){return t["Current Worker"]===w;});
-    if(pf)src=src.filter(function(t){return t.Project===pf;});
+    if(w.length)src=src.filter(function(t){return w.indexOf(t["Current Worker"])>-1;});
+    if(pf.length)src=src.filter(function(t){return pf.indexOf(t.Project)>-1;});
     var incidents=src.filter(function(t){return t["Issue Type"]==="Incident";});
     var incClosed=incidents.filter(function(t){return t.Status==="Closed";});
     var incClar=incidents.filter(function(t){return t["Root Cause"]==="Client Clarification";});
@@ -733,8 +814,8 @@ function App(){
 
   /* Performance */
   const perf=useMemo(()=>{
-    if(!dateFiltered||!w)return null;
-    const all=dateFiltered.filter(t=>t["Current Worker"]===w);const closed=all.filter(t=>t.Status==="Closed");const openT=all.length-closed.length;
+    if(!dateFiltered||w.length!==1)return null;
+    const all=dateFiltered.filter(t=>t["Current Worker"]===w[0]);const closed=all.filter(t=>t.Status==="Closed");const openT=all.length-closed.length;
     const rate=all.length?Math.round(closed.length/all.length*100):0;
     const rd=[];closed.forEach(t=>{if(t.Resolved&&t.Created){const d=Math.abs(ds(t.Created)-ds(t.Resolved));if(d<1000)rd.push(d);}});
     const avgR=rd.length?Math.round(rd.reduce((a,b)=>a+b,0)/rd.length):0;
@@ -795,7 +876,7 @@ function App(){
 
   /* Data Gaps */
   const GF=["Root Cause","Components","SVM In Charge"];
-  const gd=useMemo(()=>{if(!dateFiltered)return{t:[],s:{}};let l=dateFiltered;if(w)l=l.filter(t=>t["Current Worker"]===w);if(pf)l=l.filter(t=>t.Project===pf);
+  const gd=useMemo(()=>{if(!dateFiltered)return{t:[],s:{}};let l=dateFiltered;if(w.length)l=l.filter(t=>w.indexOf(t["Current Worker"])>-1);if(pf.length)l=l.filter(t=>pf.indexOf(t.Project)>-1);
     const ct={};GF.forEach(f=>ct[f]=0);const tx=[];
     l.forEach(t=>{const g=GF.filter(f=>{const v=t[f];return!v||String(v).trim()===""||String(v).trim().toLowerCase()==="nan";});if(g.length){g.forEach(x=>ct[x]++);tx.push({...t,_g:g});}});
     return{t:tx,s:ct};
@@ -827,14 +908,8 @@ function App(){
         <span style={{fontWeight:800,fontSize:15,color:"var(--t1)",letterSpacing:"-.2px"}}>HD Tracker</span>
         <div style={{width:1,height:28,background:"var(--border)",margin:"0 6px"}}/>
 
-        <select value={w} onChange={function(e){setW(e.target.value);clr();}} style={{background:"var(--bg)",color:"var(--t1)",border:"1px solid var(--border)",borderRadius:8,padding:"8px 14px",fontSize:12,fontWeight:600,minWidth:240}}>
-          <option value="">All Workers · {op.length} open</option>
-          {wks.map(function(x){return <option key={x[0]} value={x[0]}>{x[0]} ({x[1]})</option>;})}
-        </select>
-        <select value={pf} onChange={function(e){setPf(e.target.value);clr();}} style={{background:"var(--bg)",color:"var(--t1)",border:"1px solid var(--border)",borderRadius:8,padding:"8px 14px",fontSize:12,minWidth:170}}>
-          <option value="">All Projects</option>
-          {pjs.map(function(p){return <option key={p} value={p}>{p}</option>;})}
-        </select>
+        <MultiSelect allLabel={"All Workers · "+op.length+" open"} options={wks.map(function(x){return [x[0],x[1]];})} selected={w} onChange={function(v){setW(v);clr();}} minWidth={240}/>
+        <MultiSelect allLabel="All Projects" options={pjs.map(function(p){return [p];})} selected={pf} onChange={function(v){setPf(v);clr();}} minWidth={170}/>
         <div style={{flex:1}}/>
 
         <nav style={{display:"flex",background:"var(--bg)",borderRadius:10,padding:3,gap:2,border:"1px solid var(--border)"}}>
@@ -896,20 +971,20 @@ function App(){
         {/* Greeting */}
         <div className="fu" style={{marginBottom:10}}>
           <h2 style={{fontSize:22,fontWeight:800,letterSpacing:"-.3px",color:"var(--t1)"}}>
-            {greeting()}{w?`, ${w.split(" ")[0]}`:""}!
+            {greeting()}{w.length===1?`, ${w[0].split(" ")[0]}`:""}!
           </h2>
           <p style={{color:"var(--t2)",fontSize:13,marginTop:4}}>
             <b onClick={function(){openAllModal();}} style={{color:"var(--t1)",cursor:"pointer",borderBottom:"1px dashed var(--t3)"}}>{st.n.toLocaleString()} open ticket{st.n!==1?"s":""}</b>
-            {" "}{w?`for ${w.split(" ")[0]}`:pf?`in ${pf}`:`across ${wks.length} workers`}
+            {" "}{w.length===1?`for ${w[0].split(" ")[0]}`:w.length>1?`for ${w.length} workers`:pf.length?`in ${pf.length} project${pf.length>1?"s":""}`:`across ${wks.length} workers`}
             {st.hd.length>0&&<> · <b style={{color:"var(--cyan)"}}>{st.hd.length} need action</b></>}
             {st.cl.length>0&&<> · <b style={{color:"var(--amber)"}}>{st.cl.length} awaiting client</b></>}
             {st.eng.length>0&&<> · <b style={{color:"var(--violet)"}}>{st.eng.length} with engineering</b></>}
-            {!w&&!pf&&<>. Select a worker to drill down.</>}
+            {!w.length&&!pf.length&&<>. Select a worker to drill down.</>}
           </p>
         </div>
 
         {/* HD action banner */}
-        {w&&st.hd.length>0&&(
+        {w.length>0&&st.hd.length>0&&(
           <div className="fu fu1 card" style={{padding:"11px 18px",marginBottom:8,display:"flex",alignItems:"center",gap:16,borderColor:"var(--cyan-border)",background:"var(--cyan-bg)"}}>
             <div style={{width:42,height:42,borderRadius:10,background:"#fff",border:"1px solid var(--cyan-border)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>🎯</div>
             <div style={{flex:1}}><div style={{color:"var(--cyan)",fontWeight:800,fontSize:14}}>{st.hd.length} ticket{st.hd.length!==1?"s":""} need YOUR action</div>
@@ -917,7 +992,7 @@ function App(){
             <button onClick={function(){openCatModal("hd");}} style={{background:"var(--cyan)",color:"#fff",border:"none",padding:"9px 18px",borderRadius:8,fontSize:12,fontWeight:700,flexShrink:0}}>View →</button>
           </div>
         )}
-        {w&&st.dng>0&&(
+        {w.length>0&&st.dng>0&&(
           <div className="fu fu1 card" style={{padding:"11px 18px",marginBottom:8,display:"flex",alignItems:"center",gap:16,borderColor:"var(--rose-border)",background:"var(--rose-bg)"}}>
             <div style={{width:42,height:42,borderRadius:10,background:"#fff",border:"1px solid var(--rose-border)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:18,flexShrink:0}}>⏰</div>
             <div><div style={{color:"var(--rose)",fontWeight:800,fontSize:14}}>{st.dng} ticket{st.dng!==1?"s":""} stale for 90+ days</div>
@@ -1111,7 +1186,7 @@ function App(){
               <tbody>{wks.slice(0,20).map(([n,c],idx)=>{
                 const wt=op.filter(t=>t["Current Worker"]===n);const bk=[0,0,0,0,0];let hd=0,cl=0,eng=0;
                 wt.forEach(t=>{bk[abk(ds(t.Updated||t.Created))]++;const cat=classify(t.Status);if(cat==="hd")hd++;else if(cat==="client")cl++;else eng++;});
-                return(<tr key={n} onClick={function(){setW(n);clr();}} style={{cursor:"pointer",borderBottom:"1px solid var(--border)",transition:"background .15s"}} onMouseOver={function(e){e.currentTarget.style.background="var(--blue-bg)";}} onMouseOut={function(e){e.currentTarget.style.background="";}}>
+                return(<tr key={n} onClick={function(){setW([n]);clr();}} style={{cursor:"pointer",borderBottom:"1px solid var(--border)",transition:"background .15s"}} onMouseOver={function(e){e.currentTarget.style.background="var(--blue-bg)";}} onMouseOut={function(e){e.currentTarget.style.background="";}}>
                   <td style={{padding:"7px 12px",fontWeight:600}}>{n}</td>
                   <td style={{padding:"10px 8px",textAlign:"right",fontWeight:800,color:"var(--blue)",fontFamily:"var(--mono)"}}>{c}</td>
                   <td style={{padding:"10px 8px",textAlign:"right",fontWeight:hd?700:400,color:hd?"var(--cyan)":"var(--t4)",fontFamily:"var(--mono)"}}>{hd||"·"}</td>
