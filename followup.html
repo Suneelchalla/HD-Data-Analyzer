@@ -344,6 +344,216 @@ function TicketModal({data,onClose}){
 }
 
 
+/* ─── Engineering Followup Modal (3 tabs) ─── */
+function EnggModal({data,activeTab,onTabChange,onClose}){
+  if(!data)return null;
+  var tix=data.tickets||[];
+
+  /* ── Ageing buckets based on Created date ── */
+  var ageLabels=["< 7 days","7–30 days","31–60 days","61–90 days","90+ days"];
+  var ageColors=["#059669","#65A30D","#CA8A04","#EA580C","#E11D48"];
+  var ageBuckets=[[], [], [], [], []];
+  tix.forEach(function(t){
+    var age=ds(t.Created);
+    var idx=age<=7?0:age<=30?1:age<=60?2:age<=90?3:4;
+    ageBuckets[idx].push(t);
+  });
+
+  /* ── SVM In Charge grouping ── */
+  var svmMap={};
+  tix.forEach(function(t){
+    var svm=t["SVM In Charge"]||"(Unassigned)";
+    svm=String(svm).trim();if(!svm||svm.toLowerCase()==="nan")svm="(Unassigned)";
+    if(!svmMap[svm])svmMap[svm]=[];
+    svmMap[svm].push(t);
+  });
+  var svmEntries=Object.entries(svmMap).sort(function(a,b){return b[1].length-a[1].length;});
+  var svmMax=svmEntries.length?svmEntries[0][1].length:1;
+  /* Color palette for SVM blocks */
+  var svmPalette=["#7C3AED","#5B21B6","#2563EB","#0891B2","#059669","#D97706","#E11D48","#9333EA","#4338CA","#0D9488","#B45309","#DC2626"];
+
+  /* ── shared ticket table ── */
+  function renderTable(list,showAge){
+    return(
+      <div style={{overflowX:"auto",maxHeight:420,overflowY:"auto"}}>
+        <table style={{width:"100%",borderCollapse:"collapse",fontSize:12}}>
+          <thead><tr style={{background:"var(--bg)",position:"sticky",top:0,zIndex:2}}>
+            <th style={{padding:"7px 12px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".6px",borderBottom:"2px solid var(--border)"}}>Key</th>
+            <th style={{padding:"7px 10px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".6px",borderBottom:"2px solid var(--border)"}}>Summary</th>
+            <th style={{padding:"7px 10px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".6px",borderBottom:"2px solid var(--border)"}}>Status</th>
+            <th style={{padding:"7px 10px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".6px",borderBottom:"2px solid var(--border)"}}>Project</th>
+            <th style={{padding:"7px 10px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".6px",borderBottom:"2px solid var(--border)"}}>Priority</th>
+            <th style={{padding:"7px 10px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".6px",borderBottom:"2px solid var(--border)"}}>Linked</th>
+            <th style={{padding:"7px 10px",textAlign:"left",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".6px",borderBottom:"2px solid var(--border)"}}>Created</th>
+            <th style={{padding:"7px 10px",textAlign:"right",fontSize:10,fontWeight:700,color:"var(--t3)",textTransform:"uppercase",letterSpacing:".6px",borderBottom:"2px solid var(--border)"}}>Age</th>
+          </tr></thead>
+          <tbody>
+            {list.slice(0,500).map(function(t,i){
+              var a=ds(t.Updated||t.Created);var bk=abk(a);
+              var sla=checkSLA(t);var linked=t["Linked Issues"]||"";
+              return(<tr key={i} style={{borderBottom:"1px solid var(--border)",background:sla.anyBreach?"#FFF5F5":""}}>
+                <td style={{padding:"6px 12px",whiteSpace:"nowrap"}}>
+                  <a href={J+t.Key} target="_blank" rel="noreferrer" style={{fontWeight:700,fontFamily:"var(--mono)",fontSize:12,color:"var(--blue)"}}>{t.Key}</a>
+                  {sla.anyBreach&&<span style={{marginLeft:5,background:"#FEE2E2",color:"#BE123C",padding:"1px 5px",borderRadius:4,fontSize:8,fontWeight:700}}>⚡SLA</span>}
+                </td>
+                <td style={{padding:"6px 10px",color:"var(--t2)",maxWidth:280,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={t.Summary}>{t.Summary}</td>
+                <td style={{padding:"6px 10px"}}><span style={{background:"#7C3AED",color:"#fff",padding:"3px 10px",borderRadius:20,fontSize:10,fontWeight:600,whiteSpace:"nowrap"}}>{t.Status}</span></td>
+                <td style={{padding:"6px 10px",color:"var(--t3)",fontSize:11,whiteSpace:"nowrap",maxWidth:120,overflow:"hidden",textOverflow:"ellipsis"}}>{(t.Project||"").split(" ").slice(0,2).join(" ")}</td>
+                <td style={{padding:"6px 10px",fontSize:11,fontWeight:600,color:t.Priority==="Critical"||t.Priority==="Show Stopper"?"var(--rose)":t.Priority==="High"?"var(--amber)":"var(--t3)"}}>{t.Priority}</td>
+                <td style={{padding:"6px 10px",fontSize:10,maxWidth:130,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
+                  {linked?<a href={J+(linked.split(";")[0])} target="_blank" rel="noreferrer" style={{fontFamily:"var(--mono)",fontSize:10,color:"var(--blue)"}}>{linked.split(";")[0]}</a>:<span style={{color:"var(--t4)"}}>—</span>}
+                </td>
+                <td style={{padding:"6px 10px",color:"var(--t3)",fontSize:11,whiteSpace:"nowrap"}}>{fd(t.Created)}</td>
+                <td style={{padding:"6px 10px",textAlign:"right",fontWeight:700,color:AC[bk],fontFamily:"var(--mono)",fontSize:12}}>{a}d</td>
+              </tr>);
+            })}
+          </tbody>
+        </table>
+        {list.length>500&&<div style={{padding:12,textAlign:"center",color:"var(--t3)",fontSize:11,borderTop:"1px solid var(--border)"}}>Showing 500 of {list.length}</div>}
+        {list.length===0&&<div style={{padding:40,textAlign:"center",color:"var(--t3)",fontSize:13}}>No tickets in this category</div>}
+      </div>
+    );
+  }
+
+  return(
+    <div onClick={function(e){if(e.target===e.currentTarget)onClose();}} style={{
+      position:"fixed",top:0,left:0,right:0,bottom:0,background:"rgba(0,0,0,.4)",backdropFilter:"blur(4px)",WebkitBackdropFilter:"blur(4px)",
+      zIndex:200,display:"flex",alignItems:"center",justifyContent:"center",padding:20,animation:"fadeUp .25s cubic-bezier(.22,1,.36,1)"
+    }}>
+      <div style={{background:"#fff",borderRadius:20,boxShadow:"0 20px 60px rgba(0,0,0,.2)",width:"100%",maxWidth:1200,maxHeight:"88vh",display:"flex",flexDirection:"column",overflow:"hidden",animation:"modalIn .3s cubic-bezier(.22,1,.36,1)"}}>
+        {/* Modal header */}
+        <div style={{padding:"20px 24px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",gap:14,flexShrink:0}}>
+          <div style={{width:44,height:44,borderRadius:12,background:"var(--violet-bg)",border:"1px solid var(--violet-border)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🔧</div>
+          <div style={{flex:1}}>
+            <div style={{fontSize:18,fontWeight:800,color:"var(--t1)"}}>Engineering Followup</div>
+            <div style={{fontSize:12,color:"var(--t2)",marginTop:2}}>{tix.length} ticket{tix.length!==1?"s":""} with engineering / dev team</div>
+          </div>
+          <button onClick={function(){exportFullCSV(tix,"engineering-followup-full");}} style={{padding:"8px 14px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg)",fontSize:12,fontWeight:700,color:"var(--t2)",display:"flex",alignItems:"center",gap:5,whiteSpace:"nowrap"}} title="Export all columns to CSV">⬇ Export Full Data</button>
+          <button onClick={onClose} style={{width:36,height:36,borderRadius:8,border:"1px solid var(--border)",background:"var(--bg)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,color:"var(--t2)"}}>✕</button>
+        </div>
+
+        {/* Tabs */}
+        <div style={{display:"flex",gap:4,padding:"12px 24px 0",borderBottom:"1px solid var(--border)",background:"var(--bg)"}}>
+          {[["all","📋 All Tickets",tix.length],["ageing","⏰ Ageing (Created)",null],["svm","👤 SVM In Charge",svmEntries.length]].map(function(tb){
+            var id=tb[0],label=tb[1],cnt=tb[2];var active=activeTab===id;
+            return(<button key={id} onClick={function(){onTabChange(id);}} style={{
+              padding:"10px 18px",borderRadius:"10px 10px 0 0",fontSize:12,fontWeight:700,border:"1px solid "+(active?"var(--border)":"transparent"),borderBottom:active?"1px solid #fff":"1px solid var(--border)",
+              background:active?"#fff":"transparent",color:active?"var(--violet)":"var(--t3)",marginBottom:-1,display:"flex",alignItems:"center",gap:6,transition:"all .15s"
+            }}>{label}{cnt!==null&&<span style={{background:active?"var(--violet-bg)":"var(--bg)",color:active?"var(--violet)":"var(--t3)",padding:"1px 7px",borderRadius:10,fontSize:10,fontWeight:800,border:"1px solid "+(active?"var(--violet-border)":"var(--border)")}}>{cnt}</span>}</button>);
+          })}
+        </div>
+
+        {/* Tab content */}
+        <div style={{flex:1,overflow:"auto"}}>
+
+          {/* ALL TICKETS TAB */}
+          {activeTab==="all"&&renderTable(tix)}
+
+          {/* AGEING TAB */}
+          {activeTab==="ageing"&&(
+            <div style={{padding:"16px 24px"}}>
+              {/* Ageing summary bar */}
+              <div style={{display:"flex",borderRadius:10,overflow:"hidden",height:36,background:"var(--bg)",marginBottom:18,border:"1px solid var(--border)"}}>
+                {ageBuckets.map(function(bucket,i){
+                  var pct=tix.length?bucket.length/tix.length*100:0;
+                  if(bucket.length===0)return null;
+                  return(<div key={i} title={ageLabels[i]+": "+bucket.length+" tickets"} style={{
+                    width:pct+"%",background:ageColors[i],display:"flex",alignItems:"center",justifyContent:"center",
+                    fontSize:11,fontWeight:700,color:"#fff",minWidth:bucket.length>0?30:0,transition:"width .4s"
+                  }}>{bucket.length}</div>);
+                })}
+              </div>
+              <div style={{display:"flex",gap:12,flexWrap:"wrap",marginBottom:16}}>
+                {ageLabels.map(function(lbl,i){
+                  return(<div key={i} style={{display:"flex",alignItems:"center",gap:6,fontSize:11,fontWeight:600,color:"var(--t2)"}}>
+                    <div style={{width:10,height:10,borderRadius:3,background:ageColors[i]}}/>{lbl}: <span style={{fontFamily:"var(--mono)",fontWeight:800,color:ageColors[i]}}>{ageBuckets[i].length}</span>
+                  </div>);
+                })}
+              </div>
+              {/* Each bucket section */}
+              {ageBuckets.map(function(bucket,i){
+                if(bucket.length===0)return null;
+                var sorted=[].concat(bucket).sort(function(a,b){return ds(b.Created)-ds(a.Created);});
+                return(<div key={i} style={{marginBottom:18}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+                    <div style={{width:14,height:14,borderRadius:4,background:ageColors[i]}}/>
+                    <span style={{fontSize:14,fontWeight:800,color:ageColors[i]}}>{ageLabels[i]}</span>
+                    <span style={{fontSize:12,color:"var(--t3)",fontWeight:600}}>— {bucket.length} ticket{bucket.length!==1?"s":""}</span>
+                  </div>
+                  {renderTable(sorted)}
+                </div>);
+              })}
+            </div>
+          )}
+
+          {/* SVM IN CHARGE TAB */}
+          {activeTab==="svm"&&(
+            <div style={{padding:"16px 24px"}}>
+              {/* SVM blocks grid */}
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:12,marginBottom:20}}>
+                {svmEntries.map(function(entry,i){
+                  var name=entry[0],tickets=entry[1];
+                  var intensity=Math.max(0.35,tickets.length/svmMax);
+                  var color=svmPalette[i%svmPalette.length];
+                  var lightBg=color+"14";var borderC=color+"44";
+                  /* Ageing breakdown within each SVM */
+                  var svmAge=[0,0,0,0,0];
+                  tickets.forEach(function(t){svmAge[abk(ds(t.Created))]++;});
+                  return(<div key={name} style={{
+                    background:lightBg,border:"2px solid "+borderC,borderRadius:14,padding:"14px 16px",
+                    cursor:"default",transition:"all .2s",position:"relative",overflow:"hidden"
+                  }}>
+                    <div style={{position:"absolute",top:0,left:0,bottom:0,width:(intensity*100)+"%",background:color+"10",borderRadius:14,transition:"width .4s"}}/>
+                    <div style={{position:"relative",zIndex:1}}>
+                      <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:8}}>
+                        <div style={{fontSize:13,fontWeight:800,color:color,maxWidth:"70%",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={name}>{name}</div>
+                        <div style={{fontSize:22,fontWeight:900,color:color,fontFamily:"var(--mono)",letterSpacing:"-1px",lineHeight:1}}>{tickets.length}</div>
+                      </div>
+                      {/* Mini ageing bars */}
+                      <div style={{display:"flex",gap:3,height:6,borderRadius:4,overflow:"hidden",background:"rgba(0,0,0,.06)"}}>
+                        {svmAge.map(function(c,j){
+                          if(c===0)return null;
+                          return(<div key={j} title={ageLabels[j]+": "+c} style={{width:(c/tickets.length*100)+"%",background:ageColors[j],minWidth:c>0?3:0}}/>);
+                        })}
+                      </div>
+                      <div style={{display:"flex",gap:8,marginTop:6,flexWrap:"wrap"}}>
+                        {svmAge.map(function(c,j){
+                          if(c===0)return null;
+                          return(<span key={j} style={{fontSize:9,fontWeight:700,color:ageColors[j]}}>{AS[j]}:{c}</span>);
+                        })}
+                      </div>
+                    </div>
+                  </div>);
+                })}
+              </div>
+              {/* Full list below the blocks */}
+              {svmEntries.map(function(entry,i){
+                var name=entry[0],tickets=entry[1];
+                var color=svmPalette[i%svmPalette.length];
+                var sorted=[].concat(tickets).sort(function(a,b){return ds(b.Created)-ds(a.Created);});
+                return(<div key={name} style={{marginBottom:18}}>
+                  <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+                    <div style={{width:14,height:14,borderRadius:4,background:color}}/>
+                    <span style={{fontSize:14,fontWeight:800,color:color}}>{name}</span>
+                    <span style={{fontSize:12,color:"var(--t3)",fontWeight:600}}>— {tickets.length} ticket{tickets.length!==1?"s":""}</span>
+                  </div>
+                  {renderTable(sorted)}
+                </div>);
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{padding:"10px 24px",borderTop:"1px solid var(--border)",display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
+          <span style={{fontSize:11,color:"var(--t3)"}}>Engineering Followup · {tix.length} tickets</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
 /* ─── MultiSelect Component ─── */
 function MultiSelect({allLabel, options, selected, onChange, minWidth}){
   const [open, setOpen] = useState(false);
@@ -551,6 +761,8 @@ function App(){
   const[dtTo,setDtTo]=useState("");
   const[dtLabel,setDtLabel]=useState("All Time");
   const[modal,setModal]=useState(null); // {title, icon, color, tickets}
+  const[enggModal,setEnggModal]=useState(null); // {tickets}
+  const[enggTab,setEnggTab]=useState("all"); // "all" | "ageing" | "svm"
   const fRef=useRef();
   const blobRef=useRef(null); // original uploaded file, kept for "revert"
 
@@ -566,10 +778,10 @@ function App(){
 
   /* Keyboard: Esc closes modal */
   useEffect(function(){
-    function handleKey(e){if(e.key==="Escape"&&modal)setModal(null);}
+    function handleKey(e){if(e.key==="Escape"){if(enggModal)setEnggModal(null);else if(modal)setModal(null);}}
     document.addEventListener("keydown",handleKey);
     return function(){document.removeEventListener("keydown",handleKey);};
-  },[modal]);
+  },[modal,enggModal]);
 
   /* Load the shared data. Prefer in-app edits (from the Edit Data tab); fall
      back to parsing the uploaded Excel and seeding the edit store from it. */
@@ -608,8 +820,7 @@ function App(){
   /* Open modal with filtered tickets */
   function openCatModal(c){
     var label=CL[c];var cs=CS[c];
-    var tix=flt.filter(function(t){return classify(t.Status)===c;});
-    if(c==="hd")tix=tix.filter(function(t){return t.Status!=="On-Hold"&&t.Status!=="Invoice Yet to Raise";});
+    var tix=flt.filter(function(t){return classify(t.Status)===c&&t.Status!=="On-Hold"&&t.Status!=="Invoice Yet to Raise";});
     tix.sort(function(a,b){return ds(b.Updated||b.Created)-ds(a.Updated||a.Created);});
     setModal({title:label,icon:cs.icon,color:cs.badge,tickets:tix});
   }
@@ -621,6 +832,12 @@ function App(){
     var tix=st.inv.slice().sort(function(a,b){return ds(b.Updated||b.Created)-ds(a.Updated||a.Created);});
     setModal({title:"Invoice Yet to Raise",icon:"🧾",color:"#0891B2",tickets:tix});
   }
+  function openEnggModal(){
+    var tix=flt.filter(function(t){return classify(t.Status)==="engg"&&t.Status!=="On-Hold"&&t.Status!=="Invoice Yet to Raise";});
+    tix.sort(function(a,b){return ds(b.Updated||b.Created)-ds(a.Updated||a.Created);});
+    setEnggModal({tickets:tix});setEnggTab("all");
+  }
+  function closeEnggModal(){setEnggModal(null);}
   function openAgeModal(i){
     var tix=flt.filter(function(t){return abk(ds(t.Updated||t.Created))===i;});
     tix.sort(function(a,b){return ds(b.Updated||b.Created)-ds(a.Updated||a.Created);});
@@ -779,12 +996,14 @@ function App(){
   const st=useMemo(()=>{
     const hd=[],cl=[],eng=[],hold=[],inv=[];const bk=[0,0,0,0,0];const sm={};const pm={};let ta=0;
     flt.forEach(t=>{
-      const c=classify(t.Status);
-      if(c==="hd"){
-        if(t.Status==="On-Hold")hold.push(t);
-        else if(t.Status==="Invoice Yet to Raise")inv.push(t);
-        else hd.push(t);
-      } else if(c==="engg")eng.push(t); else cl.push(t);
+      if(t.Status==="On-Hold"){hold.push(t);}
+      else if(t.Status==="Invoice Yet to Raise"){inv.push(t);}
+      else{
+        const c=classify(t.Status);
+        if(c==="hd")hd.push(t);
+        else if(c==="engg")eng.push(t);
+        else cl.push(t);
+      }
       const a=ds(t.Updated||t.Created);bk[abk(a)]++;ta+=a;
       sm[t.Status]=(sm[t.Status]||0)+1;pm[t.Project]=(pm[t.Project]||0)+1;
     });
@@ -978,7 +1197,7 @@ function App(){
             {" "}{w.length===1?`for ${w[0].split(" ")[0]}`:w.length>1?`for ${w.length} workers`:pf.length?`in ${pf.length} project${pf.length>1?"s":""}`:`across ${wks.length} workers`}
             {st.hd.length>0&&<> · <b style={{color:"var(--cyan)"}}>{st.hd.length} need action</b></>}
             {st.cl.length>0&&<> · <b style={{color:"var(--amber)"}}>{st.cl.length} awaiting client</b></>}
-            {st.eng.length>0&&<> · <b style={{color:"var(--violet)"}}>{st.eng.length} with engineering</b></>}
+            {st.eng.length>0&&<> · <b onClick={function(){openEnggModal();}} style={{color:"var(--violet)",cursor:"pointer",background:"var(--violet-bg)",border:"1px solid var(--violet-border)",padding:"2px 10px",borderRadius:8,fontSize:14,fontWeight:800,letterSpacing:"-.3px"}}>{st.eng.length} with engineering</b></>}
             {!w.length&&!pf.length&&<>. Select a worker to drill down.</>}
           </p>
         </div>
@@ -1020,10 +1239,10 @@ function App(){
             onClick={function(){openAllModal();}}/>
           <KPI icon="🎯" label="HD Action" value={st.hd.length} color="var(--cyan)" bgColor="var(--cyan-bg)" sub="Your action needed"
             onClick={function(){openCatModal("hd");}}/>
-          <KPI icon="💬" label="Client F/U" value={st.cl.length} color="var(--amber)" bgColor="var(--amber-bg)" sub="Chase if stale"
+          <KPI icon="💬" label="Client Followup" value={st.cl.length} color="var(--amber)" bgColor="var(--amber-bg)" sub="Chase if stale"
             onClick={function(){openCatModal("client");}}/>
-          <KPI icon="🔧" label="Engg F/U" value={st.eng.length} color="var(--violet)" bgColor="var(--violet-bg)" sub="Follow up with dev"
-            onClick={function(){openCatModal("engg");}}/>
+          <KPI icon="🔧" label="Engg Followup" value={st.eng.length} color="var(--violet)" bgColor="var(--violet-bg)" sub="Follow up with dev"
+            onClick={function(){openEnggModal();}}/>
           <KPI icon="⏸️" label="On-Hold" value={st.hold.length} color="#64748B" bgColor="#F1F5F9" sub="Parked — review reason"
             onClick={function(){openHoldModal();}}/>
           <KPI icon="🧾" label="Invoice Pending" value={st.inv.length} color="#0891B2" bgColor="#ECFEFF" sub="Yet to raise"
@@ -1260,6 +1479,8 @@ function App(){
 
       {/* ─── Ticket Modal ─── */}
       <TicketModal data={modal} onClose={closeModal}/>
+      {/* ─── Engineering Followup Modal ─── */}
+      <EnggModal data={enggModal} activeTab={enggTab} onTabChange={setEnggTab} onClose={closeEnggModal}/>
     </div>
   );
 }
