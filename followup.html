@@ -365,12 +365,19 @@ function TicketModal({data,onClose}){
 }
 
 
-/* ─── Engineering Followup Modal (3 tabs) ─── */
-function EnggModal({data,activeTab,onTabChange,onClose}){
+/* ─── Category Detail Modal (3 tabs: All Tickets, Ageing, SVM In Charge) ─── */
+function CategoryDetailModal({data,activeTab,onTabChange,onClose}){
   if(!data)return null;
   var tix=data.tickets||[];
-  const [ageFilter, setAgeFilter] = useState(null); // null = show all, 0-4 = bucket index
-  const [svmFilter, setSvmFilter] = useState(null); // null = show all, or SVM name string
+  var catTitle=data.title||"Tickets";
+  var catSubtitle=data.subtitle||tix.length+" tickets";
+  var catIcon=data.icon||"📋";
+  var catColor=data.color||"var(--violet)";
+  var catBg=data.bg||"var(--violet-bg)";
+  var catBorder=data.border||"var(--violet-border)";
+  var badgeColor=data.badgeColor||"#7C3AED";
+  const [ageFilter, setAgeFilter] = useState(null);
+  const [svmFilter, setSvmFilter] = useState(null);
 
   /* ── Ageing buckets based on Created date ── */
   var ageLabels=["< 7 days","7–30 days","31–60 days","61–90 days","90+ days"];
@@ -422,7 +429,7 @@ function EnggModal({data,activeTab,onTabChange,onClose}){
                   {sla.anyBreach&&<span style={{marginLeft:5,background:"#FEE2E2",color:"#BE123C",padding:"1px 5px",borderRadius:4,fontSize:8,fontWeight:700}}>⚡SLA</span>}
                 </td>
                 <td style={{padding:"6px 10px",color:"var(--t2)",maxWidth:280,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}} title={t.Summary}>{t.Summary}</td>
-                <td style={{padding:"6px 10px"}}><span style={{background:"#7C3AED",color:"#fff",padding:"3px 10px",borderRadius:20,fontSize:10,fontWeight:600,whiteSpace:"nowrap"}}>{t.Status}</span></td>
+                <td style={{padding:"6px 10px"}}><span style={{background:badgeColor,color:"#fff",padding:"3px 10px",borderRadius:20,fontSize:10,fontWeight:600,whiteSpace:"nowrap"}}>{t.Status}</span></td>
                 <td style={{padding:"6px 10px",color:"var(--t3)",fontSize:11,whiteSpace:"nowrap",maxWidth:120,overflow:"hidden",textOverflow:"ellipsis"}}>{(t.Project||"").split(" ").slice(0,2).join(" ")}</td>
                 <td style={{padding:"6px 10px",fontSize:11,fontWeight:600,color:t.Priority==="Critical"||t.Priority==="Show Stopper"?"var(--rose)":t.Priority==="High"?"var(--amber)":"var(--t3)"}}>{t.Priority}</td>
                 <td style={{padding:"6px 10px",fontSize:10,maxWidth:130,overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>
@@ -448,12 +455,12 @@ function EnggModal({data,activeTab,onTabChange,onClose}){
       <div style={{background:"#fff",borderRadius:20,boxShadow:"0 20px 60px rgba(0,0,0,.2)",width:"100%",maxWidth:1200,maxHeight:"88vh",display:"flex",flexDirection:"column",overflow:"hidden",animation:"modalIn .3s cubic-bezier(.22,1,.36,1)"}}>
         {/* Modal header */}
         <div style={{padding:"20px 24px",borderBottom:"1px solid var(--border)",display:"flex",alignItems:"center",gap:14,flexShrink:0}}>
-          <div style={{width:44,height:44,borderRadius:12,background:"var(--violet-bg)",border:"1px solid var(--violet-border)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>🔧</div>
+          <div style={{width:44,height:44,borderRadius:12,background:catBg,border:"1px solid "+catBorder,display:"flex",alignItems:"center",justifyContent:"center",fontSize:22}}>{catIcon}</div>
           <div style={{flex:1}}>
-            <div style={{fontSize:18,fontWeight:800,color:"var(--t1)"}}>Engineering Followup</div>
-            <div style={{fontSize:12,color:"var(--t2)",marginTop:2}}>{tix.length} ticket{tix.length!==1?"s":""} with engineering / dev team</div>
+            <div style={{fontSize:18,fontWeight:800,color:"var(--t1)"}}>{catTitle}</div>
+            <div style={{fontSize:12,color:"var(--t2)",marginTop:2}}>{catSubtitle}</div>
           </div>
-          <button onClick={function(){exportFullCSV(tix,"engineering-followup-full");}} style={{padding:"8px 14px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg)",fontSize:12,fontWeight:700,color:"var(--t2)",display:"flex",alignItems:"center",gap:5,whiteSpace:"nowrap"}} title="Export all columns to CSV">⬇ Export Full Data</button>
+          <button onClick={function(){exportFullCSV(tix,(catTitle||"tickets").replace(/[^\w]+/g,"-").toLowerCase()+"-full");}} style={{padding:"8px 14px",borderRadius:8,border:"1px solid var(--border)",background:"var(--bg)",fontSize:12,fontWeight:700,color:"var(--t2)",display:"flex",alignItems:"center",gap:5,whiteSpace:"nowrap"}} title="Export all columns to CSV">⬇ Export Full Data</button>
           <button onClick={onClose} style={{width:36,height:36,borderRadius:8,border:"1px solid var(--border)",background:"var(--bg)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:16,color:"var(--t2)"}}>✕</button>
         </div>
 
@@ -463,8 +470,8 @@ function EnggModal({data,activeTab,onTabChange,onClose}){
             var id=tb[0],label=tb[1],cnt=tb[2];var active=activeTab===id;
             return(<button key={id} onClick={function(){onTabChange(id);setAgeFilter(null);setSvmFilter(null);}} style={{
               padding:"10px 18px",borderRadius:"10px 10px 0 0",fontSize:12,fontWeight:700,border:"1px solid "+(active?"var(--border)":"transparent"),borderBottom:active?"1px solid #fff":"1px solid var(--border)",
-              background:active?"#fff":"transparent",color:active?"var(--violet)":"var(--t3)",marginBottom:-1,display:"flex",alignItems:"center",gap:6,transition:"all .15s"
-            }}>{label}{cnt!==null&&<span style={{background:active?"var(--violet-bg)":"var(--bg)",color:active?"var(--violet)":"var(--t3)",padding:"1px 7px",borderRadius:10,fontSize:10,fontWeight:800,border:"1px solid "+(active?"var(--violet-border)":"var(--border)")}}>{cnt}</span>}</button>);
+              background:active?"#fff":"transparent",color:active?catColor:"var(--t3)",marginBottom:-1,display:"flex",alignItems:"center",gap:6,transition:"all .15s"
+            }}>{label}{cnt!==null&&<span style={{background:active?catColor+"18":"var(--bg)",color:active?catColor:"var(--t3)",padding:"1px 7px",borderRadius:10,fontSize:10,fontWeight:800,border:"1px solid "+(active?catColor+"44":"var(--border)")}}>{cnt}</span>}</button>);
           })}
         </div>
 
@@ -629,7 +636,7 @@ function EnggModal({data,activeTab,onTabChange,onClose}){
 
         {/* Footer */}
         <div style={{padding:"10px 24px",borderTop:"1px solid var(--border)",display:"flex",alignItems:"center",gap:10,flexShrink:0}}>
-          <span style={{fontSize:11,color:"var(--t3)"}}>Engineering Followup · {tix.length} tickets</span>
+          <span style={{fontSize:11,color:"var(--t3)"}}>{catTitle} · {tix.length} tickets</span>
         </div>
       </div>
     </div>
@@ -844,8 +851,8 @@ function App(){
   const[dtTo,setDtTo]=useState("");
   const[dtLabel,setDtLabel]=useState("All Time");
   const[modal,setModal]=useState(null); // {title, icon, color, tickets}
-  const[enggModal,setEnggModal]=useState(null); // {tickets}
-  const[enggTab,setEnggTab]=useState("all"); // "all" | "ageing" | "svm"
+  const[catModal,setCatModal]=useState(null); // {tickets, title, subtitle, icon, color, bg, border, badgeColor}
+  const[catTab,setCatTab]=useState("all"); // "all" | "ageing" | "svm"
   const fRef=useRef();
   const blobRef=useRef(null); // original uploaded file, kept for "revert"
 
@@ -861,10 +868,10 @@ function App(){
 
   /* Keyboard: Esc closes modal */
   useEffect(function(){
-    function handleKey(e){if(e.key==="Escape"){if(enggModal)setEnggModal(null);else if(modal)setModal(null);}}
+    function handleKey(e){if(e.key==="Escape"){if(catModal)setCatModal(null);else if(modal)setModal(null);}}
     document.addEventListener("keydown",handleKey);
     return function(){document.removeEventListener("keydown",handleKey);};
-  },[modal,enggModal]);
+  },[modal,catModal]);
 
   /* Load the shared data. Prefer in-app edits (from the Edit Data tab); fall
      back to parsing the uploaded Excel and seeding the edit store from it. */
@@ -918,9 +925,14 @@ function App(){
   function openEnggModal(){
     var tix=flt.filter(function(t){return classify(t.Status)==="engg"&&t.Status!=="On-Hold"&&t.Status!=="Invoice Yet to Raise";});
     tix.sort(function(a,b){return ds(b.Updated||b.Created)-ds(a.Updated||a.Created);});
-    setEnggModal({tickets:tix});setEnggTab("all");
+    setCatModal({tickets:tix,title:"Engineering Followup",subtitle:tix.length+" ticket"+(tix.length!==1?"s":"")+" with engineering / dev team",icon:"🔧",color:"var(--violet)",bg:"var(--violet-bg)",border:"var(--violet-border)",badgeColor:"#7C3AED"});setCatTab("all");
   }
-  function closeEnggModal(){setEnggModal(null);}
+  function openClientModal(){
+    var tix=flt.filter(function(t){return classify(t.Status)==="client"&&t.Status!=="On-Hold"&&t.Status!=="Invoice Yet to Raise";});
+    tix.sort(function(a,b){return ds(b.Updated||b.Created)-ds(a.Updated||a.Created);});
+    setCatModal({tickets:tix,title:"Client Followup",subtitle:tix.length+" ticket"+(tix.length!==1?"s":"")+" awaiting client response",icon:"💬",color:"var(--amber)",bg:"var(--amber-bg)",border:"var(--amber-border)",badgeColor:"#D97706"});setCatTab("all");
+  }
+  function closeCatModal(){setCatModal(null);}
   function openAgeModal(i){
     var tix=flt.filter(function(t){return abk(ds(t.Updated||t.Created))===i;});
     tix.sort(function(a,b){return ds(b.Updated||b.Created)-ds(a.Updated||a.Created);});
@@ -1279,7 +1291,7 @@ function App(){
             <b onClick={function(){openAllModal();}} style={{color:"var(--t1)",cursor:"pointer",borderBottom:"1px dashed var(--t3)"}}>{st.n.toLocaleString()} open ticket{st.n!==1?"s":""}</b>
             {" "}{w.length===1?`for ${w[0].split(" ")[0]}`:w.length>1?`for ${w.length} workers`:pf.length?`in ${pf.length} project${pf.length>1?"s":""}`:`across ${wks.length} workers`}
             {st.hd.length>0&&<> · <b style={{color:"var(--cyan)"}}>{st.hd.length} need action</b></>}
-            {st.cl.length>0&&<> · <b style={{color:"var(--amber)"}}>{st.cl.length} awaiting client</b></>}
+            {st.cl.length>0&&<> · <b onClick={function(){openClientModal();}} style={{color:"var(--amber)",cursor:"pointer",background:"var(--amber-bg)",border:"1px solid var(--amber-border)",padding:"2px 10px",borderRadius:8,fontSize:14,fontWeight:800,letterSpacing:"-.3px"}}>{st.cl.length} awaiting client</b></>}
             {st.eng.length>0&&<> · <b onClick={function(){openEnggModal();}} style={{color:"var(--violet)",cursor:"pointer",background:"var(--violet-bg)",border:"1px solid var(--violet-border)",padding:"2px 10px",borderRadius:8,fontSize:14,fontWeight:800,letterSpacing:"-.3px"}}>{st.eng.length} with engineering</b></>}
             {!w.length&&!pf.length&&<>. Select a worker to drill down.</>}
           </p>
@@ -1323,7 +1335,7 @@ function App(){
           <KPI icon="🎯" label="HD Action" value={st.hd.length} color="var(--cyan)" bgColor="var(--cyan-bg)" sub="Your action needed"
             onClick={function(){openCatModal("hd");}}/>
           <KPI icon="💬" label="Client Followup" value={st.cl.length} color="var(--amber)" bgColor="var(--amber-bg)" sub="Chase if stale"
-            onClick={function(){openCatModal("client");}}/>
+            onClick={function(){openClientModal();}}/>
           <KPI icon="🔧" label="Engg Followup" value={st.eng.length} color="var(--violet)" bgColor="var(--violet-bg)" sub="Follow up with dev"
             onClick={function(){openEnggModal();}}/>
           <KPI icon="⏸️" label="On-Hold" value={st.hold.length} color="#64748B" bgColor="#F1F5F9" sub="Parked — review reason"
@@ -1562,8 +1574,8 @@ function App(){
 
       {/* ─── Ticket Modal ─── */}
       <TicketModal data={modal} onClose={closeModal}/>
-      {/* ─── Engineering Followup Modal ─── */}
-      <EnggModal data={enggModal} activeTab={enggTab} onTabChange={setEnggTab} onClose={closeEnggModal}/>
+      {/* ─── Category Detail Modal (Engg / Client Followup) ─── */}
+      <CategoryDetailModal data={catModal} activeTab={catTab} onTabChange={setCatTab} onClose={closeCatModal}/>
     </div>
   );
 }
