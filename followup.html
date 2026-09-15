@@ -348,6 +348,8 @@ function TicketModal({data,onClose}){
 function EnggModal({data,activeTab,onTabChange,onClose}){
   if(!data)return null;
   var tix=data.tickets||[];
+  const [ageFilter, setAgeFilter] = useState(null); // null = show all, 0-4 = bucket index
+  const [svmFilter, setSvmFilter] = useState(null); // null = show all, or SVM name string
 
   /* ── Ageing buckets based on Created date ── */
   var ageLabels=["< 7 days","7–30 days","31–60 days","61–90 days","90+ days"];
@@ -358,6 +360,8 @@ function EnggModal({data,activeTab,onTabChange,onClose}){
     var idx=age<=7?0:age<=30?1:age<=60?2:age<=90?3:4;
     ageBuckets[idx].push(t);
   });
+  /* Filtered list for ageing tab */
+  var ageDisplayList = ageFilter!==null ? ageBuckets[ageFilter] : null;
 
   /* ── SVM In Charge grouping ── */
   var svmMap={};
@@ -436,7 +440,7 @@ function EnggModal({data,activeTab,onTabChange,onClose}){
         <div style={{display:"flex",gap:4,padding:"12px 24px 0",borderBottom:"1px solid var(--border)",background:"var(--bg)"}}>
           {[["all","📋 All Tickets",tix.length],["ageing","⏰ Ageing (Created)",null],["svm","👤 SVM In Charge",svmEntries.length]].map(function(tb){
             var id=tb[0],label=tb[1],cnt=tb[2];var active=activeTab===id;
-            return(<button key={id} onClick={function(){onTabChange(id);}} style={{
+            return(<button key={id} onClick={function(){onTabChange(id);setAgeFilter(null);setSvmFilter(null);}} style={{
               padding:"10px 18px",borderRadius:"10px 10px 0 0",fontSize:12,fontWeight:700,border:"1px solid "+(active?"var(--border)":"transparent"),borderBottom:active?"1px solid #fff":"1px solid var(--border)",
               background:active?"#fff":"transparent",color:active?"var(--violet)":"var(--t3)",marginBottom:-1,display:"flex",alignItems:"center",gap:6,transition:"all .15s"
             }}>{label}{cnt!==null&&<span style={{background:active?"var(--violet-bg)":"var(--bg)",color:active?"var(--violet)":"var(--t3)",padding:"1px 7px",borderRadius:10,fontSize:10,fontWeight:800,border:"1px solid "+(active?"var(--violet-border)":"var(--border)")}}>{cnt}</span>}</button>);
@@ -452,26 +456,55 @@ function EnggModal({data,activeTab,onTabChange,onClose}){
           {/* AGEING TAB */}
           {activeTab==="ageing"&&(
             <div style={{padding:"16px 24px"}}>
-              {/* Ageing summary bar */}
-              <div style={{display:"flex",borderRadius:10,overflow:"hidden",height:36,background:"var(--bg)",marginBottom:18,border:"1px solid var(--border)"}}>
+              {/* Ageing summary bar — each segment is clickable */}
+              <div style={{display:"flex",borderRadius:10,overflow:"hidden",height:40,background:"var(--bg)",marginBottom:14,border:"1px solid var(--border)"}}>
                 {ageBuckets.map(function(bucket,i){
                   var pct=tix.length?bucket.length/tix.length*100:0;
                   if(bucket.length===0)return null;
-                  return(<div key={i} title={ageLabels[i]+": "+bucket.length+" tickets"} style={{
+                  var isActive=ageFilter===i;
+                  return(<div key={i} onClick={function(){setAgeFilter(ageFilter===i?null:i);}} title={ageLabels[i]+": "+bucket.length+" tickets — click to filter"} style={{
                     width:pct+"%",background:ageColors[i],display:"flex",alignItems:"center",justifyContent:"center",
-                    fontSize:11,fontWeight:700,color:"#fff",minWidth:bucket.length>0?30:0,transition:"width .4s"
+                    fontSize:12,fontWeight:800,color:"#fff",minWidth:bucket.length>0?34:0,transition:"all .3s",
+                    cursor:"pointer",opacity:ageFilter!==null&&!isActive?0.4:1,
+                    outline:isActive?"3px solid var(--t1)":"none",outlineOffset:-2,position:"relative",zIndex:isActive?1:0
                   }}>{bucket.length}</div>);
                 })}
               </div>
-              <div style={{display:"flex",gap:12,flexWrap:"wrap",marginBottom:16}}>
+              {/* Legend — also clickable */}
+              <div style={{display:"flex",gap:12,flexWrap:"wrap",marginBottom:14}}>
                 {ageLabels.map(function(lbl,i){
-                  return(<div key={i} style={{display:"flex",alignItems:"center",gap:6,fontSize:11,fontWeight:600,color:"var(--t2)"}}>
+                  var isActive=ageFilter===i;
+                  return(<div key={i} onClick={function(){setAgeFilter(ageFilter===i?null:i);}} style={{
+                    display:"flex",alignItems:"center",gap:6,fontSize:11,fontWeight:600,
+                    color:isActive?ageColors[i]:"var(--t2)",cursor:"pointer",
+                    background:isActive?ageColors[i]+"18":"transparent",
+                    border:isActive?"1px solid "+ageColors[i]+"44":"1px solid transparent",
+                    padding:"4px 10px",borderRadius:8,transition:"all .15s"
+                  }}>
                     <div style={{width:10,height:10,borderRadius:3,background:ageColors[i]}}/>{lbl}: <span style={{fontFamily:"var(--mono)",fontWeight:800,color:ageColors[i]}}>{ageBuckets[i].length}</span>
                   </div>);
                 })}
               </div>
-              {/* Each bucket section */}
-              {ageBuckets.map(function(bucket,i){
+
+              {/* Active filter chip */}
+              {ageFilter!==null&&(
+                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12,padding:"9px 16px",background:ageColors[ageFilter]+"14",borderRadius:10,border:"1px solid "+ageColors[ageFilter]+"44"}}>
+                  <div style={{width:12,height:12,borderRadius:3,background:ageColors[ageFilter]}}/>
+                  <span style={{fontSize:13,fontWeight:800,color:ageColors[ageFilter]}}>{ageLabels[ageFilter]}</span>
+                  <span style={{fontSize:12,color:"var(--t2)",fontWeight:600}}>— {ageBuckets[ageFilter].length} ticket{ageBuckets[ageFilter].length!==1?"s":""}</span>
+                  <div style={{flex:1}}/>
+                  <button onClick={function(){setAgeFilter(null);}} style={{background:ageColors[ageFilter],color:"#fff",border:"none",padding:"5px 14px",borderRadius:7,fontSize:11,fontWeight:700,cursor:"pointer"}}>✕ Show all</button>
+                </div>
+              )}
+
+              {/* Filtered: single bucket table */}
+              {ageFilter!==null&&(function(){
+                var sorted=[].concat(ageBuckets[ageFilter]).sort(function(a,b){return ds(b.Created)-ds(a.Created);});
+                return renderTable(sorted);
+              })()}
+
+              {/* Unfiltered: show all buckets */}
+              {ageFilter===null&&ageBuckets.map(function(bucket,i){
                 if(bucket.length===0)return null;
                 var sorted=[].concat(bucket).sort(function(a,b){return ds(b.Created)-ds(a.Created);});
                 return(<div key={i} style={{marginBottom:18}}>
@@ -487,21 +520,32 @@ function EnggModal({data,activeTab,onTabChange,onClose}){
           )}
 
           {/* SVM IN CHARGE TAB */}
-          {activeTab==="svm"&&(
+          {activeTab==="svm"&&(function(){
+            var activeSvmIdx=svmFilter!==null?svmEntries.findIndex(function(e){return e[0]===svmFilter;}): -1;
+            var activeSvmColor=activeSvmIdx>=0?svmPalette[activeSvmIdx%svmPalette.length]:"#7C3AED";
+            var activeSvmTickets=activeSvmIdx>=0?svmEntries[activeSvmIdx][1]:[];
+            return(
             <div style={{padding:"16px 24px"}}>
-              {/* SVM blocks grid */}
-              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:12,marginBottom:20}}>
+              {/* SVM blocks grid — each block is clickable */}
+              <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(220px,1fr))",gap:12,marginBottom:16}}>
                 {svmEntries.map(function(entry,i){
                   var name=entry[0],tickets=entry[1];
                   var intensity=Math.max(0.35,tickets.length/svmMax);
                   var color=svmPalette[i%svmPalette.length];
+                  var isActive=svmFilter===name;
+                  var isDimmed=svmFilter!==null&&!isActive;
                   var lightBg=color+"14";var borderC=color+"44";
                   /* Ageing breakdown within each SVM */
                   var svmAge=[0,0,0,0,0];
                   tickets.forEach(function(t){svmAge[abk(ds(t.Created))]++;});
-                  return(<div key={name} style={{
-                    background:lightBg,border:"2px solid "+borderC,borderRadius:14,padding:"14px 16px",
-                    cursor:"default",transition:"all .2s",position:"relative",overflow:"hidden"
+                  return(<div key={name} onClick={function(){setSvmFilter(svmFilter===name?null:name);}} style={{
+                    background:isActive?color+"22":lightBg,
+                    border:(isActive?"3px solid "+color:"2px solid "+borderC),
+                    borderRadius:14,padding:"14px 16px",
+                    cursor:"pointer",transition:"all .2s",position:"relative",overflow:"hidden",
+                    opacity:isDimmed?0.45:1,
+                    transform:isActive?"scale(1.02)":"scale(1)",
+                    boxShadow:isActive?"0 4px 16px "+color+"33":"none"
                   }}>
                     <div style={{position:"absolute",top:0,left:0,bottom:0,width:(intensity*100)+"%",background:color+"10",borderRadius:14,transition:"width .4s"}}/>
                     <div style={{position:"relative",zIndex:1}}>
@@ -526,8 +570,26 @@ function EnggModal({data,activeTab,onTabChange,onClose}){
                   </div>);
                 })}
               </div>
-              {/* Full list below the blocks */}
-              {svmEntries.map(function(entry,i){
+
+              {/* Active filter chip */}
+              {svmFilter!==null&&activeSvmIdx>=0&&(
+                <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:12,padding:"9px 16px",background:activeSvmColor+"14",borderRadius:10,border:"1px solid "+activeSvmColor+"44"}}>
+                  <div style={{width:12,height:12,borderRadius:3,background:activeSvmColor}}/>
+                  <span style={{fontSize:13,fontWeight:800,color:activeSvmColor}}>{svmFilter}</span>
+                  <span style={{fontSize:12,color:"var(--t2)",fontWeight:600}}>— {activeSvmTickets.length} ticket{activeSvmTickets.length!==1?"s":""}</span>
+                  <div style={{flex:1}}/>
+                  <button onClick={function(){setSvmFilter(null);}} style={{background:activeSvmColor,color:"#fff",border:"none",padding:"5px 14px",borderRadius:7,fontSize:11,fontWeight:700,cursor:"pointer"}}>✕ Show all</button>
+                </div>
+              )}
+
+              {/* Filtered: single SVM table */}
+              {svmFilter!==null&&activeSvmIdx>=0&&(function(){
+                var sorted=[].concat(activeSvmTickets).sort(function(a,b){return ds(b.Created)-ds(a.Created);});
+                return renderTable(sorted);
+              })()}
+
+              {/* Unfiltered: show all SVM sections */}
+              {svmFilter===null&&svmEntries.map(function(entry,i){
                 var name=entry[0],tickets=entry[1];
                 var color=svmPalette[i%svmPalette.length];
                 var sorted=[].concat(tickets).sort(function(a,b){return ds(b.Created)-ds(a.Created);});
@@ -540,8 +602,8 @@ function EnggModal({data,activeTab,onTabChange,onClose}){
                   {renderTable(sorted)}
                 </div>);
               })}
-            </div>
-          )}
+            </div>);
+          })()}
         </div>
 
         {/* Footer */}
