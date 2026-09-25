@@ -16,6 +16,7 @@
   --blue:#2563EB; --blue-soft:#EFF4FF; --blue-line:#CFE0FF; --blue-glow:rgba(37,99,235,.35);
   --teal:#0F766E; --teal-soft:#E9F9F4; --teal-line:#BCEBE2; --teal-glow:rgba(15,118,110,.32);
   --amber:#B45309;
+  --violet:#7C3AED; --violet-soft:#EDE9FE; --violet-line:#C4B5FD; --violet-glow:rgba(124,58,237,.3);
   --disp:'Space Grotesk',sans-serif;
   --sans:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
   --mono:'JetBrains Mono',monospace;
@@ -102,6 +103,7 @@ h1 .two{background:linear-gradient(100deg,var(--blue) 0%,#3A86C9 45%,var(--teal)
 .flow.fu{stroke:var(--blue);filter:drop-shadow(0 0 4px var(--blue-glow))}
 .flow.tr{stroke:var(--teal);filter:drop-shadow(0 0 4px var(--teal-glow))}
 .flow.wr{stroke:var(--amber);filter:drop-shadow(0 0 4px rgba(180,83,9,.35))}
+.flow.rl{stroke:var(--violet);filter:drop-shadow(0 0 4px var(--violet-glow))}
 @keyframes march{to{stroke-dashoffset:-42}}
 
 .source{position:relative;z-index:2;background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--sh);overflow:hidden}
@@ -131,7 +133,7 @@ h1 .two{background:linear-gradient(100deg,var(--blue) 0%,#3A86C9 45%,var(--teal)
 
 .fork{height:52px}
 
-.cards{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;position:relative;z-index:2}
+.cards{display:grid;grid-template-columns:1fr 1fr;gap:14px;position:relative;z-index:2}
 .card{position:relative;display:block;border-radius:18px;padding:20px 20px 18px;overflow:hidden;background:var(--card);border:1px solid var(--line);box-shadow:var(--sh);transition:transform .2s,box-shadow .25s,border-color .2s,opacity .35s,filter .35s}
 .card::after{content:"";position:absolute;left:0;right:0;top:0;height:3px;background:var(--line);transition:background .35s,box-shadow .35s}
 .card .top{display:flex;align-items:center;justify-content:space-between;margin-bottom:11px}
@@ -160,6 +162,10 @@ h1 .two{background:linear-gradient(100deg,var(--blue) 0%,#3A86C9 45%,var(--teal)
 .cards:not(.locked) .card.wr::after{background:var(--amber);box-shadow:0 0 14px rgba(180,83,9,.3)}
 .cards:not(.locked) .card.wr .badge{background:#FEF3E2;border-color:#F5D9A8}
 .cards:not(.locked) .card.wr .go{color:var(--amber)}
+.cards:not(.locked) .card.rl{border-color:var(--violet-line)}
+.cards:not(.locked) .card.rl::after{background:var(--violet);box-shadow:0 0 14px var(--violet-glow)}
+.cards:not(.locked) .card.rl .badge{background:var(--violet-soft);border-color:var(--violet-line)}
+.cards:not(.locked) .card.rl .go{color:var(--violet)}
 .cards:not(.locked) .card:hover{transform:translateY(-4px);box-shadow:var(--sh2)}
 .cards:not(.locked) .card:hover .go .ar{transform:translateX(4px)}
 
@@ -188,7 +194,7 @@ h1 .two{background:linear-gradient(100deg,var(--blue) 0%,#3A86C9 45%,var(--teal)
 @media (max-height:660px) and (min-width:901px){
   body{overflow:auto}.shell{height:auto;min-height:100vh}
 }
-@media (max-width:560px){ .cards{grid-template-columns:1fr} .filerow{flex-wrap:wrap} }
+@media (max-width:680px){ .cards{grid-template-columns:1fr} .filerow{flex-wrap:wrap} }
 @media (prefers-reduced-motion:reduce){
   .rise{animation:none}
   .wave-g,.wave2-g,.bars i,.ping::before,.ping::after{animation:none}
@@ -301,8 +307,8 @@ h1 .two{background:linear-gradient(100deg,var(--blue) 0%,#3A86C9 45%,var(--teal)
     <!-- left hero -->
     <div class="rise d1">
       <div class="eyebrow">SVM Help Desk · analytics</div>
-      <h1>One export.<br><span class="two">Three lenses.</span></h1>
-      <p class="lead">Drop a single Jira export and it powers every dashboard at once — the <b class="b">Follow-up Tracker</b> for daily triage, the <b class="t">HD Trend Tracker</b> for the bigger picture, and the <b style="color:var(--amber);font-weight:600">Weekly Report</b> for client-ready summaries. Right-click a card to open it in its own tab.</p>
+      <h1>One export.<br><span class="two">Four lenses.</span></h1>
+      <p class="lead">Drop a single Jira export and it powers every dashboard at once — the <b class="b">Follow-up Tracker</b> for daily triage, the <b class="t">HD Trend Tracker</b> for the bigger picture, the <b style="color:var(--amber);font-weight:600">Weekly Report</b> for client-ready summaries, and the <b style="color:var(--violet);font-weight:600">Release Tracker</b> for data fixes, bug fixes &amp; workarounds.</p>
     </div>
 
     <!-- right stage -->
@@ -314,6 +320,8 @@ h1 .two{background:linear-gradient(100deg,var(--blue) 0%,#3A86C9 45%,var(--teal)
         <path class="flow fu" id="flowFU"></path>
         <path class="flow tr" id="flowTR"></path>
         <path class="flow wr" id="flowWR"></path>
+        <path class="track" id="trackRL"></path>
+        <path class="flow rl" id="flowRL"></path>
       </svg>
 
       <div class="source" id="sourceNode">
@@ -343,7 +351,7 @@ h1 .two{background:linear-gradient(100deg,var(--blue) 0%,#3A86C9 45%,var(--teal)
               <div class="fname" id="fname">—</div>
               <div class="fmeta">
                 <span class="num" id="fcount">0</span> tickets loaded
-                <span class="sep">·</span> feeding all three
+                <span class="sep">·</span> feeding all four
                 <span class="sep" id="fsep" style="display:none">·</span>
                 <span id="fdaterange" style="display:none">created <span class="rng" id="fcmin">—</span> → <span class="rng" id="fcmax">—</span> <span class="sep">·</span> resolved <span class="rng" id="frmin">—</span> → <span class="rng" id="frmax">—</span></span>
               </div>
@@ -375,6 +383,13 @@ h1 .two{background:linear-gradient(100deg,var(--blue) 0%,#3A86C9 45%,var(--teal)
           <h2>Weekly Report</h2>
           <p>Client-ready weekly report: per-client KPIs, inflow, resolved, SVM vs client, activity stages — print or save as PDF.</p>
           <div class="feat"><span>Per client</span><span>SVM vs Client</span><span>Stages</span><span>Print / PDF</span><span>Weekly</span></div>
+          <div class="lock">◌ Waiting for source file</div>
+        </a>
+        <a class="card rl" id="cardRL" href="releases.html">
+          <div class="top"><div class="badge">📦</div><span class="go">Open <span class="ar">→</span></span></div>
+          <h2>Release Tracker</h2>
+          <p>Every release in one view: data fixes, bug fixes, and workarounds — with trend charts, project and SVM breakdowns, and full search.</p>
+          <div class="feat"><span>Data Fix</span><span>Bug Fix</span><span>Workaround</span><span>Trend</span><span>Search</span></div>
           <div class="lock">◌ Waiting for source file</div>
         </a>
       </div>
@@ -470,7 +485,7 @@ function buildBackdrop(){
 
 /* ── connective wires ── */
 function drawWires(){
-  var stage=el("stage"),src=el("sourceNode"),fu=el("cardFU"),tr=el("cardTR"),wr=el("cardWR"),svg=el("wires");
+  var stage=el("stage"),src=el("sourceNode"),fu=el("cardFU"),tr=el("cardTR"),wr=el("cardWR"),rl=el("cardRL"),svg=el("wires");
   if(!stage||!src||!fu||!tr) return;
   var sr=stage.getBoundingClientRect();
   svg.setAttribute("viewBox","0 0 "+sr.width+" "+sr.height);
@@ -482,6 +497,7 @@ function drawWires(){
   el("trackFU").setAttribute("d",pFU); el("flowFU").setAttribute("d",pFU);
   el("trackTR").setAttribute("d",pTR); el("flowTR").setAttribute("d",pTR);
   if(wr){ var pWR=pathTo(wr.getBoundingClientRect()); el("trackWR").setAttribute("d",pWR); el("flowWR").setAttribute("d",pWR); }
+  if(rl){ var pRL=pathTo(rl.getBoundingClientRect()); el("trackRL").setAttribute("d",pRL); el("flowRL").setAttribute("d",pRL); }
 }
 function relayout(){ buildBackdrop(); drawWires(); }
 window.addEventListener("resize", relayout);
