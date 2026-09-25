@@ -138,10 +138,11 @@ main{max-width:1800px;margin:0 auto;padding:14px 24px 34px}
 .barrow:hover .blbl{color:var(--ink)}
 .blbl{font-size:11px;color:var(--ink2);min-width:120px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:color .15s}
 .btrack{flex:1;height:22px;border-radius:6px;background:var(--paper);overflow:hidden;display:flex}
-.bfill{height:100%;transition:width .5s cubic-bezier(.22,1,.36,1)}
+.bfill{height:100%;transition:width .5s cubic-bezier(.22,1,.36,1);display:flex;align-items:center;justify-content:center;overflow:hidden;min-width:0}
 .bfill.df{background:linear-gradient(90deg,#0D9488,#2DD4BF)}
 .bfill.bf{background:linear-gradient(90deg,#DC2626,#F87171)}
 .bfill.wa{background:linear-gradient(90deg,#D97706,#FBBF24)}
+.bfill-n{font-family:var(--mono);font-size:10px;font-weight:700;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.3);white-space:nowrap;padding:0 4px}
 .bnum{font-size:11px;color:var(--muted);font-family:var(--mono);min-width:60px;text-align:right}
 
 /* ── TABLES ── */
@@ -198,7 +199,7 @@ tbody tr.detail-row{background:var(--paper)}
 .modal-head .s{font-size:11.5px;color:var(--muted)}
 .modal-x{margin-left:auto;width:34px;height:34px;border-radius:8px;border:1px solid var(--line);background:var(--paper);color:var(--ink2);font-size:15px;display:flex;align-items:center;justify-content:center}
 .modal-x:hover{color:var(--ink);border-color:var(--muted)}
-.modal-body{flex:1;overflow:auto;padding:0}
+.modal-body{flex:1 1 0;overflow:auto;padding:0;min-height:0}
 .modal-body table{font-size:11.5px}
 .modal-foot{padding:10px 20px;border-top:1px solid var(--line);font-size:11px;color:var(--muted);text-align:center;flex-shrink:0}
 
@@ -467,7 +468,11 @@ function renderOverview(){
     var w=p.data.total/pmax*100;
     var dfw=p.data.df/p.data.total*w, bfw=p.data.bf/p.data.total*w, waw=p.data.wa/p.data.total*w;
     h+='<div class="barrow" data-projdrill="'+esc(p.name)+'"><span class="blbl" title="'+esc(p.name)+'">'+esc(p.name)+'</span>'+
-      '<div class="btrack"><div class="bfill df growb" style="width:'+dfw+'%"></div><div class="bfill bf growb" style="width:'+bfw+'%"></div><div class="bfill wa growb" style="width:'+waw+'%"></div></div>'+
+      '<div class="btrack">'+
+        (p.data.df?'<div class="bfill df growb" style="width:'+dfw+'%"><span class="bfill-n">'+p.data.df+'</span></div>':'')+
+        (p.data.bf?'<div class="bfill bf growb" style="width:'+bfw+'%"><span class="bfill-n">'+p.data.bf+'</span></div>':'')+
+        (p.data.wa?'<div class="bfill wa growb" style="width:'+waw+'%"><span class="bfill-n">'+p.data.wa+'</span></div>':'')+
+      '</div>'+
       '<span class="bnum">'+fmtN(p.data.total)+'</span></div>';
   });
   h+='</div>';
