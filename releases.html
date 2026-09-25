@@ -175,17 +175,18 @@ tbody tr.detail-row{background:var(--paper)}
 /* ── TREND ── */
 .trend-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 @media(max-width:900px){.trend-grid{grid-template-columns:1fr}}
-.chart-area{padding:18px;min-height:280px;position:relative}
+.chart-area{padding:18px 18px 14px;position:relative}
 .chart-area svg{width:100%;overflow:visible}
-.mbar-wrap{display:flex;align-items:flex-end;gap:4px;height:200px}
-.mbar-group{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px}
+.chart-area .sec-head{margin-bottom:14px}
+.mbar-wrap{display:flex;align-items:flex-end;gap:4px;padding-top:22px;position:relative}
+.mbar-group{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0}
 .mbar-stack{width:100%;display:flex;flex-direction:column-reverse;gap:1px;align-items:stretch}
 .mbar{border-radius:4px 4px 0 0;min-height:0;transition:height .5s cubic-bezier(.22,1,.36,1)}
 .mbar.df{background:var(--df)}
 .mbar.bf{background:var(--bf)}
 .mbar.wa{background:var(--wa)}
-.mbar-label{font-size:9.5px;color:var(--faint);font-weight:600;writing-mode:horizontal-tb;margin-top:4px}
-.mbar-total{font-size:10px;font-family:var(--mono);font-weight:700;color:var(--ink2)}
+.mbar-label{font-size:9px;color:var(--faint);font-weight:600;writing-mode:horizontal-tb;margin-top:4px;white-space:nowrap}
+.mbar-total{font-size:9px;font-family:var(--mono);font-weight:700;color:var(--ink2);white-space:nowrap;line-height:1}
 .chart-leg{display:flex;gap:14px;justify-content:center;margin-top:12px}
 .chart-leg span{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--ink2);font-weight:500}
 .chart-leg i{width:10px;height:10px;border-radius:3px;display:inline-block}
@@ -614,10 +615,10 @@ function renderTrend(){
 
   // Monthly stacked bar chart
   h+='<div class="card chart-area"><div class="sec-head"><span class="sec-title">Monthly Releases</span><span class="sec-sub">Stacked by fix type</span></div>';
-  h+='<div class="mbar-wrap">';
+  h+='<div class="mbar-wrap" style="height:180px">';
   mkeys.forEach(function(k){
     var m=months[k];
-    var H=200;
+    var H=150;
     var dfH=m.df/mmax*H, bfH=m.bf/mmax*H, waH=m.wa/mmax*H;
     var label=k.split("-")[1]+"/"+k.split("-")[0].slice(2);
     h+='<div class="mbar-group" data-monthdrill="'+k+'" style="cursor:pointer"><div class="mbar-total">'+m.total+'</div><div class="mbar-stack" style="height:'+H+'px">'+
@@ -642,17 +643,18 @@ function renderTrend(){
   var allMk=Object.keys(Object.assign({},months,closedByMonth)).sort();
   var ccmax=1;allMk.forEach(function(k){var v=Math.max(months[k]?months[k].total:0,closedByMonth[k]||0);if(v>ccmax)ccmax=v;});
 
-  h+='<div class="mbar-wrap">';
+  h+='<div class="mbar-wrap" style="height:180px">';
   allMk.forEach(function(k){
     var created=months[k]?months[k].total:0;
     var closed=closedByMonth[k]||0;
-    var H=200;
+    var H=150;
     var cH=created/ccmax*H, clH=closed/ccmax*H;
     var label=k.split("-")[1]+"/"+k.split("-")[0].slice(2);
-    h+='<div class="mbar-group" style="gap:0"><div class="mbar-total" style="font-size:9px">'+created+'/'+closed+'</div>'+
+    h+='<div class="mbar-group" style="gap:0;cursor:pointer" data-monthdrill="'+k+'">'+
+      '<div class="mbar-total"><span style="color:var(--vi)">'+created+'</span><span style="color:var(--faint)"> / </span><span style="color:var(--green)">'+closed+'</span></div>'+
       '<div style="display:flex;gap:2px;align-items:flex-end;height:'+H+'px;width:100%">'+
-        '<div style="flex:1;background:var(--vi);border-radius:4px 4px 0 0;height:'+cH+'px" class="growb" title="Created: '+created+'"></div>'+
-        '<div style="flex:1;background:var(--green);border-radius:4px 4px 0 0;height:'+clH+'px" class="growb" title="Closed: '+closed+'"></div>'+
+        '<div style="flex:1;background:var(--vi);border-radius:3px 3px 0 0;height:'+cH+'px" class="growb" title="Created: '+created+'"></div>'+
+        '<div style="flex:1;background:var(--green);border-radius:3px 3px 0 0;height:'+clH+'px" class="growb" title="Closed: '+closed+'"></div>'+
       '</div><div class="mbar-label">'+label+'</div></div>';
   });
   h+='</div>';
@@ -665,11 +667,11 @@ function renderTrend(){
   var wkeys=Object.keys(weekBuckets).sort().slice(-12);
   if(wkeys.length>1){
     var wmax=1;wkeys.forEach(function(k){if(weekBuckets[k].total>wmax)wmax=weekBuckets[k].total;});
-    h+='<div class="card up d2" style="padding:20px;margin-top:14px"><div class="sec-head"><span class="sec-title">Weekly Trend</span><span class="sec-sub">Last '+wkeys.length+' weeks</span></div>';
-    h+='<div class="mbar-wrap" style="height:160px">';
+    h+='<div class="card up d2" style="padding:18px 18px 14px;margin-top:14px"><div class="sec-head" style="margin-bottom:14px"><span class="sec-title">Weekly Trend</span><span class="sec-sub">Last '+wkeys.length+' weeks</span></div>';
+    h+='<div class="mbar-wrap" style="height:140px">';
     wkeys.forEach(function(k){
       var w=weekBuckets[k];
-      var H=160;
+      var H=110;
       var dfH=w.df/wmax*H, bfH=w.bf/wmax*H, waH=w.wa/wmax*H;
       h+='<div class="mbar-group" data-weekdrill="'+k+'" style="cursor:pointer"><div class="mbar-total">'+w.total+'</div><div class="mbar-stack" style="height:'+H+'px">'+
         '<div class="mbar df growb" style="height:'+dfH+'px"></div>'+
