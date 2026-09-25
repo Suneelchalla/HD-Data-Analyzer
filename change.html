@@ -533,7 +533,7 @@ function renderOverview(){
   h+='</tbody></table></div></div>';
 
   // observations
-  h+='<div class="card up d3" style="padding:20px;margin-bottom:0"><div class="sec-head"><span class="sec-title">Observations</span></div>'+observations(F)+'</div>';
+  h+='<div class="card up d3" style="padding:20px;margin-bottom:0"><div class="sec-head"><span class="sec-title">Auto insights</span><span class="sec-sub">read from the numbers in view · updates with your filters</span></div>'+observations(F)+'</div>';
   return h;
 }
 function svmCell(name,type,val,style){
@@ -552,7 +552,9 @@ function legRow(c,label,val,total,dim,dval){
   return '<div class="leg-row" data-legdim="'+dim+'" data-legval="'+esc(dval)+'"><span class="leg-dot" style="background:'+c+'"></span><span class="leg-label">'+esc(label)+'</span><span class="leg-val">'+fmtN(val)+'</span><span class="leg-pct">'+pct(val,total)+'</span></div>';
 }
 function observations(F){
-  var n=[], open=F.filter(function(t){return t.open;});
+  var n=[], total=F.length, open=F.filter(function(t){return t.open;});
+  var closed=F.filter(function(t){return t.closed;}).length;
+  if(total)n.push({i:"📊",c:"",h:"Closure rate is <b>"+pct(closed,total)+"</b> — <b>"+closed+"</b> of <b>"+total+"</b> changes closed, <b>"+open.length+"</b> still open."});
   var stale=open.filter(function(t){return t.age!=null&&t.age>90;}).length;
   if(stale)n.push({i:"🔴",c:"warn",h:"<b>"+stale+"</b> open changes are older than <b>90 days</b> — long-runners worth a review."});
   var est=F.filter(function(t){return t.stage==="Estimation";}).length;
@@ -565,6 +567,19 @@ function observations(F){
   if(hold)n.push({i:"⏸️",c:"",h:"<b>"+hold+"</b> changes are <b>On-Hold</b>."});
   var uns=open.filter(function(t){return !t.size;}).length;
   if(uns)n.push({i:"👕",c:"",h:"<b>"+uns+"</b> open changes have no <b>T-Shirt size</b> — add sizing for planning."});
+  // client concentration
+  var pm={}; F.forEach(function(t){var k=t.project||"(blank)";pm[k]=(pm[k]||0)+1;});
+  var pk=Object.keys(pm).sort(function(a,b){return pm[b]-pm[a];});
+  if(pk.length&&total)n.push({i:"🏢",c:"",h:"<b>"+esc(pk[0])+"</b> is the largest client in view at <b>"+pm[pk[0]]+"</b> ("+pct(pm[pk[0]],total)+" of scope)."});
+  // busiest SVM
+  var sm={}; F.forEach(function(t){if(t.svm)sm[t.svm]=(sm[t.svm]||0)+1;});
+  var sk=Object.keys(sm).sort(function(a,b){return sm[b]-sm[a];});
+  if(sk.length)n.push({i:"👤",c:"",h:"<b>"+esc(sk[0])+"</b> carries the most changes (<b>"+sm[sk[0]]+"</b>)."});
+  // month-over-month inflow
+  var mc={}; F.forEach(function(t){if(t.created){var mk=monthKey(t.created);mc[mk]=(mc[mk]||0)+1;}});
+  var mks=Object.keys(mc).sort();
+  if(mks.length>=2){var cur=mc[mks[mks.length-1]],prev=mc[mks[mks.length-2]],diff=cur-prev;
+    n.push({i:diff>0?"📈":"📉",c:"",h:"Inflow in <b>"+mLabel(mks[mks.length-1])+"</b> is <b>"+cur+"</b> vs <b>"+prev+"</b> the month before ("+(diff>=0?"+":"")+diff+")."});}
   var now=new Date();
   var dv=F.filter(function(t){return t.delivered&&t.delivered.getMonth()===now.getMonth()&&t.delivered.getFullYear()===now.getFullYear();}).length;
   if(dv)n.push({i:"🚀",c:"good",h:"<b>"+dv+"</b> changes delivered this month so far."});
@@ -572,11 +587,60 @@ function observations(F){
   return '<div class="notes">'+n.map(function(x){return '<div class="note '+x.c+'"><span class="i">'+x.i+'</span><span>'+x.h+'</span></div>';}).join('')+'</div>';
 }
 
+/* ── shared insight-card helpers (rule-based, no AI tokens) ── */
+function noteHTML(arr){
+  if(!arr.length)arr=[{i:"✅",c:"good",h:"Nothing notable in the current scope."}];
+  return '<div class="notes">'+arr.map(function(x){return '<div class="note '+(x.c||"")+'"><span class="i">'+x.i+'</span><span>'+x.h+'</span></div>';}).join('')+'</div>';
+}
+function insightsCard(title,sub,arr){
+  return '<div class="card up" style="padding:20px;margin-bottom:16px"><div class="sec-head"><span class="sec-title">'+esc(title)+'</span><span class="sec-sub">'+esc(sub)+'</span></div>'+noteHTML(arr)+'</div>';
+}
+function pipelineInsights(F){
+  var n=[], total=F.length; if(!total)return n;
+  var byStage={}; STAGE_ORDER.forEach(function(k){byStage[k]=F.filter(function(t){return t.stage===k;}).length;});
+  var openStages=STAGE_ORDER.filter(function(k){return k!=="Closed";});
+  var bigOpen=openStages.slice().sort(function(a,b){return byStage[b]-byStage[a];})[0];
+  if(bigOpen&&byStage[bigOpen])n.push({i:STAGE_ICON[bigOpen],c:"",h:"The busiest active stage is <b>"+esc(bigOpen)+"</b> with <b>"+byStage[bigOpen]+"</b> changes ("+pct(byStage[bigOpen],total)+" of scope)."});
+  var gate=(byStage["Estimation"]||0)+(byStage["IAD Approval"]||0)+(byStage["Work Order"]||0);
+  if(gate)n.push({i:"⛲",c:gate>total*0.25?"warn":"",h:"<b>"+gate+"</b> changes ("+pct(gate,total)+") sit in <b>approval gates</b> (Estimation, IAD, Work Order) before development can start."});
+  var cl=F.filter(function(t){return t.open&&t.owner==="client";}).length;
+  if(cl)n.push({i:"💬",c:"warn",h:"<b>"+cl+"</b> open changes are parked with the <b>client</b> — SVM can't progress these until they respond."});
+  var opens=F.filter(function(t){return t.open&&t.age!=null;});
+  if(opens.length){var old=opens.slice().sort(function(a,b){return b.age-a.age;})[0];
+    n.push({i:"⏳",c:old.age>120?"warn":"",h:"Oldest open change is <b>"+esc(old.key)+"</b> at <b>"+old.age+" days</b> in <b>"+esc(old.stage)+"</b>."});}
+  return n;
+}
+function trendInsights(F,months,closedBy,delivBy,mkeys){
+  var n=[]; if(!mkeys.length)return n;
+  var last=mkeys[mkeys.length-1];
+  var crLast=months[last]?months[last].total:0, clLast=closedBy[last]||0, net=crLast-clLast;
+  n.push({i:net>0?"📈":"📉",c:net>0?"warn":"good",h:"In <b>"+mLabel(last)+"</b>, <b>"+crLast+"</b> changes were created and <b>"+clLast+"</b> closed — backlog "+(net>0?"grew by <b>"+net+"</b>":net<0?"shrank by <b>"+(-net)+"</b>":"held steady")+"."});
+  var peak=mkeys.slice().sort(function(a,b){return (months[b]?months[b].total:0)-(months[a]?months[a].total:0);})[0];
+  if(peak)n.push({i:"🔝",c:"",h:"Peak inflow month is <b>"+mLabel(peak)+"</b> with <b>"+(months[peak]?months[peak].total:0)+"</b> new changes."});
+  var totDeliv=0,totClosed=0; mkeys.forEach(function(k){totDeliv+=delivBy[k]||0;totClosed+=closedBy[k]||0;});
+  n.push({i:"🚀",c:"",h:"Across the window in view, <b>"+totDeliv+"</b> changes were delivered and <b>"+totClosed+"</b> reached closed."});
+  return n;
+}
+function pivotInsights(rowD,colD,rKeys,cKeys,cell,total,rowTot,colTot,maxInfo){
+  if(!total)return '';
+  var n=[];
+  if(maxInfo)n.push({i:"🔥",c:"",h:"Busiest cell: <b>"+esc(pvLabel(rowD,maxInfo.r))+"</b> × <b>"+esc(pvLabel(colD,maxInfo.c))+"</b> — <b>"+maxInfo.v+"</b> changes ("+pct(maxInfo.v,total)+" of scope)."});
+  var rk=rKeys.slice().sort(function(a,b){return rowTot[b]-rowTot[a];});
+  if(rk.length)n.push({i:"⬅️",c:"",h:"Largest "+esc(rowD.l)+": <b>"+esc(pvLabel(rowD,rk[0]))+"</b> with <b>"+rowTot[rk[0]]+"</b> ("+pct(rowTot[rk[0]],total)+")."});
+  var ck=cKeys.slice().sort(function(a,b){return colTot[b]-colTot[a];});
+  if(ck.length)n.push({i:"⬆️",c:"",h:"Most common "+esc(colD.l)+": <b>"+esc(pvLabel(colD,ck[0]))+"</b> with <b>"+colTot[ck[0]]+"</b> ("+pct(colTot[ck[0]],total)+")."});
+  if(rk.length>3){var t3=rowTot[rk[0]]+rowTot[rk[1]]+rowTot[rk[2]];n.push({i:"🎯",c:"",h:"The top 3 "+esc(rowD.l)+" values cover <b>"+pct(t3,total)+"</b> of changes ("+t3+" of "+total+")."});}
+  var cells=rKeys.length*cKeys.length, filled=0; rKeys.forEach(function(r){cKeys.forEach(function(c){if(cell[r+"\u0001"+c])filled++;});});
+  if(cells)n.push({i:"🕸️",c:"",h:"<b>"+(cells-filled)+"</b> of "+cells+" cells are empty — activity is concentrated in a few "+esc(rowD.l)+" / "+esc(colD.l)+" combinations."});
+  return '<div style="margin-top:16px"><div class="sec-head"><span class="sec-title" style="font-size:13px">Reading this pivot</span><span class="sec-sub">auto-generated · updates with rows, columns &amp; filters</span></div>'+noteHTML(n)+'</div>';
+}
+
 /* ── PIPELINE ── */
 function renderPipeline(){
   var F=FILTERED, max=1;
   STAGE_ORDER.forEach(function(k){var n=F.filter(function(t){return t.stage===k;}).length;if(n>max)max=n;});
-  var h='<div class="card up d1" style="padding:20px;margin-bottom:16px"><div class="sec-head"><span class="sec-title">Change Pipeline</span><span class="sec-sub">Bars segmented by owner · click a stage to drill</span></div>';
+  var h=insightsCard("Auto insights","what the pipeline is telling you · updates with your filters",pipelineInsights(F));
+  h+='<div class="card up d1" style="padding:20px;margin-bottom:16px"><div class="sec-head"><span class="sec-title">Change Pipeline</span><span class="sec-sub">Bars segmented by owner · click a stage to drill</span></div>';
   STAGE_ORDER.forEach(function(k){
     var tix=F.filter(function(t){return t.stage===k;}), n=tix.length;
     var svm=tix.filter(function(t){return t.owner==="svm";}).length;
@@ -624,7 +688,8 @@ function renderTrend(){
   var mkeys=Object.keys(months).sort(), mmax=1; mkeys.forEach(function(k){if(months[k].total>mmax)mmax=months[k].total;});
   if(!mkeys.length) return '<div class="card" style="padding:40px;text-align:center;color:var(--muted)">No dated changes in the current scope.</div>';
 
-  var h='<div class="trend-grid up d1">';
+  var h=insightsCard("Auto insights","how inflow, delivery and backlog are trending · updates with your filters",trendInsights(F,months,closedBy,delivBy,mkeys));
+  h+='<div class="trend-grid up d1">';
   // monthly stacked by size
   h+='<div class="card chart-area"><div class="sec-head"><span class="sec-title">Monthly Changes</span><span class="sec-sub">Created · stacked by size</span></div><div class="mbar-wrap" style="height:180px">';
   mkeys.forEach(function(k){var m=months[k],H=150;
@@ -696,8 +761,9 @@ function renderPivots(){
   var rk={},ck={},cell={};
   F.forEach(function(t){ vals(t,rowD).forEach(function(r){ rk[r]=(rk[r]||0)+1; vals(t,colD).forEach(function(c){ ck[c]=1; cell[r+"\u0001"+c]=(cell[r+"\u0001"+c]||0)+1; }); }); });
   var rKeys=pvSortKeys(Object.keys(rk),rowD), cKeys=pvSortKeys(Object.keys(ck),colD);
-  var maxCell=1; rKeys.forEach(function(r){cKeys.forEach(function(c){maxCell=Math.max(maxCell,cell[r+"\u0001"+c]||0);});});
+  var maxCell=1,maxInfo=null; rKeys.forEach(function(r){cKeys.forEach(function(c){var v=cell[r+"\u0001"+c]||0;if(v>maxCell)maxCell=v;if(v>0&&(!maxInfo||v>maxInfo.v))maxInfo={r:r,c:c,v:v};});});
   var colTot={}; cKeys.forEach(function(c){colTot[c]=rKeys.reduce(function(s,r){return s+(cell[r+"\u0001"+c]||0);},0);});
+  var rowTot={}; rKeys.forEach(function(r){rowTot[r]=cKeys.reduce(function(s,c){return s+(cell[r+"\u0001"+c]||0);},0);});
 
   h+='<div class="pv-wrap"><table class="pv"><thead><tr><th style="text-align:left">'+esc(rowD.l)+' \\ '+esc(colD.l)+'</th>'+
     cKeys.map(function(c){return '<th>'+esc(pvLabel(colD,c))+'</th>';}).join('')+'<th class="tot">Total</th></tr></thead><tbody>';
@@ -709,7 +775,9 @@ function renderPivots(){
     }).join('')+'<td class="tot">'+rt+'</td></tr>';
   });
   h+='<tr><td class="rh tot">Total</td>'+cKeys.map(function(c){return '<td class="tot">'+colTot[c]+'</td>';}).join('')+'<td class="tot">'+F.length+'</td></tr>';
-  h+='</tbody></table></div></div>';
+  h+='</tbody></table></div>';
+  h+=pivotInsights(rowD,colD,rKeys,cKeys,cell,F.length,rowTot,colTot,maxInfo);
+  h+='</div>';
   return h;
 }
 
