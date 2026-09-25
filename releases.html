@@ -696,7 +696,7 @@ function openModal(title,tickets){
   var cols=["Key","Summary","Fix Type","Status","Project","SVM In Charge","Root Cause","Type of Fix",
     "Release Number","Release Number (Data Fix)","Parent Release No","Priority","Created","Resolved",
     "Time to resolution","Current Worker","Components","Issue Type","Severity","Reporter","Assignee",
-    "Screen Name","Next Action","Linked Issues","Linked Ticket status","Analysis"];
+    "Screen Name","Next Action","Linked Issues","Linked Ticket status"];
 
   var h='<table><thead><tr>'+cols.map(function(c){return'<th class="static">'+c+'</th>';}).join('')+'</tr></thead><tbody>';
   tickets.forEach(function(t){
