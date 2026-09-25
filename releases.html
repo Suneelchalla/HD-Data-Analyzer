@@ -154,6 +154,8 @@ tbody td{padding:6px 10px;border-bottom:1px solid var(--line);vertical-align:mid
 tbody tr{transition:background .12s}
 tbody tr:hover{background:var(--vi-bg)}
 tbody tr.detail-row{background:var(--paper)}
+.dcell{cursor:pointer;transition:background .12s;border-radius:4px}
+.dcell:hover{background:var(--vi-soft)!important}
 .jkey{font-family:var(--mono);font-weight:700;font-size:11.5px;color:var(--vi)}
 .badge{padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;white-space:nowrap;display:inline-block}
 .badge.df{background:var(--df-soft);color:var(--df)}
@@ -233,6 +235,7 @@ tbody tr.detail-row{background:var(--paper)}
 /* ═══════════════════════ HD Release Tracker ═══════════════════════ */
 var FILENAME="", BLOB=null, RAW=[], FILTERED=[];
 var PAGE_SIZE=50;
+var JIRA="https://svmhelpdesk.atlassian.net/browse/";
 
 var S={
   tab:"overview", search:"", proj:"", svm:"", fixType:"", status:"", from:"", to:"",
@@ -422,7 +425,7 @@ function render(){
 }
 
 function kpiCard(id,label,val,sub,icon,style){
-  return '<div class="card kpi'+(S.kpiFilter===id?" active":"")+'" data-kpi="'+id+'" style="'+style+'">'+
+  return '<div class="card kpi" data-kpi="'+id+'" style="'+style+'">'+
     '<span class="tag">'+icon+'</span>'+
     '<div class="kv mono">'+fmtN(val)+'</div>'+
     '<div class="kl">'+esc(label)+'</div>'+
@@ -444,9 +447,9 @@ function renderOverview(){
   h+='<div style="display:flex;flex-direction:column;align-items:center">';
   h+=drawDonut([{v:df,c:"#0D9488",l:"Data Fix"},{v:bf,c:"#DC2626",l:"Bug Fix"},{v:wa,c:"#D97706",l:"Workaround"}],total);
   h+='<div class="legend">';
-  h+=legRow("#0D9488","Data Fix",df,total);
-  h+=legRow("#DC2626","Bug Fix",bf,total);
-  h+=legRow("#D97706","Workaround",wa,total);
+  h+=legRow("#0D9488","Data Fix",df,total,"df");
+  h+=legRow("#DC2626","Bug Fix",bf,total,"bf");
+  h+=legRow("#D97706","Workaround",wa,total,"wa");
   h+='</div></div></div>';
 
   // Right: project breakdown
@@ -463,7 +466,7 @@ function renderOverview(){
   ps.forEach(function(p){
     var w=p.data.total/pmax*100;
     var dfw=p.data.df/p.data.total*w, bfw=p.data.bf/p.data.total*w, waw=p.data.wa/p.data.total*w;
-    h+='<div class="barrow" data-proj="'+esc(p.name)+'"><span class="blbl" title="'+esc(p.name)+'">'+esc(p.name)+'</span>'+
+    h+='<div class="barrow" data-projdrill="'+esc(p.name)+'"><span class="blbl" title="'+esc(p.name)+'">'+esc(p.name)+'</span>'+
       '<div class="btrack"><div class="bfill df growb" style="width:'+dfw+'%"></div><div class="bfill bf growb" style="width:'+bfw+'%"></div><div class="bfill wa growb" style="width:'+waw+'%"></div></div>'+
       '<span class="bnum">'+fmtN(p.data.total)+'</span></div>';
   });
@@ -481,12 +484,13 @@ function renderOverview(){
   var ss=Object.keys(sm).map(function(k){return{name:k,d:sm[k]};}).sort(function(a,b){return b.d.total-a.d.total;});
   h+='<div class="tbl-wrap"><table><thead><tr><th>SVM In Charge</th><th>Total</th><th>Data Fix</th><th>Bug Fix</th><th>Workaround</th><th>Closed</th><th>Outstanding</th></tr></thead><tbody>';
   ss.forEach(function(s){
-    h+='<tr><td style="font-weight:600">'+esc(s.name)+'</td><td class="mono">'+fmtN(s.d.total)+'</td>'+
-      '<td class="mono" style="color:var(--df)">'+fmtN(s.d.df)+'</td>'+
-      '<td class="mono" style="color:var(--bf)">'+fmtN(s.d.bf)+'</td>'+
-      '<td class="mono" style="color:var(--wa)">'+fmtN(s.d.wa)+'</td>'+
-      '<td class="mono" style="color:var(--green)">'+fmtN(s.d.closed)+'</td>'+
-      '<td class="mono" style="color:var(--vi)">'+fmtN(s.d.total-s.d.closed)+'</td></tr>';
+    h+='<tr><td style="font-weight:600">'+esc(s.name)+'</td>'+
+      '<td class="mono dcell" data-svmdrill="'+esc(s.name)+'" data-svmtype="total" style="cursor:pointer">'+fmtN(s.d.total)+'</td>'+
+      '<td class="mono dcell" data-svmdrill="'+esc(s.name)+'" data-svmtype="df" style="color:var(--df);cursor:pointer">'+fmtN(s.d.df)+'</td>'+
+      '<td class="mono dcell" data-svmdrill="'+esc(s.name)+'" data-svmtype="bf" style="color:var(--bf);cursor:pointer">'+fmtN(s.d.bf)+'</td>'+
+      '<td class="mono dcell" data-svmdrill="'+esc(s.name)+'" data-svmtype="wa" style="color:var(--wa);cursor:pointer">'+fmtN(s.d.wa)+'</td>'+
+      '<td class="mono dcell" data-svmdrill="'+esc(s.name)+'" data-svmtype="closed" style="color:var(--green);cursor:pointer">'+fmtN(s.d.closed)+'</td>'+
+      '<td class="mono dcell" data-svmdrill="'+esc(s.name)+'" data-svmtype="open" style="color:var(--vi);cursor:pointer">'+fmtN(s.d.total-s.d.closed)+'</td></tr>';
   });
   h+='</tbody></table></div></div>';
 
@@ -514,8 +518,8 @@ function drawDonut(slices,total){
   return svg;
 }
 
-function legRow(c,label,val,total){
-  return '<div class="leg-row"><span class="leg-dot" style="background:'+c+'"></span><span class="leg-label">'+label+'</span><span class="leg-val">'+fmtN(val)+'</span><span class="leg-pct">'+pct(val,total)+'</span></div>';
+function legRow(c,label,val,total,drillId){
+  return '<div class="leg-row" data-drill="'+drillId+'" style="cursor:pointer"><span class="leg-dot" style="background:'+c+'"></span><span class="leg-label">'+label+'</span><span class="leg-val">'+fmtN(val)+'</span><span class="leg-pct">'+pct(val,total)+'</span></div>';
 }
 
 /* ── TICKETS TAB ── */
@@ -548,7 +552,7 @@ function renderTickets(){
     var ftClass=t.fixType==="Data Fix"?"df":t.fixType==="Bug Fix"?"bf":"wa";
     var stClass=t.closed?"closed":"open";
     h+='<tr>'+
-      '<td><span class="jkey">'+esc(t.key)+'</span></td>'+
+      '<td><a class="jkey" href="'+JIRA+encodeURIComponent(t.key)+'" target="_blank" rel="noreferrer">'+esc(t.key)+'</a></td>'+
       '<td class="trunc" title="'+esc(t.summary)+'">'+esc(t.summary)+'</td>'+
       '<td><span class="badge '+ftClass+'">'+esc(t.fixType)+'</span></td>'+
       '<td><span class="badge '+stClass+'">'+esc(t.status)+'</span></td>'+
@@ -611,7 +615,7 @@ function renderTrend(){
     var H=200;
     var dfH=m.df/mmax*H, bfH=m.bf/mmax*H, waH=m.wa/mmax*H;
     var label=k.split("-")[1]+"/"+k.split("-")[0].slice(2);
-    h+='<div class="mbar-group"><div class="mbar-total">'+m.total+'</div><div class="mbar-stack" style="height:'+H+'px">'+
+    h+='<div class="mbar-group" data-monthdrill="'+k+'" style="cursor:pointer"><div class="mbar-total">'+m.total+'</div><div class="mbar-stack" style="height:'+H+'px">'+
       '<div class="mbar df growb" style="height:'+dfH+'px" title="Data Fix: '+m.df+'"></div>'+
       '<div class="mbar bf growb" style="height:'+bfH+'px" title="Bug Fix: '+m.bf+'"></div>'+
       '<div class="mbar wa growb" style="height:'+waH+'px" title="Workaround: '+m.wa+'"></div>'+
@@ -662,7 +666,7 @@ function renderTrend(){
       var w=weekBuckets[k];
       var H=160;
       var dfH=w.df/wmax*H, bfH=w.bf/wmax*H, waH=w.wa/wmax*H;
-      h+='<div class="mbar-group"><div class="mbar-total">'+w.total+'</div><div class="mbar-stack" style="height:'+H+'px">'+
+      h+='<div class="mbar-group" data-weekdrill="'+k+'" style="cursor:pointer"><div class="mbar-total">'+w.total+'</div><div class="mbar-stack" style="height:'+H+'px">'+
         '<div class="mbar df growb" style="height:'+dfH+'px"></div>'+
         '<div class="mbar bf growb" style="height:'+bfH+'px"></div>'+
         '<div class="mbar wa growb" style="height:'+waH+'px"></div>'+
@@ -680,7 +684,7 @@ function renderTrend(){
 function openModal(title,tickets){
   var mv=el("modalOv");
   el("modalTitle").textContent=title;
-  el("modalSub").textContent=tickets.length+" tickets";
+  el("modalSub").textContent=tickets.length+" tickets · click a key to open in Jira";
 
   var cols=["Key","Summary","Fix Type","Status","Project","SVM In Charge","Root Cause","Type of Fix",
     "Release Number","Release Number (Data Fix)","Parent Release No","Priority","Created","Resolved",
@@ -693,7 +697,7 @@ function openModal(title,tickets){
     var stC=t.closed?"closed":"open";
     h+='<tr>';
     cols.forEach(function(c){
-      if(c==="Key") h+='<td><span class="jkey">'+esc(t.key)+'</span></td>';
+      if(c==="Key") h+='<td><a class="jkey" href="'+JIRA+encodeURIComponent(t.key)+'" target="_blank" rel="noreferrer">'+esc(t.key)+'</a></td>';
       else if(c==="Summary") h+='<td class="trunc" style="max-width:300px" title="'+esc(t.summary)+'">'+esc(t.summary)+'</td>';
       else if(c==="Fix Type") h+='<td><span class="badge '+ftC+'">'+esc(t.fixType)+'</span></td>';
       else if(c==="Status") h+='<td><span class="badge '+stC+'">'+esc(t.status)+'</span></td>';
@@ -710,9 +714,10 @@ function openModal(title,tickets){
       else if(c==="Current Worker") h+='<td>'+esc(t.worker||"—")+'</td>';
       else if(c==="Components") h+='<td style="font-size:10.5px">'+esc(t.components||"—")+'</td>';
       else if(c==="Issue Type") h+='<td>'+esc(t.issueType)+'</td>';
+      else if(c==="Linked Issues") h+='<td>'+(t.linked?'<a class="jkey" style="color:var(--bf)" href="'+JIRA+encodeURIComponent(t.linked.split(";")[0].trim())+'" target="_blank" rel="noreferrer">'+esc(t.linked.split(";")[0])+'</a>':'<span style="color:var(--faint)">—</span>')+'</td>';
       else{
-        var val=t[c.toLowerCase().replace(/ /g,"").replace(/[()]/g,"")]||t[c]||"—";
-        if(typeof val==="object"&&val) val=fmtD(val);
+        var map={severity:"severity",reporter:"reporter",assignee:"assignee","screen name":"screenName","next action":"nextAction","linked ticket status":"linkedStatus",analysis:"analysis","time to resolution":"ttr"};
+        var mk=c.toLowerCase(); var val=t[map[mk]]||"—";
         h+='<td style="font-size:11px">'+esc(val)+'</td>';
       }
     });
@@ -803,6 +808,12 @@ function handleUpload(e){
   e.target.value="";
 }
 
+/* ── helper: filter tickets for drill ── */
+function drillTickets(filterFn,title){
+  var tix=FILTERED.filter(filterFn);
+  openModal(title,tix);
+}
+
 /* ── EVENT BINDING ── */
 function bindAll(){
   // tabs
@@ -823,28 +834,82 @@ function bindAll(){
   var rb=el("resetBtn");if(rb)rb.onclick=function(){
     S.search="";S.proj="";S.svm="";S.fixType="";S.status="";S.from="";S.to="";S.kpiFilter="";S.page=0;render();};
 
-  // KPI clicks
+  // KPI clicks → single-click opens drill modal directly
   document.querySelectorAll("[data-kpi]").forEach(function(k){
     k.onclick=function(){
       var id=k.dataset.kpi;
-      if(S.kpiFilter===id){S.kpiFilter="";} else {S.kpiFilter=id;}
-      // If user clicks a kpi, switch to tickets tab to show the data
-      if(S.kpiFilter){S.tab="tickets";}
-      S.page=0;render();
-    };
-    k.ondblclick=function(){
-      // Double-click opens full modal with ALL columns
-      var id=k.dataset.kpi;
-      var tix=FILTERED.filter(function(t){
+      var labels={total:"All Release Tickets",df:"Data Fix Tickets",bf:"Bug Fix Tickets",wa:"Workaround Tickets",closed:"Closed Tickets",open:"Outstanding Tickets"};
+      drillTickets(function(t){
         if(id==="df")return t.fixType==="Data Fix";
         if(id==="bf")return t.fixType==="Bug Fix";
         if(id==="wa")return t.fixType==="Workaround";
         if(id==="closed")return t.closed;
         if(id==="open")return !t.closed;
         return true;
-      });
-      var labels={total:"All Release Tickets",df:"Data Fix Tickets",bf:"Bug Fix Tickets",wa:"Workaround Tickets",closed:"Closed Tickets",open:"Outstanding Tickets"};
-      openModal(labels[id]||"Tickets",tix);
+      },labels[id]||"Tickets");
+    };
+  });
+
+  // Donut legend clicks
+  document.querySelectorAll("[data-drill]").forEach(function(r){
+    r.onclick=function(){
+      var id=r.dataset.drill;
+      var labels={df:"Data Fix Tickets",bf:"Bug Fix Tickets",wa:"Workaround Tickets"};
+      var types={df:"Data Fix",bf:"Bug Fix",wa:"Workaround"};
+      drillTickets(function(t){return t.fixType===types[id];},labels[id]||"Tickets");
+    };
+  });
+
+  // Project bar clicks → drill into that project
+  document.querySelectorAll("[data-projdrill]").forEach(function(b){
+    b.onclick=function(){
+      var proj=b.dataset.projdrill;
+      drillTickets(function(t){return t.project===proj;},proj+" — All Releases");
+    };
+  });
+
+  // SVM table cell clicks
+  document.querySelectorAll("[data-svmdrill]").forEach(function(td){
+    td.onclick=function(){
+      var svm=td.dataset.svmdrill, type=td.dataset.svmtype;
+      var labels={total:"All",df:"Data Fix",bf:"Bug Fix",wa:"Workaround",closed:"Closed",open:"Outstanding"};
+      drillTickets(function(t){
+        if(t.svm!==svm&&!(svm==="(unassigned)"&&!t.svm)) return false;
+        if(type==="df")return t.fixType==="Data Fix";
+        if(type==="bf")return t.fixType==="Bug Fix";
+        if(type==="wa")return t.fixType==="Workaround";
+        if(type==="closed")return t.closed;
+        if(type==="open")return !t.closed;
+        return true;
+      },svm+" — "+labels[type]+" Tickets");
+    };
+  });
+
+  // Monthly bar clicks → drill into that month
+  document.querySelectorAll("[data-monthdrill]").forEach(function(b){
+    b.onclick=function(){
+      var mk=b.dataset.monthdrill;
+      var parts=mk.split("-");var yr=parseInt(parts[0]),mo=parseInt(parts[1]);
+      drillTickets(function(t){
+        if(!t.created)return false;
+        return t.created.getFullYear()===yr&&(t.created.getMonth()+1)===mo;
+      },mk+" — Monthly Releases");
+    };
+  });
+
+  // Weekly bar clicks → drill into that week
+  document.querySelectorAll("[data-weekdrill]").forEach(function(b){
+    b.onclick=function(){
+      var wk=b.dataset.weekdrill;
+      // compute ISO week for each ticket and match
+      drillTickets(function(t){
+        if(!t.created)return false;
+        var d=new Date(t.created);d.setHours(0,0,0,0);
+        var thu=new Date(d);thu.setDate(d.getDate()+(3-(d.getDay()+6)%7));
+        var yr=thu.getFullYear();
+        var wn=1+Math.floor((thu-new Date(yr,0,4))/604800000);
+        return wk===yr+"-W"+String(wn).padStart(2,"0");
+      },wk+" — Weekly Releases");
     };
   });
 
@@ -868,11 +933,6 @@ function bindAll(){
       else S.page=pages-1;
       render();
     };
-  });
-
-  // project bar click → set project filter
-  document.querySelectorAll("[data-proj]").forEach(function(b){
-    b.onclick=function(){S.proj=b.dataset.proj;S.page=0;render();};
   });
 
   // modal close
